@@ -6,7 +6,6 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
 from . import scanner, mismatches, unused
-from .scanner import _DISPLAY_NAMES
 
 mcp = FastMCP("Envexa")
 
@@ -35,9 +34,14 @@ def check_outdated(chain: str | None = "all") -> str:
     results = report["results"]
 
     lines = ["# Outdated Packages\n"]
+    lines.append("| Toolchain | Package | Current | Latest |")
+    lines.append("|-----------|---------|---------|--------|")
     has_anything = False
 
-    for tool, res in results.items():
+    for tool in ("brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker"):
+        res = results.get(tool)
+        if not res:
+            continue
         items = []
         for key in ("outdated_formulae", "outdated_casks", "outdated_global", "outdated"):
             if key in res and res[key]:
@@ -45,13 +49,9 @@ def check_outdated(chain: str | None = "all") -> str:
 
         if items:
             has_anything = True
-            display = _DISPLAY_NAMES.get(tool, tool.title())
-            lines.append(f"## {display} ({len(items)} outdated)\n")
+            display = scanner._DISPLAY_NAMES.get(tool, tool.title())
             for item in items:
-                lines.append(
-                    f"- **{item['name']}**: {item.get('current', '?')} -> {item.get('latest', '?')}"
-                )
-            lines.append("")
+                lines.append(f"| {display} | {item['name']} | {item.get('current', '?')} | {item.get('latest', '?')} |")
 
     if not has_anything:
         return "All packages are up to date!"
@@ -140,27 +140,7 @@ def cmd(command: str) -> str:
 
     if cmd_name in ("/status", "status"):
         report = scanner.run_scan("all")
-        results = report["results"]
-        rows = []
-        for tool in ("brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker"):
-            if tool not in results:
-                continue
-            res = results[tool]
-            label = {"ok": "PASS", "warning": "WARN", "error": "FAIL", "skipped": "SKIP"}.get(res["status"], "?")
-            n = len(scanner._extract_outdated(res))
-            detail = f"({n})" if n else ""
-            display = _DISPLAY_NAMES.get(tool, tool.title())
-            rows.append(f"| {display:8} | {label:<6} {detail:<8} |")
-        lines = [
-            "# Envexa Status",
-            "",
-            f"| {'Tool':8} | {'Status':<16} |",
-            f"|{'-'*10}|{'-'*18}|",
-            *rows,
-            "",
-            "Run `/envexa:scan` for full report or `/envexa:outdated` for details.",
-        ]
-        return "\n".join(lines)
+        return scanner.format_status(report)
 
     if cmd_name in ("/report", "report"):
         return get_report()
@@ -194,10 +174,10 @@ def prompt_scan() -> list[dict]:
     return [{"role": "assistant", "content": scanner.format_report(report)}]
 
 
-@mcp.prompt(name="envexa:status", description="Envexa — full health report of all toolchains")
+@mcp.prompt(name="envexa:status", description="Envexa — quick dashboard overview of all toolchains")
 def prompt_status() -> list[dict]:
     report = scanner.run_scan("all")
-    return [{"role": "assistant", "content": scanner.format_report(report)}]
+    return [{"role": "assistant", "content": scanner.format_status(report)}]
 
 
 @mcp.prompt(name="envexa:outdated", description="Envexa — list outdated packages across all toolchains")
@@ -205,19 +185,23 @@ def prompt_outdated() -> list[dict]:
     report = scanner.run_scan("all")
     results = report["results"]
     lines = ["# Envexa Outdated Packages\n"]
+    lines.append("| Toolchain | Package | Current | Latest |")
+    lines.append("|-----------|---------|---------|--------|")
     has_anything = False
-    for tool, res in results.items():
+    display_names = scanner._DISPLAY_NAMES
+    for tool in ("brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker"):
+        res = results.get(tool)
+        if not res:
+            continue
         items = []
         for key in ("outdated_formulae", "outdated_casks", "outdated_global", "outdated"):
             if key in res and res[key]:
                 items.extend(res[key])
         if items:
             has_anything = True
-            display = _DISPLAY_NAMES.get(tool, tool.title())
-            lines.append(f"## {display} ({len(items)} outdated)\n")
+            display = display_names.get(tool, tool.title())
             for item in items:
-                lines.append(f"- **{item['name']}**: {item.get('current', '?')} -> {item.get('latest', '?')}")
-            lines.append("")
+                lines.append(f"| {display} | {item['name']} | {item.get('current', '?')} | {item.get('latest', '?')} |")
     if not has_anything:
         lines = ["# Envexa Outdated Packages\n\nAll packages are up to date!"]
     return [{"role": "assistant", "content": "\n".join(lines)}]

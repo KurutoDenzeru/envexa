@@ -69,20 +69,13 @@ Then restart opencode or reload MCP servers.
 
 ## Slash Commands
 
-Type these directly in chat or pass to the `envexa_cmd` tool:
+These are **Envexa-specific** commands — use the `envexa:` prefix to distinguish from other agents (codex, claude, gemini, opencode) that also expose `/status` and similar commands:
 
 | Command | What it does |
 |---------|--------------|
-| `/scan [chain]` | Full health scan (default: all toolchains) |
-| `/outdated [chain]` | Outdated packages only |
-| `/status` | Quick dashboard summary |
-| `/upgrade pip` | Upgrade pip to latest |
-| `/report` | Show the last cached report |
-| `/help` | Show all available slash commands |
-
-Examples: `/scan brew`, `/scan pnpm`, `/status`
-
-> **Pro tip:** When the AI agent is active, just type `/scan` in chat and it'll handle the tool call for you.
+| `/envexa:scan` | Full health scan (default: all toolchains) |
+| `/envexa:outdated` | Outdated packages only |
+| `/envexa:status` | Quick dashboard summary (Envexa-specific) |
 
 ---
 
@@ -114,12 +107,12 @@ Examples: `/scan brew`, `/scan pnpm`, `/status`
 
 ## MCP Prompts
 
-These appear in opencode's `/` menu — no parameters needed, they run immediately:
+These appear in opencode's `/` menu — the `envexa:` prefix ensures they don't conflict with other agents:
 
 | Menu entry | What it does |
 |------------|-------------|
 | `/envexa:envexa_scan` | Full health report |
-| `/envexa:envexa_status` | Full health report (same as scan) |
+| `/envexa:envexa_status` | Quick dashboard summary |
 | `/envexa:envexa_outdated` | Outdated packages across all toolchains |
 
 ---

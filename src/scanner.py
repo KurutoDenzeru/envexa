@@ -114,21 +114,17 @@ def format_report(report: dict = None) -> str:
 
     if outdated_all:
         lines.append("## Outdated Packages")
-        lines.append("```")
-        tool_names = list(outdated_all.keys())
-        for i, tool in enumerate(tool_names):
-            icon = _ICONS.get(tool, "")
-            items = outdated_all[tool]
-            is_last_tool = i == len(tool_names) - 1
-            tool_prefix = "└── " if is_last_tool else "├── "
+        lines.append("")
+        lines.append("| Toolchain | Package | Current | Latest |")
+        lines.append("|-----------|---------|---------|--------|")
+        for tool in ("brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker"):
+            items = outdated_all.get(tool)
+            if not items:
+                continue
             display = _DISPLAY_NAMES.get(tool, tool.title())
-            lines.append(f"{tool_prefix}{icon} {display} ({len(items)})")
-            indent_prefix = "    " if is_last_tool else "│   "
-            for j, item in enumerate(items):
-                sub_prefix = "└── " if j == len(items) - 1 else "├── "
-                ver = f"{item.get('current', '?')} -> {item.get('latest', '?')}"
-                lines.append(f"{indent_prefix}{sub_prefix}{item['name']}: {ver}")
-        lines.append("```")
+            icon = _ICONS.get(tool, "")
+            for item in items:
+                lines.append(f"| {icon} {display} | {item['name']} | {item.get('current', '?')} | {item.get('latest', '?')} |")
         lines.append("")
 
     lines.append("## Per-Toolchain Details")
@@ -177,4 +173,35 @@ def format_report(report: dict = None) -> str:
 
         lines.append("")
 
+    return "\n".join(lines)
+
+
+def format_status(report: dict = None) -> str:
+    if report is None:
+        if REPORT_FILE.exists():
+            report = json.loads(REPORT_FILE.read_text())
+        else:
+            return "No report available. Run `scan` first."
+
+    results = report["results"]
+    lines = []
+    lines.append("# Envexa Status")
+    lines.append(f"**Generated:** {report['timestamp']}")
+    lines.append("")
+    lines.append("| Toolchain | Status | Count |")
+    lines.append("|-----------|--------|-------|")
+    for tool in ("brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker"):
+        if tool not in results:
+            continue
+        res = results[tool]
+        icon = _ICONS.get(tool, "")
+        label = _LABELS.get(res["status"], "?")
+        emoji = _STATUS_EMOJI.get(res["status"], "")
+        outdated = _extract_outdated(res)
+        n = len(outdated)
+        display = _DISPLAY_NAMES.get(tool, tool.title())
+        count = f"({n})" if n else ""
+        lines.append(f"| {icon} {display} | {emoji} {label} | {count} |")
+    lines.append("")
+    lines.append("Run `/envexa:scan` for full report or `/envexa:outdated` for details.")
     return "\n".join(lines)
