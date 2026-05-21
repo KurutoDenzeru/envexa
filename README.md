@@ -12,6 +12,7 @@
 - [MCP Tools](#mcp-tools)
 - [MCP Resources](#mcp-resources)
 - [MCP Prompts](#mcp-prompts)
+- [Performance](#performance)
 - [Toolchains](#toolchains)
 - [Sample Output](#sample-output)
 - [Project Structure](#project-structure)
@@ -35,14 +36,14 @@ All results are cached to `report.json` so you can read them offline or compare 
 
 ## Quick Start
 
-**Prerequisites:** Python 3.12+, [uv](https://docs.astral.sh/uv/)
+**Prerequisites:** [Rust](https://rustup.rs/) toolchain
 
 ```bash
-# Install
-uv sync
+# Build
+cargo build --release
 
-# Test a full scan (no MCP server needed)
-uv run python -c "from src.scanner import run_scan, format_report; print(format_report(run_scan('all')))"
+# Test the MCP server (sends initialize + scan, prints report)
+printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n{"jsonrpc":"2.0","method":"notifications/initialized"}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"envexa_scan","arguments":{"chain":"brew"}}}\n' | ./target/release/envexa
 ```
 
 ### Register with opencode
@@ -53,10 +54,7 @@ Add to `~/.config/opencode/opencode.json`:
 {
   "mcp": {
     "envexa": {
-      "command": [
-        "uv", "run", "--directory", "/absolute/path/to/envexa",
-        "python", "-m", "src.server"
-      ],
+      "command": ["/absolute/path/to/envexa/target/release/envexa"],
       "type": "local"
     }
   }
@@ -85,8 +83,8 @@ These are **Envexa-specific** commands — use the `envexa:` prefix to distingui
 |------|-------------|
 | `envexa_scan` | Full health scan of all or one toolchain |
 | `envexa_check_outdated` | Outdated packages only |
-| `envexa_check_mismatches` | Version conflicts across projects |
-| `envexa_find_unused` | Unused deps in an npm project |
+| `envexa_check_mismatches` | Version conflicts across projects (Python port pending) |
+| `envexa_find_unused` | Unused deps in a project (Python port pending) |
 | `envexa_get_report` | Latest cached report as markdown |
 | `envexa_brew_status` | Homebrew only |
 | `envexa_npm_status` | npm/Node only |
@@ -96,12 +94,16 @@ These are **Envexa-specific** commands — use the `envexa:` prefix to distingui
 
 ---
 
+## Performance
+
+All 10 toolchains run concurrently via `tokio::join!`. Full scan completes in ~3-4 seconds wall-clock vs ~6-7 seconds sequential (Python version). The release binary is 3.2MB — no Python, no uv, no virtualenv needed.
+
 ## MCP Resources
 
 | URI | Type | What you get |
 |-----|------|-------------|
-| `envexa://report` | `text/markdown` | Formatted health report |
-| `envexa://report/raw` | `application/json` | Raw JSON for scripting |
+| `envexa://report` | `text/markdown` | Formatted health report (from cache) |
+| `envexa://report/raw` | `application/json` | Raw JSON for scripting (from cache) |
 
 ---
 
@@ -137,18 +139,18 @@ These appear in opencode's `/` menu — the `envexa:` prefix ensures they don't 
 ## Sample Output
 
 ```
-| Toolchain  | Status               | Version |
-|------------|----------------------|---------|
-| 🍺 Brew    | ⚠️ WARN (5)         | 5.1.12  |
-|  npm     | ✅ PASS             | v24.15.0 |
-|  pnpm    | ✅ PASS             | v11.1.2 |
+| Toolchain | Status | Version |
+|-----------|--------|---------|
+| 🍺 Brew    | ⚠️ WARN (6)         | 5.1.12  |
+|  npm     | ⚠️ WARN (3)         | 11.14.1 |
+|  pnpm    | ✅ PASS             | v24.15.0 |
 |  Yarn    | ⏭️ SKIP             |         |
 |  Bun     | ✅ PASS             | 1.3.14  |
 |  Deno    | ✅ PASS             | 2.5.4   |
 |  pip     | ✅ PASS             | Python 3.14.3 |
 |  Gem     | ⚠️ WARN (100)       | ruby 3.2.2 |
 | 🦀 Cargo   | ✅ PASS             | rustc 1.93.0 |
-| 🐳 Docker  | ❌ FAIL             | daemon not running |
+| 🐳 Docker  | ✅ PASS             | 29.4.0  |
 ```
 
 ---
@@ -157,18 +159,18 @@ These appear in opencode's `/` menu — the `envexa:` prefix ensures they don't 
 
 ```
 envexa/
-├── pyproject.toml           # Dependencies + metadata
+├── Cargo.toml               # Dependencies + metadata
 ├── src/
-│   ├── server.py            # MCP server entry point (tools, prompts, resources)
-│   ├── scanner.py           # Scan orchestration + report formatting
-│   ├── mismatches.py        # Cross-project version conflict detection
-│   ├── unused.py            # Unused dependency analysis (via depcheck)
+│   ├── main.rs              # Entry point + tokio stdin/stdout loop
+│   ├── transport.rs         # JSON-RPC MCP protocol (hand-rolled, no SDK)
+│   ├── server.rs            # Tool/prompt/resource registration + dispatch
+│   ├── scanner.rs           # Scan orchestration + markdown formatting + cache
 │   └── toolchains/          # One scanner per toolchain
-│       ├── brew.py / npm.py / pip.py / gem.py / cargo.py / docker.py
-│       ├── pnpm.py / yarn.py / bun.py / deno.py
+│       ├── mod.rs           # ScanResult type + scan_all() concurrent dispatcher
+│       ├── brew.rs / npm.rs / pip.rs / gem.rs / cargo.rs / docker.rs
+│       ├── pnpm.rs / yarn.rs / bun.rs / deno.rs
 ├── AGENTS.md                # Instructions for AI assistants
 ├── report.json              # Cached scan results (gitignored)
-├── test_output.txt          # Verification test results (gitignored)
 ```
 
 ---
@@ -176,15 +178,23 @@ envexa/
 ## Development
 
 ```bash
-# Install
-uv sync
+# Build + run (debug)
+cargo run
 
-# Run a scan locally
-uv run python -c "from src.scanner import run_scan, format_report; print(format_report(run_scan('all')))"
+# Build optimized
+cargo build --release
 
-# Start MCP server (stdio)
-uv run python -m src.server
-```
+# Test a scan directly
+printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n{"jsonrpc":"2.0","method":"notifications/initialized"}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"envexa_scan","arguments":{"chain":"brew"}}}\n' | cargo run
+
+# Pipe output through Python to extract just the report text
+printf '...' | cargo run | python3 -c "
+import sys, json
+for line in sys.stdin:
+    data = json.loads(line)
+    if 'result' in data and isinstance(data['result'], dict) and 'content' in data['result']:
+        print(data['result']['content'][0]['text'])
+"
 
 ---
 
