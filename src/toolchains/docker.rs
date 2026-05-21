@@ -24,9 +24,9 @@ pub async fn scan() -> ScanResult {
     };
 
     if info_check.status.success() {
-        if let Ok(info) = serde_json::from_str::<serde_json::Value>(
-            &String::from_utf8_lossy(&info_check.stdout),
-        ) {
+        if let Ok(info) =
+            serde_json::from_str::<serde_json::Value>(&String::from_utf8_lossy(&info_check.stdout))
+        {
             let mut disk = serde_json::Map::new();
             if let Some(driver) = info["Driver"].as_str() {
                 disk.insert("driver".into(), serde_json::Value::String(driver.into()));

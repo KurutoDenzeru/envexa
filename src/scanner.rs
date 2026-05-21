@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::toolchains::{self, ScanResult, PackageInfo};
+use crate::toolchains::{self, PackageInfo, ScanResult};
 
 #[derive(Clone)]
 pub struct ReportCache {
@@ -17,7 +17,9 @@ pub struct Report {
 
 impl ReportCache {
     pub fn new() -> Self {
-        Self { inner: Arc::new(Mutex::new(None)) }
+        Self {
+            inner: Arc::new(Mutex::new(None)),
+        }
     }
 
     pub async fn set(&self, report: Report) {
@@ -74,28 +76,51 @@ const DISPLAY_NAMES: &[(&str, &str)] = &[
 ];
 
 fn tool_order() -> [&'static str; 10] {
-    ["brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker"]
+    [
+        "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker",
+    ]
 }
 
 fn display_name(tool: &str) -> &str {
-    DISPLAY_NAMES.iter().find(|(k, _)| *k == tool).map(|(_, v)| *v).unwrap_or(tool)
+    DISPLAY_NAMES
+        .iter()
+        .find(|(k, _)| *k == tool)
+        .map(|(_, v)| *v)
+        .unwrap_or(tool)
 }
 
 fn icon(tool: &str) -> &str {
-    ICONS.iter().find(|(k, _)| *k == tool).map(|(_, v)| *v).unwrap_or("")
+    ICONS
+        .iter()
+        .find(|(k, _)| *k == tool)
+        .map(|(_, v)| *v)
+        .unwrap_or("")
 }
 
 fn status_emoji(s: &str) -> &str {
-    STATUS_EMOJI.iter().find(|(k, _)| *k == s).map(|(_, v)| *v).unwrap_or("")
+    STATUS_EMOJI
+        .iter()
+        .find(|(k, _)| *k == s)
+        .map(|(_, v)| *v)
+        .unwrap_or("")
 }
 
 fn status_label(s: &str) -> &str {
-    LABELS.iter().find(|(k, _)| *k == s).map(|(_, v)| *v).unwrap_or("?")
+    LABELS
+        .iter()
+        .find(|(k, _)| *k == s)
+        .map(|(_, v)| *v)
+        .unwrap_or("?")
 }
 
 fn extract_outdated(res: &ScanResult) -> Vec<&PackageInfo> {
     let mut items = vec![];
-    for key in ["outdated_formulae", "outdated_casks", "outdated_global", "outdated"] {
+    for key in [
+        "outdated_formulae",
+        "outdated_casks",
+        "outdated_global",
+        "outdated",
+    ] {
         match key {
             "outdated_formulae" => items.extend(res.outdated_formulae.iter()),
             "outdated_casks" => items.extend(res.outdated_casks.iter()),
@@ -117,8 +142,17 @@ fn status_text(res: &ScanResult) -> String {
 }
 
 fn first_version(res: &ScanResult) -> String {
-    let fields = ["version", "node_version", "python_version", "ruby_version",
-                   "rustc_version", "cargo_version", "pnpm_version", "bun_version", "deno_version"];
+    let fields = [
+        "version",
+        "node_version",
+        "python_version",
+        "ruby_version",
+        "rustc_version",
+        "cargo_version",
+        "pnpm_version",
+        "bun_version",
+        "deno_version",
+    ];
     for f in fields {
         let val = match f {
             "version" => &res.version,
@@ -161,7 +195,9 @@ pub fn format_report(report: &Report) -> String {
             let status_txt = status_text(res);
             let ver = first_version(res);
             let display = display_name(tool);
-            dashboard_rows.push(format!("| {icon} {display:7} | {status_emoji} {status_txt:<16} | {ver} |"));
+            dashboard_rows.push(format!(
+                "| {icon} {display:7} | {status_emoji} {status_txt:<16} | {ver} |"
+            ));
         }
     }
 
@@ -183,7 +219,10 @@ pub fn format_report(report: &Report) -> String {
                 let display = display_name(tool);
                 let ic = icon(tool);
                 for item in items {
-                    lines.push(format!("| {ic} {display} | {} | {} | {} |", item.name, item.current, item.latest));
+                    lines.push(format!(
+                        "| {ic} {display} | {} | {} | {} |",
+                        item.name, item.current, item.latest
+                    ));
                 }
             }
         }
@@ -218,22 +257,25 @@ pub fn format_report(report: &Report) -> String {
                 ("bun_version", &res.bun_version),
                 ("deno_version", &res.deno_version),
             ];
-            let ver_parts: Vec<String> = version_labels.iter()
-                .filter_map(|(key, val)| val.as_ref().map(|v| {
-                    let label = match *key {
-                        "version" => "Version",
-                        "node_version" => "Node",
-                        "python_version" => "Python",
-                        "ruby_version" => "Ruby",
-                        "rustc_version" => "Rust",
-                        "cargo_version" => "Cargo",
-                        "pnpm_version" => "pnpm",
-                        "bun_version" => "Bun",
-                        "deno_version" => "Deno",
-                        _ => key,
-                    };
-                    format!("**{label}:** {v}")
-                }))
+            let ver_parts: Vec<String> = version_labels
+                .iter()
+                .filter_map(|(key, val)| {
+                    val.as_ref().map(|v| {
+                        let label = match *key {
+                            "version" => "Version",
+                            "node_version" => "Node",
+                            "python_version" => "Python",
+                            "ruby_version" => "Ruby",
+                            "rustc_version" => "Rust",
+                            "cargo_version" => "Cargo",
+                            "pnpm_version" => "pnpm",
+                            "bun_version" => "Bun",
+                            "deno_version" => "Deno",
+                            _ => key,
+                        };
+                        format!("**{label}:** {v}")
+                    })
+                })
                 .collect();
             if !ver_parts.is_empty() {
                 lines.push(ver_parts.join(" | "));
@@ -258,7 +300,10 @@ pub fn format_report(report: &Report) -> String {
                 lines.push("| Package | Current | Latest |".into());
                 lines.push("|---------|---------|--------|".into());
                 for item in &outdated_items {
-                    lines.push(format!("| {} | {} | {} |", item.name, item.current, item.latest));
+                    lines.push(format!(
+                        "| {} | {} | {} |",
+                        item.name, item.current, item.latest
+                    ));
                 }
             }
 
@@ -288,7 +333,11 @@ pub fn format_status(report: &Report) -> String {
             let emoji = status_emoji(&res.status);
             let label = status_label(&res.status);
             let n = extract_outdated(res).len();
-            let count = if n > 0 { format!("({n})") } else { String::new() };
+            let count = if n > 0 {
+                format!("({n})")
+            } else {
+                String::new()
+            };
             let display = display_name(tool);
             lines.push(format!("| {ic} {display} | {emoji} {label} | {count} |"));
         }
@@ -301,11 +350,12 @@ pub fn format_status(report: &Report) -> String {
 
 pub fn format_outdated(report: &Report) -> String {
     let results = &report.results;
-    let mut lines = vec![];
-    lines.push("# Outdated Packages".into());
-    lines.push(String::new());
-    lines.push("| Toolchain | Package | Current | Latest |".into());
-    lines.push("|-----------|---------|---------|--------|".into());
+    let mut lines = vec![
+        "# Outdated Packages".into(),
+        String::new(),
+        "| Toolchain | Package | Current | Latest |".into(),
+        "|-----------|---------|---------|--------|".into(),
+    ];
 
     let mut has_anything = false;
     for tool in &tool_order() {
@@ -315,7 +365,10 @@ pub fn format_outdated(report: &Report) -> String {
                 has_anything = true;
                 let display = display_name(tool);
                 for item in &items {
-                    lines.push(format!("| {display} | {} | {} | {} |", item.name, item.current, item.latest));
+                    lines.push(format!(
+                        "| {display} | {} | {} | {} |",
+                        item.name, item.current, item.latest
+                    ));
                 }
             }
         }

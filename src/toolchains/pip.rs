@@ -31,7 +31,11 @@ pub async fn scan() -> ScanResult {
         }
     }
 
-    result.status = if result.outdated.is_empty() { "ok".into() } else { "warning".into() };
+    result.status = if result.outdated.is_empty() {
+        "ok".into()
+    } else {
+        "warning".into()
+    };
 
     result
 }

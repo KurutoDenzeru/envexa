@@ -29,7 +29,7 @@ pub async fn scan() -> ScanResult {
                 result.outdated.push(PackageInfo {
                     name: cap[1].to_string(),
                     current: cap[2].to_string(),
-                    latest: if cap.get(3).map_or(true, |m| m.as_str().is_empty()) {
+                    latest: if cap.get(3).is_none_or(|m| m.as_str().is_empty()) {
                         "?".to_string()
                     } else {
                         cap[3].to_string()
@@ -40,7 +40,11 @@ pub async fn scan() -> ScanResult {
     }
 
     let n = result.outdated.len();
-    result.status = if n == 0 { "ok".into() } else { "warning".into() };
+    result.status = if n == 0 {
+        "ok".into()
+    } else {
+        "warning".into()
+    };
     if n > 0 {
         result.issues.push(format!("{n} outdated gem(s)"));
     }

@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
 use crate::scanner::{self, ReportCache};
 use crate::toolchains;
@@ -178,41 +178,36 @@ impl McpServer {
             "envexa_scan" => {
                 let chain = str_val(args, "chain");
                 let chain = if chain.is_empty() { "all" } else { &chain };
-                Ok(Value::String(
-                    tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(async {
-                            scanner::scan_and_cache(&self.cache, chain).await
-                        })
-                    })
-                ))
+                Ok(Value::String(tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current()
+                        .block_on(async { scanner::scan_and_cache(&self.cache, chain).await })
+                })))
             }
             "envexa_check_outdated" => {
                 let chain = str_val(args, "chain");
                 let chain = if chain.is_empty() { "all" } else { &chain };
-                Ok(Value::String(
-                    tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(async {
-                            let results = if chain == "all" {
-                                toolchains::scan_all().await
-                            } else if let Some(res) = toolchains::scan_one(chain).await {
-                                let mut map = HashMap::new();
-                                map.insert(chain.to_string(), res);
-                                map
-                            } else {
-                                return format!("Unknown chain: {chain}");
-                            };
-                            let report = scanner::Report {
-                                timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
-                                results,
-                            };
-                            scanner::format_outdated(&report)
-                        })
+                Ok(Value::String(tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        let results = if chain == "all" {
+                            toolchains::scan_all().await
+                        } else if let Some(res) = toolchains::scan_one(chain).await {
+                            let mut map = HashMap::new();
+                            map.insert(chain.to_string(), res);
+                            map
+                        } else {
+                            return format!("Unknown chain: {chain}");
+                        };
+                        let report = scanner::Report {
+                            timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
+                            results,
+                        };
+                        scanner::format_outdated(&report)
                     })
-                ))
+                })))
             }
-            "envexa_check_mismatches" => {
-                Ok(Value::String("Version mismatch detection not yet implemented in Rust".into()))
-            }
+            "envexa_check_mismatches" => Ok(Value::String(
+                "Version mismatch detection not yet implemented in Rust".into(),
+            )),
             "envexa_find_unused" => {
                 let project = str_val(args, "project");
                 Ok(Value::String(format!("Unused dependency analysis not yet implemented in Rust. Check the Python version for project: {project}")))
@@ -235,9 +230,7 @@ impl McpServer {
             "envexa_bun_status" => self.scan_single("bun"),
             "envexa_deno_status" => self.scan_single("deno"),
             "envexa_pip_status" => self.scan_single("pip"),
-            "envexa_pip_upgrade" => {
-                Ok(Value::String(self.cmd_handler("/upgrade pip")))
-            }
+            "envexa_pip_upgrade" => Ok(Value::String(self.cmd_handler("/upgrade pip"))),
             "envexa_cmd" => {
                 let cmd = str_val(args, "command");
                 Ok(Value::String(self.cmd_handler(&cmd)))
@@ -247,48 +240,38 @@ impl McpServer {
     }
 
     fn scan_single(&self, chain: &str) -> Result<Value, String> {
-        Ok(Value::String(
-            tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    scanner::scan_and_cache(&self.cache, chain).await
-                })
-            })
-        ))
+        Ok(Value::String(tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current()
+                .block_on(async { scanner::scan_and_cache(&self.cache, chain).await })
+        })))
     }
 
     pub fn handle_prompt(&self, name: &str) -> Result<Value, String> {
         let text = match name {
-            "envexa:scan" => {
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        scanner::scan_and_cache(&self.cache, "all").await
-                    })
+            "envexa:scan" => tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current()
+                    .block_on(async { scanner::scan_and_cache(&self.cache, "all").await })
+            }),
+            "envexa:status" => tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    let results = toolchains::scan_all().await;
+                    let report = scanner::Report {
+                        timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
+                        results,
+                    };
+                    scanner::format_status(&report)
                 })
-            }
-            "envexa:status" => {
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        let results = toolchains::scan_all().await;
-                        let report = scanner::Report {
-                            timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
-                            results,
-                        };
-                        scanner::format_status(&report)
-                    })
+            }),
+            "envexa:outdated" => tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    let results = toolchains::scan_all().await;
+                    let report = scanner::Report {
+                        timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
+                        results,
+                    };
+                    scanner::format_outdated(&report)
                 })
-            }
-            "envexa:outdated" => {
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        let results = toolchains::scan_all().await;
-                        let report = scanner::Report {
-                            timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
-                            results,
-                        };
-                        scanner::format_outdated(&report)
-                    })
-                })
-            }
+            }),
             _ => return Err(format!("Unknown prompt: {name}")),
         };
         Ok(Value::String(text))
@@ -319,7 +302,7 @@ impl McpServer {
     }
 
     fn cmd_handler(&self, input: &str) -> String {
-        let parts: Vec<&str> = input.trim().split_whitespace().collect();
+        let parts: Vec<&str> = input.split_whitespace().collect();
         if parts.is_empty() {
             return self.cmd_help();
         }
@@ -330,15 +313,14 @@ impl McpServer {
         match cmd {
             "help" | "h" => self.cmd_help(),
             "scan" => {
-                let chain = args.first().map(|s| *s).unwrap_or("all");
+                let chain = args.first().copied().unwrap_or("all");
                 tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        scanner::scan_and_cache(&self.cache, chain).await
-                    })
+                    tokio::runtime::Handle::current()
+                        .block_on(async { scanner::scan_and_cache(&self.cache, chain).await })
                 })
             }
             "outdated" => {
-                let chain = args.first().map(|s| *s).unwrap_or("all");
+                let chain = args.first().copied().unwrap_or("all");
                 tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(async {
                         let results = if chain == "all" {
@@ -358,28 +340,24 @@ impl McpServer {
                     })
                 })
             }
-            "status" => {
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        let results = toolchains::scan_all().await;
-                        let report = scanner::Report {
-                            timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
-                            results,
-                        };
-                        scanner::format_status(&report)
-                    })
+            "status" => tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    let results = toolchains::scan_all().await;
+                    let report = scanner::Report {
+                        timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
+                        results,
+                    };
+                    scanner::format_status(&report)
                 })
-            }
-            "report" => {
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        match self.cache.get().await {
-                            Some(report) => scanner::format_report(&report),
-                            None => "No report available. Run `scan` first.".into(),
-                        }
-                    })
+            }),
+            "report" => tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    match self.cache.get().await {
+                        Some(report) => scanner::format_report(&report),
+                        None => "No report available. Run `scan` first.".into(),
+                    }
                 })
-            }
+            }),
             "upgrade" => {
                 if args.is_empty() {
                     return "Specify what to upgrade: `/upgrade pip`".into();

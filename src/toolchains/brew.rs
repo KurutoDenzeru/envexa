@@ -18,7 +18,10 @@ pub async fn scan() -> ScanResult {
                     for f in formulae {
                         result.outdated_formulae.push(PackageInfo {
                             name: f["name"].as_str().unwrap_or("?").to_string(),
-                            current: f["installed_versions"][0].as_str().unwrap_or("?").to_string(),
+                            current: f["installed_versions"][0]
+                                .as_str()
+                                .unwrap_or("?")
+                                .to_string(),
                             latest: f["current_version"].as_str().unwrap_or("?").to_string(),
                         });
                     }
@@ -34,7 +37,10 @@ pub async fn scan() -> ScanResult {
                     for c in casks {
                         result.outdated_casks.push(PackageInfo {
                             name: c["name"].as_str().unwrap_or("?").to_string(),
-                            current: c["installed_versions"][0].as_str().unwrap_or("?").to_string(),
+                            current: c["installed_versions"][0]
+                                .as_str()
+                                .unwrap_or("?")
+                                .to_string(),
                             latest: c["current_version"].as_str().unwrap_or("?").to_string(),
                         });
                     }
@@ -50,7 +56,11 @@ pub async fn scan() -> ScanResult {
     }
 
     let total = result.outdated_formulae.len() + result.outdated_casks.len();
-    result.status = if total == 0 { "ok".into() } else { "warning".into() };
+    result.status = if total == 0 {
+        "ok".into()
+    } else {
+        "warning".into()
+    };
     if total > 0 {
         result.issues.push(format!("{total} outdated package(s)"));
     }

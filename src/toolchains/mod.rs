@@ -1,7 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::process::Command;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageInfo {
@@ -96,14 +96,14 @@ async fn run_cmd(program: &str, args: &[&str]) -> Result<String, anyhow::Error> 
 }
 
 pub mod brew;
+pub mod bun;
 pub mod cargo;
+pub mod deno;
+pub mod docker;
 pub mod gem;
 pub mod npm;
 pub mod pip;
-pub mod docker;
 pub mod pnpm;
-pub mod deno;
-pub mod bun;
 pub mod yarn;
 
 pub async fn scan_all() -> HashMap<String, ScanResult> {

@@ -39,7 +39,11 @@ pub struct JsonRpcError {
 
 impl JsonRpcError {
     pub fn new(code: i32, message: impl Into<String>) -> Self {
-        Self { code, message: message.into(), data: None }
+        Self {
+            code,
+            message: message.into(),
+            data: None,
+        }
     }
 }
 
@@ -55,11 +59,21 @@ pub struct JsonRpcResponse {
 
 impl JsonRpcResponse {
     pub fn ok(id: Value, result: Value) -> Self {
-        Self { jsonrpc: "2.0".into(), id, result: Some(result), error: None }
+        Self {
+            jsonrpc: "2.0".into(),
+            id,
+            result: Some(result),
+            error: None,
+        }
     }
 
     pub fn err(id: Value, code: i32, message: impl Into<String>) -> Self {
-        Self { jsonrpc: "2.0".into(), id, result: None, error: Some(JsonRpcError::new(code, message)) }
+        Self {
+            jsonrpc: "2.0".into(),
+            id,
+            result: None,
+            error: Some(JsonRpcError::new(code, message)),
+        }
     }
 }
 
@@ -120,7 +134,10 @@ pub struct ContentItem {
 
 impl ContentItem {
     pub fn text(text: impl Into<String>) -> Self {
-        Self { content_type: "text".into(), text: text.into() }
+        Self {
+            content_type: "text".into(),
+            text: text.into(),
+        }
     }
 }
 
@@ -190,10 +207,18 @@ pub async fn read_loop(
         };
 
         match msg {
-            JsonRpcMessage::Request { id, method, params, .. } => {
+            JsonRpcMessage::Request {
+                id, method, params, ..
+            } => {
                 let response = handle_request(
-                    &method, params, &tools, &prompts, &resources,
-                    &tool_handler, &prompt_handler, &resource_handler,
+                    &method,
+                    params,
+                    &tools,
+                    &prompts,
+                    &resources,
+                    &tool_handler,
+                    &prompt_handler,
+                    &resource_handler,
                 );
                 let resp = match response {
                     Ok(val) => JsonRpcResponse::ok(id, val),
@@ -204,7 +229,9 @@ pub async fn read_loop(
                 stdout.write_all(json.as_bytes()).await?;
                 stdout.flush().await?;
             }
-            JsonRpcMessage::Notification { method, params: _, .. } => {
+            JsonRpcMessage::Notification {
+                method, params: _, ..
+            } => {
                 if method == "notifications/initialized" {
                     // Handshake complete, nothing to do
                 } else if method == "$/cancelRequest" {
@@ -249,15 +276,13 @@ fn handle_request(
             };
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
-        "ping" => {
-            Ok(Value::Object(serde_json::Map::new()))
-        }
-        "tools/list" => {
-            serde_json::to_value(tools).map_err(|e| e.to_string())
-        }
+        "ping" => Ok(Value::Object(serde_json::Map::new())),
+        "tools/list" => serde_json::to_value(tools).map_err(|e| e.to_string()),
         "tools/call" => {
             let params = params.ok_or_else(|| "Missing params".to_string())?;
-            let name = params["name"].as_str().ok_or_else(|| "Missing tool name".to_string())?;
+            let name = params["name"]
+                .as_str()
+                .ok_or_else(|| "Missing tool name".to_string())?;
             let args = params.get("arguments").cloned();
             let result_val = tool_handler(name, args)?;
             let text = result_val.as_str().unwrap_or("").to_string();
@@ -266,12 +291,12 @@ fn handle_request(
             };
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
-        "prompts/list" => {
-            serde_json::to_value(prompts).map_err(|e| e.to_string())
-        }
+        "prompts/list" => serde_json::to_value(prompts).map_err(|e| e.to_string()),
         "prompts/get" => {
             let params = params.ok_or_else(|| "Missing params".to_string())?;
-            let name = params["name"].as_str().ok_or_else(|| "Missing prompt name".to_string())?;
+            let name = params["name"]
+                .as_str()
+                .ok_or_else(|| "Missing prompt name".to_string())?;
             let result_val = prompt_handler(name)?;
             let text = result_val.as_str().unwrap_or("").to_string();
             let result = GetPromptResult {
@@ -282,12 +307,12 @@ fn handle_request(
             };
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
-        "resources/list" => {
-            serde_json::to_value(resources).map_err(|e| e.to_string())
-        }
+        "resources/list" => serde_json::to_value(resources).map_err(|e| e.to_string()),
         "resources/read" => {
             let params = params.ok_or_else(|| "Missing params".to_string())?;
-            let uri = params["uri"].as_str().ok_or_else(|| "Missing resource URI".to_string())?;
+            let uri = params["uri"]
+                .as_str()
+                .ok_or_else(|| "Missing resource URI".to_string())?;
             let result_val = resource_handler(uri)?;
             let text = result_val.as_str().unwrap_or("").to_string();
             let result = ReadResourceResult {
@@ -303,8 +328,6 @@ fn handle_request(
             // Not supported yet
             Ok(Value::Object(serde_json::Map::new()))
         }
-        _ => {
-            Err(format!("Method not found: {method}"))
-        }
+        _ => Err(format!("Method not found: {method}")),
     }
 }

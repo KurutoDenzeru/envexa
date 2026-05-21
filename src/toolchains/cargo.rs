@@ -18,7 +18,9 @@ pub async fn scan() -> ScanResult {
     }
 
     if !which("cargo-outdated") {
-        result.issues.push("cargo-outdated not installed (run: cargo install cargo-outdated)".into());
+        result
+            .issues
+            .push("cargo-outdated not installed (run: cargo install cargo-outdated)".into());
         return result;
     }
 
@@ -36,7 +38,11 @@ pub async fn scan() -> ScanResult {
         }
     }
 
-    result.status = if result.outdated.is_empty() { "ok".into() } else { "warning".into() };
+    result.status = if result.outdated.is_empty() {
+        "ok".into()
+    } else {
+        "warning".into()
+    };
 
     result
 }
