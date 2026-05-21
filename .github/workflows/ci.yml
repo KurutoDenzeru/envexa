@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, rust-rewrite]
   pull_request:
     branches: [main]
 
@@ -11,18 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          version: "latest"
-      - run: uv sync
-      - run: uv run python -m compileall src/
+          components: clippy, rustfmt
+      - run: cargo fmt --check
+      - run: cargo clippy -- -D warnings
 
-  scan:
-    runs-on: macos-latest
+  build:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-        with:
-          version: "latest"
-      - run: uv sync
-      - run: uv run python -c "from src.scanner import run_scan; run_scan('all')"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
