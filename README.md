@@ -27,10 +27,8 @@ Ever wonder what's rotting in your dev environment? Run one scan and Envexa tell
 - Which Homebrew formulae and casks are outdated
 - Which npm/pip/gem packages need updating
 - If your Docker daemon is running and how much disk it's using
-- Version conflicts for the same dependency across multiple projects
-- Unused dependencies in your npm projects
 
-All results are cached to `report.json` so you can read them offline or compare over time.
+Results are cached in memory so you can re-read them without re-scanning.
 
 ---
 
@@ -83,8 +81,8 @@ These are **Envexa-specific** commands — use the `envexa:` prefix to distingui
 |------|-------------|
 | `envexa_scan` | Full health scan of all or one toolchain |
 | `envexa_check_outdated` | Outdated packages only |
-| `envexa_check_mismatches` | Version conflicts across projects (Python port pending) |
-| `envexa_find_unused` | Unused deps in a project (Python port pending) |
+| `envexa_check_mismatches` | Version conflicts across projects (not yet implemented) |
+| `envexa_find_unused` | Unused deps in a project (not yet implemented) |
 | `envexa_get_report` | Latest cached report as markdown |
 | `envexa_brew_status` | Homebrew only |
 | `envexa_npm_status` | npm/Node only |
@@ -184,16 +182,13 @@ cargo run
 # Build optimized
 cargo build --release
 
-# Test a scan directly
-printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n{"jsonrpc":"2.0","method":"notifications/initialized"}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"envexa_scan","arguments":{"chain":"brew"}}}\n' | cargo run
-
-# Pipe output through Python to extract just the report text
-printf '...' | cargo run | python3 -c "
+# Test a scan (extracts report text from JSON-RPC)
+printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n{"jsonrpc":"2.0","method":"notifications/initialized"}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"envexa_scan","arguments":{"chain":"brew"}}}\n' | cargo run | python3 -c "
 import sys, json
 for line in sys.stdin:
-    data = json.loads(line)
-    if 'result' in data and isinstance(data['result'], dict) and 'content' in data['result']:
-        print(data['result']['content'][0]['text'])
+    d = json.loads(line)
+    if d.get('result',{}).get('content'):
+        print(d['result']['content'][0]['text'])
 "
 
 ---

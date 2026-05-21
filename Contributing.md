@@ -1,12 +1,8 @@
 # Contributing
 
-When contributing to this repository, please first discuss the change you wish to make via issue, email, or any other method with the owners of this repository before making a change.
-
 ## Development
 
 1. Fork this repository.
-
-You can fork this repo by clicking the fork button in the top right corner of this page.
 
 2. Clone the repository.
 
@@ -14,16 +10,36 @@ You can fork this repo by clicking the fork button in the top right corner of th
 git clone https://github.com/KurutoDenzeru/envexa.git
 ```
 
-3. Install dependencies using uv.
+3. Build the project.
 
 ```bash
-uv sync
+cargo build
 ```
 
-4. Start the MCP server.
+4. Test the MCP server.
 
 ```bash
-uv run python -m src.server
+printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n{"jsonrpc":"2.0","method":"notifications/initialized"}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"envexa_scan","arguments":{"chain":"brew"}}}\n' | cargo run | python3 -c "
+import sys, json
+for line in sys.stdin:
+    d = json.loads(line)
+    if d.get('result',{}).get('content'):
+        print(d['result']['content'][0]['text'])
+"
+```
+
+## Project Layout
+
+```
+src/
+├── main.rs           # Entry point + tokio stdin/stdout loop
+├── transport.rs      # JSON-RPC MCP protocol (hand-rolled)
+├── server.rs         # Tool/prompt/resource dispatch
+├── scanner.rs        # Scan orchestration + formatting + cache
+└── toolchains/
+    ├── mod.rs        # ScanResult type + concurrent scan_all()
+    ├── brew.rs / npm.rs / pip.rs / gem.rs / cargo.rs / docker.rs
+    ├── pnpm.rs / yarn.rs / bun.rs / deno.rs
 ```
 
 ## Commit Convention
@@ -58,10 +74,11 @@ https://www.conventionalcommits.org/ or check out the
 
 ## Testing
 
-Tests are run via uv. You can run all tests from the root of the repository.
+Build and test the full scan:
 
 ```bash
-uv run python -c "from src.scanner import run_scan; run_scan('all')"
+cargo build
+printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n{"jsonrpc":"2.0","method":"notifications/initialized"}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"envexa_scan","arguments":{"chain":"all"}}}\n' | cargo run > /dev/null && echo "PASS"
 ```
 
-Please ensure that the tests are passing when submitting a pull request. If you're adding new components or features, creating tests would be appreciated.
+Please ensure the server compiles and responds to MCP requests correctly when submitting a pull request.

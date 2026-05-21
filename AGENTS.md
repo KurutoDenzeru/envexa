@@ -15,24 +15,26 @@
 
 ## Setup commands
 
-- Install deps: `uv sync`
-- Start MCP server: `uv run python -m src.server`
-- Run scan locally: `uv run python -c "from src.scanner import run_scan, format_report; print(format_report(run_scan('all')))"`
+- Build: `cargo build`
+- Build optimized: `cargo build --release`
+- Run MCP server: `cargo run`
+- Quick test (brew scan): `printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n{"jsonrpc":"2.0","method":"notifications/initialized"}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"envexa_scan","arguments":{"chain":"brew"}}}\n' | cargo run | python3 -c "import sys,json; [print(json.loads(l)['result']['content'][0]['text']) for l in sys.stdin if json.loads(l).get('result',{}).get('content')]"`
 
 ---
 
 ## Code style
 
-Follows standard Python conventions. The project uses no linter config yet — write clean, idiomatic Python:
+Follows standard Rust conventions (`cargo fmt` + `cargo clippy`). Write clean, idiomatic Rust:
 
-- Use type hints on all public functions (`def scan(chain: str = "all") -> str`)
-- Prefer `Path` over `os.path` for filesystem operations
-- Use `subprocess.run()` with `capture_output=True, text=True, timeout=N` for all shell commands
-- Handle missing toolchains gracefully — check `shutil.which()` before calling CLI tools
-- Use dict/set literals over `.get()` with defaults when key presence is guaranteed
-- Avoid bare `except:` — catch specific exceptions (`subprocess.TimeoutExpired`, `json.JSONDecodeError`, `FileNotFoundError`)
-- Keep toolchain modules lean: one `scan()` function per module returning a uniform dict shape
-- Module-level constants in `UPPER_CASE`; private helpers prefixed with `_`
+- Use `serde::{Serialize, Deserialize}` derive for all protocol types
+- Use `anyhow::Result` for fallible functions; avoid unwrap/expect in production paths
+- Use `tokio::process::Command` with `tokio::time::timeout` for async CLI execution
+- Handle missing toolchains gracefully — check `which()` before calling CLI tools
+- Keep toolchain scanners lean: one `pub async fn scan() -> ScanResult` per module
+- All scanner modules live under `toolchains/` with `mod.rs` handling dispatch
+- Use `tokio::join!` to run independent scanners concurrently
+- Prefer `String` over `&str` in struct fields for owned data
+- Use `serde_json::Value` for toolchain-specific fields that vary by scanner
 - No comments on obvious code — explain *why*, not *what*
 
 ---
@@ -42,16 +44,16 @@ Follows standard Python conventions. The project uses no linter config yet — w
 Before calling any task done, run this command — do not mark it done if it exits with errors:
 
 ```bash
-uv run python -c "from src.scanner import run_scan; run_scan('all')"
+cargo build && printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n{"jsonrpc":"2.0","method":"notifications/initialized"}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"envexa_scan","arguments":{"chain":"all"}}}\n' | cargo run > /dev/null && echo "PASS"
 ```
 
 Then confirm:
 
 - No toolchain scanner crashes on missing CLI tools (brew/npm/pip/gem/cargo/docker)
-- New modules follow the existing uniform result dict pattern
+- New scanner modules follow the `pub async fn scan() -> ScanResult` pattern
+- New tools are registered in both `server.rs` and the README MCP Tools table
 - If you changed the report format: show a sample of the new output
-- If you added a toolchain: verify it handles "not installed" gracefully
-- If you added a dependency: call it out explicitly in your summary
+- If you added a dependency to `Cargo.toml`: call it out explicitly in your summary
 
 ---
 
@@ -71,10 +73,12 @@ The MCP prompts (`/envexa:scan`, `/envexa:status`, `/envexa:outdated`) also appe
 
 ## MCP tool patterns
 
-- Each tool gets a short, one-line `description=` that starts with "Envexa — "
-- Tool parameter types must be simple (str, int, list[str]) — FastMCP handles JSON serialization
-- Return markdown strings for human readability
-- Keep tool implementations under ~50 LOC; compose by calling `scanner.py` helpers
+- Each tool is registered in `server.rs` as a `ToolDescription` with name, description, and input_schema
+- All tool descriptions start with "Envexa — "
+- Tools return `Value::String(markdown)` — human-readable markdown
+- Keep handler implementations under ~50 LOC; compose by calling `scanner.rs` helpers
+- Use `tokio::task::block_in_place` + `Handle::current().block_on` inside tool handlers to run async scan code synchronously
+- New single-toolchain scanners (e.g. `envexa_brew_status`) follow the `scan_single()` pattern
 
 ---
 
@@ -94,7 +98,7 @@ The MCP prompts (`/envexa:scan`, `/envexa:status`, `/envexa:outdated`) also appe
 - **Never** force push
 - **Never** delete branches without confirmation
 - **Never** modify files outside the project directory
-- **Never** touch `pyproject.toml`, `uv.lock`, CI/workflow files, or `.gitignore` without explicit instruction
+- **Never** touch `Cargo.toml`, `Cargo.lock`, CI/workflow files, or `.gitignore` without explicit instruction
 
 ---
 
