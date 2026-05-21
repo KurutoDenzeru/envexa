@@ -35,6 +35,11 @@ _ICONS = {
 
 _STATUS_EMOJI = {"ok": "✅", "warning": "⚠️", "error": "❌", "skipped": "⏭️"}
 _LABELS = {"ok": "PASS", "warning": "WARN", "error": "FAIL", "skipped": "SKIP"}
+_DISPLAY_NAMES = {
+    "brew": "Brew", "npm": "npm", "pnpm": "pnpm", "yarn": "Yarn",
+    "bun": "Bun", "deno": "Deno", "pip": "pip", "gem": "Gem",
+    "cargo": "Cargo", "docker": "Docker",
+}
 
 
 def run_scan(chain: str = "all"):
@@ -97,7 +102,8 @@ def format_report(report: dict = None) -> str:
             if k in res and res[k]:
                 ver_str = res[k]
                 break
-        dashboard_rows.append(f"| {icon} {tool.title():7} | {status_emoji} {status_text:<16} | {ver_str} |")
+        display = _DISPLAY_NAMES.get(tool, tool.title())
+        dashboard_rows.append(f"| {icon} {display:7} | {status_emoji} {status_text:<16} | {ver_str} |")
 
     lines.append("## Dashboard")
     lines.append(f"| {'Toolchain':10} | {'Status':<20} | {'Version'} |")
@@ -115,7 +121,8 @@ def format_report(report: dict = None) -> str:
             items = outdated_all[tool]
             is_last_tool = i == len(tool_names) - 1
             tool_prefix = "└── " if is_last_tool else "├── "
-            lines.append(f"{tool_prefix}{icon} {tool.title()} ({len(items)})")
+            display = _DISPLAY_NAMES.get(tool, tool.title())
+            lines.append(f"{tool_prefix}{icon} {display} ({len(items)})")
             indent_prefix = "    " if is_last_tool else "│   "
             for j, item in enumerate(items):
                 sub_prefix = "└── " if j == len(items) - 1 else "├── "
@@ -129,7 +136,8 @@ def format_report(report: dict = None) -> str:
     for tool, res in results.items():
         icon = _ICONS.get(tool, "")
         label = _LABELS.get(res["status"], "?")
-        lines.append(f"### {icon} [{label}] {tool.title()}")
+        display = _DISPLAY_NAMES.get(tool, tool.title())
+        lines.append(f"### {icon} [{label}] {display}")
 
         if res["status"] == "skipped":
             lines.append(f"> {res['issues'][0] if res['issues'] else 'Skipped'}")

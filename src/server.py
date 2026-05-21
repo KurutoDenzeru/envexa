@@ -6,6 +6,7 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
 from . import scanner, mismatches, unused
+from .scanner import _DISPLAY_NAMES
 
 mcp = FastMCP("Envexa")
 
@@ -17,7 +18,8 @@ REPORT_FILE = Path(__file__).resolve().parent.parent / "report.json"
 @mcp.tool(
     description="Envexa — scan dev environment toolchains. chain: all|brew|npm|pnpm|yarn|bun|deno|pip|gem|cargo|docker"
 )
-def scan(chain: str = "all") -> str:
+def scan(chain: str | None = "all") -> str:
+    chain = (chain or "").strip() or "all"
     report = scanner.run_scan(chain)
     if "error" in report:
         return report["error"]
@@ -27,7 +29,8 @@ def scan(chain: str = "all") -> str:
 @mcp.tool(
     description="Envexa — check for outdated packages. chain: all|brew|npm|pnpm|yarn|bun|deno|pip|gem|cargo|docker"
 )
-def check_outdated(chain: str = "all") -> str:
+def check_outdated(chain: str | None = "all") -> str:
+    chain = (chain or "").strip() or "all"
     report = scanner.run_scan(chain)
     results = report["results"]
 
@@ -42,7 +45,8 @@ def check_outdated(chain: str = "all") -> str:
 
         if items:
             has_anything = True
-            lines.append(f"## {tool.title()} ({len(items)} outdated)\n")
+            display = _DISPLAY_NAMES.get(tool, tool.title())
+            lines.append(f"## {display} ({len(items)} outdated)\n")
             for item in items:
                 lines.append(
                     f"- **{item['name']}**: {item.get('current', '?')} -> {item.get('latest', '?')}"
@@ -95,7 +99,7 @@ def get_report() -> str:
 
 # ── Slash-command relay ─────────────────────────────────────────────────
 
-_CMD_HELP = """Available commands:
+_CMD_HELP = """Envexa slash commands — type these in chat or pass to the cmd tool:
 
   /scan [chain]       — Full health scan (chain: all|brew|npm|pnpm|yarn|bun|deno|pip|gem|cargo|docker)
   /outdated [chain]   — Check outdated packages only
@@ -113,7 +117,7 @@ Examples:
 
 
 @mcp.tool(
-    description="Envexa — execute a preset slash command. Usage: /scan, /outdated brew, /status, /upgrade pip, /help"
+    description="Envexa — execute a preset slash command. Use this when the user types /scan, /outdated, /status, /upgrade, /report, or /help in chat. Usage example: cmd(\"/scan brew\"), cmd(\"/status\")"
 )
 def cmd(command: str) -> str:
     parts = command.strip().split()
@@ -127,11 +131,11 @@ def cmd(command: str) -> str:
         return _CMD_HELP
 
     if cmd_name in ("/scan", "scan"):
-        chain = (args[0] if args else "all").strip() or "all"
+        chain = args[0].strip() if args else "all"
         return scan(chain)
 
     if cmd_name in ("/outdated", "outdated"):
-        chain = (args[0] if args else "all").strip() or "all"
+        chain = args[0].strip() if args else "all"
         return check_outdated(chain)
 
     if cmd_name in ("/status", "status"):
@@ -145,7 +149,8 @@ def cmd(command: str) -> str:
             label = {"ok": "PASS", "warning": "WARN", "error": "FAIL", "skipped": "SKIP"}.get(res["status"], "?")
             n = len(scanner._extract_outdated(res))
             detail = f"({n})" if n else ""
-            rows.append(f"| {tool.title():8} | {label:<6} {detail:<8} |")
+            display = _DISPLAY_NAMES.get(tool, tool.title())
+            rows.append(f"| {display:8} | {label:<6} {detail:<8} |")
         lines = [
             "# Envexa Status",
             "",
@@ -153,7 +158,7 @@ def cmd(command: str) -> str:
             f"|{'-'*10}|{'-'*18}|",
             *rows,
             "",
-            "Run `/scan` for full report or `/outdated` for details.",
+            "Run `/envexa:scan` for full report or `/envexa:outdated` for details.",
         ]
         return "\n".join(lines)
 
@@ -181,46 +186,25 @@ def cmd(command: str) -> str:
 
 # ── Slash-command prompts (appear in / menu as /envexa:scan:mcp etc.) ───
 
-@mcp.prompt(name="envexa:scan", description="Scan dev environment toolchains")
-def prompt_scan(chain: str = "all") -> list[dict]:
-    chain = chain.strip() or "all"
-    report = scanner.run_scan(chain)
+@mcp.prompt(name="envexa:scan", description="Envexa — full health scan of dev environment toolchains")
+def prompt_scan() -> list[dict]:
+    report = scanner.run_scan("all")
     if "error" in report:
         return [{"role": "assistant", "content": report["error"]}]
     return [{"role": "assistant", "content": scanner.format_report(report)}]
 
 
-@mcp.prompt(name="envexa:status", description="Quick dashboard summary")
+@mcp.prompt(name="envexa:status", description="Envexa — full health report of all toolchains")
 def prompt_status() -> list[dict]:
     report = scanner.run_scan("all")
-    results = report["results"]
-    rows = []
-    for tool in ("brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker"):
-        if tool not in results:
-            continue
-        res = results[tool]
-        label = {"ok": "PASS", "warning": "WARN", "error": "FAIL", "skipped": "SKIP"}.get(res["status"], "?")
-        n = len(scanner._extract_outdated(res))
-        status_text = f"{label} ({n})" if n else label
-        rows.append(f"| {tool.title():8} | {status_text:<16} |")
-    content = "\n".join([
-        "# Envexa Status",
-        "",
-        f"| {'Tool':8} | {'Status':<16} |",
-        f"|{'-'*10}|{'-'*18}|",
-        *rows,
-        "",
-        "Run `/envexa:scan` for full report.",
-    ])
-    return [{"role": "assistant", "content": content}]
+    return [{"role": "assistant", "content": scanner.format_report(report)}]
 
 
-@mcp.prompt(name="envexa:outdated", description="Check outdated packages")
-def prompt_outdated(chain: str = "all") -> list[dict]:
-    chain = chain.strip() or "all"
-    report = scanner.run_scan(chain)
+@mcp.prompt(name="envexa:outdated", description="Envexa — list outdated packages across all toolchains")
+def prompt_outdated() -> list[dict]:
+    report = scanner.run_scan("all")
     results = report["results"]
-    lines = ["# Outdated Packages\n"]
+    lines = ["# Envexa Outdated Packages\n"]
     has_anything = False
     for tool, res in results.items():
         items = []
@@ -229,12 +213,13 @@ def prompt_outdated(chain: str = "all") -> list[dict]:
                 items.extend(res[key])
         if items:
             has_anything = True
-            lines.append(f"## {tool.title()} ({len(items)} outdated)\n")
+            display = _DISPLAY_NAMES.get(tool, tool.title())
+            lines.append(f"## {display} ({len(items)} outdated)\n")
             for item in items:
                 lines.append(f"- **{item['name']}**: {item.get('current', '?')} -> {item.get('latest', '?')}")
             lines.append("")
     if not has_anything:
-        lines = ["All packages are up to date!"]
+        lines = ["# Envexa Outdated Packages\n\nAll packages are up to date!"]
     return [{"role": "assistant", "content": "\n".join(lines)}]
 
 

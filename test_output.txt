@@ -1,0 +1,762 @@
+
+============================================================
+COMMAND 1: /envexa:envexa_scan (envexa:scan prompt)
+============================================================
+PASS: prompt_scan
+Length: 8181 chars
+
+# Envexa Health Report
+**Generated:** 2026-05-21T13:09:37.001831
+
+## Dashboard
+| Toolchain  | Status               | Version |
+|------------|----------------------|--------------------|
+| 🍺 Brew    | ⚠️ WARN (5)         | 5.1.12-60-gd8deaca |
+|  npm     | ✅ PASS             | v24.15.0 |
+|  pnpm    | ✅ PASS             | v24.15.0 |
+|  Yarn    | ⏭️ SKIP             |  |
+|  Bun     | ✅ PASS             | 1.3.14 |
+|  Deno    | ✅ PASS             | deno 2.5.4 (stable, release, aarch64-apple-darwin) |
+|  pip     | ✅ PASS             | Python 3.14.3 |
+|  Gem     | ⚠️ WARN (100)       | ruby 3.2.2 (2023-03-30 revision e51014f9c0) [arm64-darwin24] |
+| 🦀 Cargo   | ✅ PASS             | rustc 1.93.0 (254b59607 2026-01-19) |
+| 🐳 Docker  | ❌ FAIL             | unknown |
+
+## Outdated Packages
+```
+├── 🍺 Brew (5)
+│   ├── yvgude/lean-ctx/lean-ctx: 3.5.10 -> 3.6.13
+│   ├── codex: 0.130.0 -> 0.132.0
+│   ├── crossover: 26.0.0 -> 26.1.0
+│   ├── stats: 2.11.42 -> 2.12.14
+│   └── transmission: 4.0.6 -> 4.1.1
+└──  Gem (100)
+    ├── CFPropertyList: 3.0.8 -> 4.0.0
+    ├── abbrev: 0.1.1 -> 0.1.2
+    ├── activesupport: 7.2.3 -> 8.1.3
+    ├── addressable: 2.8.8 -> 2.9.0
+    ├── atomos: 0.1.3 -> 1.0.0
+    ├── base64: 0.1.1 -> 0.3.0
+    ├── bigdecimal: 3.1.3 -> 4.1.2
+    ├── bundler: 2.4.10 -> 4.0.12
+    ├── cgi: 0.3.6 -> 0.5.1
+    ├── colored2: 3.1.2 -> 4.0.3
+    ├── concurrent-ruby: 1.3.5 -> 1.3.6
+    ├── connection_pool: 2.5.5 -> 3.0.2
+    ├── csv: 3.2.6 -> 3.3.5
+    ├── date: 3.3.3 -> 3.5.1
+    ├── debug: 1.7.1 -> 1.11.1
+    ├── delegate: 0.3.0 -> 0.6.1
+    ├── did_you_mean: 1.6.3 -> 2.0.0
+    ├── digest: 3.1.1 -> 3.2.1
+    ├── drb: 2.1.1 -> 2.2.3
+    ├── english: 0.7.2 -> 0.8.1
+    ├── erb: 4.0.2 -> 6.0.4
+    ├── error_highlight: 0.5.1 -> 0.7.1
+    ├── etc: 1.4.2 -> 1.4.6
+    ├── ethon: 0.15.0 -> 0.18.0
+    ├── fcntl: 1.0.2 -> 1.3.0
+    ├── ffi: 1.17.2 -> 1.17.4
+    ├── fiddle: 1.1.1 -> 1.1.8
+    ├── fileutils: 1.7.0 -> 1.8.0
+    ├── find: 0.1.1 -> 0.2.0
+    ├── forwardable: 1.3.3 -> 1.4.0
+    ├── fuzzy_match: 2.0.4 -> 2.1.0
+    ├── getoptlong: 0.2.0 -> 0.2.1
+    ├── i18n: 1.14.7 -> 1.14.8
+    ├── io-console: 0.6.0 -> 0.8.2
+    ├── io-nonblock: 0.2.0 -> 0.3.2
+    ├── io-wait: 0.3.0 -> 0.4.0
+    ├── ipaddr: 1.2.5 -> 1.2.9
+    ├── irb: 1.6.2 -> 1.18.0
+    ├── json: 2.6.3 -> 2.19.5
+    ├── logger: 1.5.3 -> 1.7.0
+    ├── matrix: 0.4.2 -> 0.4.3
+    ├── mcp: 0.8.0 -> 0.17.0
+    ├── minitest: 5.16.3 -> 6.0.6
+    ├── mutex_m: 0.1.2 -> 0.3.0
+    ├── net-ftp: 0.2.0 -> 0.3.9
+    ├── net-http: 0.3.2 -> 0.9.1
+    ├── net-imap: 0.3.4 -> 0.6.4
+    ├── net-protocol: 0.2.1 -> 0.2.2
+    ├── net-smtp: 0.3.3 -> 0.5.1
+    ├── nkf: 0.1.2 -> 0.2.0
+    ├── observer: 0.1.1 -> 0.1.2
+    ├── open-uri: 0.3.0 -> 0.5.0
+    ├── open3: 0.1.2 -> 0.2.1
+    ├── openssl: 3.1.0 -> 4.0.2
+    ├── optparse: 0.3.1 -> 0.8.1
+    ├── ostruct: 0.5.5 -> 0.6.3
+    ├── parallel: 1.27.0 -> 2.1.0
+    ├── parser: 3.3.10.2 -> 3.3.11.1
+    ├── pathname: 0.2.1 -> 0.5.0
+    ├── power_assert: 2.0.3 -> 3.0.1
+    ├── pp: 0.4.0 -> 0.6.3
+    ├── prettyprint: 0.1.1 -> 0.2.0
+    ├── prime: 0.1.2 -> 0.1.4
+    ├── pstore: 0.1.2 -> 0.2.1
+    ├── psych: 5.0.1 -> 5.3.1
+    ├── public_suffix: 4.0.7 -> 7.0.5
+    ├── racc: 1.6.2 -> 1.8.1
+    ├── rake: 13.0.6 -> 13.4.2
+    ├── rbs: 2.8.2 -> 4.0.2
+    ├── rdoc: 6.5.0 -> 7.2.0
+    ├── readline: 0.0.3 -> 0.0.4
+    ├── readline-ext: 0.1.5 -> 0.2.0
+    ├── regexp_parser: 2.11.3 -> 2.12.0
+    ├── reline: 0.3.2 -> 0.6.3
+    ├── resolv: 0.2.2 -> 0.7.1
+    ├── resolv-replace: 0.1.1 -> 0.2.0
+    ├── rinda: 0.1.1 -> 0.2.0
+    ├── rss: 0.2.9 -> 0.3.2
+    ├── rubocop: 1.85.1 -> 1.86.2
+    ├── ruby-macho: 2.5.1 -> 5.0.0
+    ├── set: 1.0.3 -> 1.1.3
+    ├── shellwords: 0.1.0 -> 0.2.2
+    ├── singleton: 0.1.1 -> 0.3.0
+    ├── stringio: 3.0.4 -> 3.2.0
+    ├── strscan: 3.0.5 -> 3.1.8
+    ├── syntax_suggest: 1.0.2 -> 3.0.0
+    ├── syslog: 0.1.1 -> 0.4.0
+    ├── tempfile: 0.1.3 -> 0.3.1
+    ├── test-unit: 3.5.7 -> 3.7.7
+    ├── time: 0.2.2 -> 0.4.2
+    ├── timeout: 0.3.1 -> 0.6.1
+    ├── tmpdir: 0.1.3 -> 0.3.1
+    ├── tsort: 0.1.1 -> 0.2.0
+    ├── typeprof: 0.21.3 -> 0.32.0
+    ├── typhoeus: 1.5.0 -> 1.6.0
+    ├── un: 0.2.1 -> 0.3.0
+    ├── uri: 0.12.1 -> 1.1.1
+    ├── weakref: 0.1.2 -> 0.1.4
+    ├── yaml: 0.2.1 -> 0.4.0
+    └── zlib: 3.0.0 -> 3.2.3
+```
+
+## Per-Toolchain Details
+
+### 🍺 [WARN] Brew
+**Version:** 5.1.12-60-gd8deaca
+**Formulae:** 72
+
+| Package | Current | Latest |
+|---------|---------|--------|
+| yvgude/lean-ctx/lean-ctx | 3.5.10 | 3.6.13 |
+| codex | 0.130.0 | 0.132.0 |
+| crossover | 26.0.0 | 26.1.0 |
+| stats | 2.11.42 | 2.12.14 |
+| transmission | 4.0.6 | 4.1.1 |
+
+> 5 outdated package(s)
+
+###  [PASS] npm
+**Node:** v24.15.0
+
+###  [PASS] pnpm
+**Node:** v24.15.0 | **pnpm:** 11.1.2
+
+###  [SKIP] Yarn
+> yarn not installed
+
+###  [PASS] Bun
+**bun:** 1.3.14
+
+###  [PASS] Deno
+**deno:** deno 2.5.4 (stable, release, aarch64-apple-darwin)
+
+###  [PASS] pip
+**Python:** Python 3.14.3
+
+###  [WARN] Gem
+**Ruby:** ruby 3.2.2 (2023-03-30 revision e51014f9c0) [arm64-darwin24]
+
+| Package | Current | Latest |
+|---------|---------|--------|
+| CFPropertyList | 3.0.8 | 4.0.0 |
+| abbrev | 0.1.1 | 0.1.2 |
+| activesupport | 7.2.3 | 8.1.3 |
+| addressable | 2.8.8 | 2.9.0 |
+| atomos | 0.1.3 | 1.0.0 |
+| base64 | 0.1.1 | 0.3.0 |
+| bigdecimal | 3.1.3 | 4.1.2 |
+| bundler | 2.4.10 | 4.0.12 |
+| cgi | 0.3.6 | 0.5.1 |
+| colored2 | 3.1.2 | 4.0.3 |
+| concurrent-ruby | 1.3.5 | 1.3.6 |
+| connection_pool | 2.5.5 | 3.0.2 |
+| csv | 3.2.6 | 3.3.5 |
+| date | 3.3.3 | 3.5.1 |
+| debug | 1.7.1 | 1.11.1 |
+| delegate | 0.3.0 | 0.6.1 |
+| did_you_mean | 1.6.3 | 2.0.0 |
+| digest | 3.1.1 | 3.2.1 |
+| drb | 2.1.1 | 2.2.3 |
+| english | 0.7.2 | 0.8.1 |
+| erb | 4.0.2 | 6.0.4 |
+| error_highlight | 0.5.1 | 0.7.1 |
+| etc | 1.4.2 | 1.4.6 |
+| ethon | 0.15.0 | 0.18.0 |
+| fcntl | 1.0.2 | 1.3.0 |
+| ffi | 1.17.2 | 1.17.4 |
+| fiddle | 1.1.1 | 1.1.8 |
+| fileutils | 1.7.0 | 1.8.0 |
+| find | 0.1.1 | 0.2.0 |
+| forwardable | 1.3.3 | 1.4.0 |
+| fuzzy_match | 2.0.4 | 2.1.0 |
+| getoptlong | 0.2.0 | 0.2.1 |
+| i18n | 1.14.7 | 1.14.8 |
+| io-console | 0.6.0 | 0.8.2 |
+| io-nonblock | 0.2.0 | 0.3.2 |
+| io-wait | 0.3.0 | 0.4.0 |
+| ipaddr | 1.2.5 | 1.2.9 |
+| irb | 1.6.2 | 1.18.0 |
+| json | 2.6.3 | 2.19.5 |
+| logger | 1.5.3 | 1.7.0 |
+| matrix | 0.4.2 | 0.4.3 |
+| mcp | 0.8.0 | 0.17.0 |
+| minitest | 5.16.3 | 6.0.6 |
+| mutex_m | 0.1.2 | 0.3.0 |
+| net-ftp | 0.2.0 | 0.3.9 |
+| net-http | 0.3.2 | 0.9.1 |
+| net-imap | 0.3.4 | 0.6.4 |
+| net-protocol | 0.2.1 | 0.2.2 |
+| net-smtp | 0.3.3 | 0.5.1 |
+| nkf | 0.1.2 | 0.2.0 |
+| observer | 0.1.1 | 0.1.2 |
+| open-uri | 0.3.0 | 0.5.0 |
+| open3 | 0.1.2 | 0.2.1 |
+| openssl | 3.1.0 | 4.0.2 |
+| optparse | 0.3.1 | 0.8.1 |
+| ostruct | 0.5.5 | 0.6.3 |
+| parallel | 1.27.0 | 2.1.0 |
+| parser | 3.3.10.2 | 3.3.11.1 |
+| pathname | 0.2.1 | 0.5.0 |
+| power_assert | 2.0.3 | 3.0.1 |
+| pp | 0.4.0 | 0.6.3 |
+| prettyprint | 0.1.1 | 0.2.0 |
+| prime | 0.1.2 | 0.1.4 |
+| pstore | 0.1.2 | 0.2.1 |
+| psych | 5.0.1 | 5.3.1 |
+| public_suffix | 4.0.7 | 7.0.5 |
+| racc | 1.6.2 | 1.8.1 |
+| rake | 13.0.6 | 13.4.2 |
+| rbs | 2.8.2 | 4.0.2 |
+| rdoc | 6.5.0 | 7.2.0 |
+| readline | 0.0.3 | 0.0.4 |
+| readline-ext | 0.1.5 | 0.2.0 |
+| regexp_parser | 2.11.3 | 2.12.0 |
+| reline | 0.3.2 | 0.6.3 |
+| resolv | 0.2.2 | 0.7.1 |
+| resolv-replace | 0.1.1 | 0.2.0 |
+| rinda | 0.1.1 | 0.2.0 |
+| rss | 0.2.9 | 0.3.2 |
+| rubocop | 1.85.1 | 1.86.2 |
+| ruby-macho | 2.5.1 | 5.0.0 |
+| set | 1.0.3 | 1.1.3 |
+| shellwords | 0.1.0 | 0.2.2 |
+| singleton | 0.1.1 | 0.3.0 |
+| stringio | 3.0.4 | 3.2.0 |
+| strscan | 3.0.5 | 3.1.8 |
+| syntax_suggest | 1.0.2 | 3.0.0 |
+| syslog | 0.1.1 | 0.4.0 |
+| tempfile | 0.1.3 | 0.3.1 |
+| test-unit | 3.5.7 | 3.7.7 |
+| time | 0.2.2 | 0.4.2 |
+| timeout | 0.3.1 | 0.6.1 |
+| tmpdir | 0.1.3 | 0.3.1 |
+| tsort | 0.1.1 | 0.2.0 |
+| typeprof | 0.21.3 | 0.32.0 |
+| typhoeus | 1.5.0 | 1.6.0 |
+| un | 0.2.1 | 0.3.0 |
+| uri | 0.12.1 | 1.1.1 |
+| weakref | 0.1.2 | 0.1.4 |
+| yaml | 0.2.1 | 0.4.0 |
+| zlib | 3.0.0 | 3.2.3 |
+
+> 100 outdated gem(s)
+
+### 🦀 [PASS] Cargo
+**Rust:** rustc 1.93.0 (254b59607 2026-01-19) | **Cargo:** cargo 1.93.0 (083ac5135 2025-12-15)
+
+> cargo-outdated not installed (run: cargo install cargo-outdated)
+
+### 🐳 [FAIL] Docker
+**Version:** unknown
+
+> Docker daemon not running
+
+
+============================================================
+COMMAND 2: /envexa:envexa_outdated (envexa:outdated prompt)
+============================================================
+PASS: prompt_outdated
+Length: 3303 chars
+
+# Envexa Outdated Packages
+
+## Brew (5 outdated)
+
+- **yvgude/lean-ctx/lean-ctx**: 3.5.10 -> 3.6.13
+- **codex**: 0.130.0 -> 0.132.0
+- **crossover**: 26.0.0 -> 26.1.0
+- **stats**: 2.11.42 -> 2.12.14
+- **transmission**: 4.0.6 -> 4.1.1
+
+## Gem (100 outdated)
+
+- **CFPropertyList**: 3.0.8 -> 4.0.0
+- **abbrev**: 0.1.1 -> 0.1.2
+- **activesupport**: 7.2.3 -> 8.1.3
+- **addressable**: 2.8.8 -> 2.9.0
+- **atomos**: 0.1.3 -> 1.0.0
+- **base64**: 0.1.1 -> 0.3.0
+- **bigdecimal**: 3.1.3 -> 4.1.2
+- **bundler**: 2.4.10 -> 4.0.12
+- **cgi**: 0.3.6 -> 0.5.1
+- **colored2**: 3.1.2 -> 4.0.3
+- **concurrent-ruby**: 1.3.5 -> 1.3.6
+- **connection_pool**: 2.5.5 -> 3.0.2
+- **csv**: 3.2.6 -> 3.3.5
+- **date**: 3.3.3 -> 3.5.1
+- **debug**: 1.7.1 -> 1.11.1
+- **delegate**: 0.3.0 -> 0.6.1
+- **did_you_mean**: 1.6.3 -> 2.0.0
+- **digest**: 3.1.1 -> 3.2.1
+- **drb**: 2.1.1 -> 2.2.3
+- **english**: 0.7.2 -> 0.8.1
+- **erb**: 4.0.2 -> 6.0.4
+- **error_highlight**: 0.5.1 -> 0.7.1
+- **etc**: 1.4.2 -> 1.4.6
+- **ethon**: 0.15.0 -> 0.18.0
+- **fcntl**: 1.0.2 -> 1.3.0
+- **ffi**: 1.17.2 -> 1.17.4
+- **fiddle**: 1.1.1 -> 1.1.8
+- **fileutils**: 1.7.0 -> 1.8.0
+- **find**: 0.1.1 -> 0.2.0
+- **forwardable**: 1.3.3 -> 1.4.0
+- **fuzzy_match**: 2.0.4 -> 2.1.0
+- **getoptlong**: 0.2.0 -> 0.2.1
+- **i18n**: 1.14.7 -> 1.14.8
+- **io-console**: 0.6.0 -> 0.8.2
+- **io-nonblock**: 0.2.0 -> 0.3.2
+- **io-wait**: 0.3.0 -> 0.4.0
+- **ipaddr**: 1.2.5 -> 1.2.9
+- **irb**: 1.6.2 -> 1.18.0
+- **json**: 2.6.3 -> 2.19.5
+- **logger**: 1.5.3 -> 1.7.0
+- **matrix**: 0.4.2 -> 0.4.3
+- **mcp**: 0.8.0 -> 0.17.0
+- **minitest**: 5.16.3 -> 6.0.6
+- **mutex_m**: 0.1.2 -> 0.3.0
+- **net-ftp**: 0.2.0 -> 0.3.9
+- **net-http**: 0.3.2 -> 0.9.1
+- **net-imap**: 0.3.4 -> 0.6.4
+- **net-protocol**: 0.2.1 -> 0.2.2
+- **net-smtp**: 0.3.3 -> 0.5.1
+- **nkf**: 0.1.2 -> 0.2.0
+- **observer**: 0.1.1 -> 0.1.2
+- **open-uri**: 0.3.0 -> 0.5.0
+- **open3**: 0.1.2 -> 0.2.1
+- **openssl**: 3.1.0 -> 4.0.2
+- **optparse**: 0.3.1 -> 0.8.1
+- **ostruct**: 0.5.5 -> 0.6.3
+- **parallel**: 1.27.0 -> 2.1.0
+- **parser**: 3.3.10.2 -> 3.3.11.1
+- **pathname**: 0.2.1 -> 0.5.0
+- **power_assert**: 2.0.3 -> 3.0.1
+- **pp**: 0.4.0 -> 0.6.3
+- **prettyprint**: 0.1.1 -> 0.2.0
+- **prime**: 0.1.2 -> 0.1.4
+- **pstore**: 0.1.2 -> 0.2.1
+- **psych**: 5.0.1 -> 5.3.1
+- **public_suffix**: 4.0.7 -> 7.0.5
+- **racc**: 1.6.2 -> 1.8.1
+- **rake**: 13.0.6 -> 13.4.2
+- **rbs**: 2.8.2 -> 4.0.2
+- **rdoc**: 6.5.0 -> 7.2.0
+- **readline**: 0.0.3 -> 0.0.4
+- **readline-ext**: 0.1.5 -> 0.2.0
+- **regexp_parser**: 2.11.3 -> 2.12.0
+- **reline**: 0.3.2 -> 0.6.3
+- **resolv**: 0.2.2 -> 0.7.1
+- **resolv-replace**: 0.1.1 -> 0.2.0
+- **rinda**: 0.1.1 -> 0.2.0
+- **rss**: 0.2.9 -> 0.3.2
+- **rubocop**: 1.85.1 -> 1.86.2
+- **ruby-macho**: 2.5.1 -> 5.0.0
+- **set**: 1.0.3 -> 1.1.3
+- **shellwords**: 0.1.0 -> 0.2.2
+- **singleton**: 0.1.1 -> 0.3.0
+- **stringio**: 3.0.4 -> 3.2.0
+- **strscan**: 3.0.5 -> 3.1.8
+- **syntax_suggest**: 1.0.2 -> 3.0.0
+- **syslog**: 0.1.1 -> 0.4.0
+- **tempfile**: 0.1.3 -> 0.3.1
+- **test-unit**: 3.5.7 -> 3.7.7
+- **time**: 0.2.2 -> 0.4.2
+- **timeout**: 0.3.1 -> 0.6.1
+- **tmpdir**: 0.1.3 -> 0.3.1
+- **tsort**: 0.1.1 -> 0.2.0
+- **typeprof**: 0.21.3 -> 0.32.0
+- **typhoeus**: 1.5.0 -> 1.6.0
+- **un**: 0.2.1 -> 0.3.0
+- **uri**: 0.12.1 -> 1.1.1
+- **weakref**: 0.1.2 -> 0.1.4
+- **yaml**: 0.2.1 -> 0.4.0
+- **zlib**: 3.0.0 -> 3.2.3
+
+
+============================================================
+COMMAND 3: /envexa:envexa_status (envexa:status prompt)
+============================================================
+PASS: prompt_status
+Length: 8181 chars
+
+# Envexa Health Report
+**Generated:** 2026-05-21T13:09:50.292647
+
+## Dashboard
+| Toolchain  | Status               | Version |
+|------------|----------------------|--------------------|
+| 🍺 Brew    | ⚠️ WARN (5)         | 5.1.12-60-gd8deaca |
+|  npm     | ✅ PASS             | v24.15.0 |
+|  pnpm    | ✅ PASS             | v24.15.0 |
+|  Yarn    | ⏭️ SKIP             |  |
+|  Bun     | ✅ PASS             | 1.3.14 |
+|  Deno    | ✅ PASS             | deno 2.5.4 (stable, release, aarch64-apple-darwin) |
+|  pip     | ✅ PASS             | Python 3.14.3 |
+|  Gem     | ⚠️ WARN (100)       | ruby 3.2.2 (2023-03-30 revision e51014f9c0) [arm64-darwin24] |
+| 🦀 Cargo   | ✅ PASS             | rustc 1.93.0 (254b59607 2026-01-19) |
+| 🐳 Docker  | ❌ FAIL             | unknown |
+
+## Outdated Packages
+```
+├── 🍺 Brew (5)
+│   ├── yvgude/lean-ctx/lean-ctx: 3.5.10 -> 3.6.13
+│   ├── codex: 0.130.0 -> 0.132.0
+│   ├── crossover: 26.0.0 -> 26.1.0
+│   ├── stats: 2.11.42 -> 2.12.14
+│   └── transmission: 4.0.6 -> 4.1.1
+└──  Gem (100)
+    ├── CFPropertyList: 3.0.8 -> 4.0.0
+    ├── abbrev: 0.1.1 -> 0.1.2
+    ├── activesupport: 7.2.3 -> 8.1.3
+    ├── addressable: 2.8.8 -> 2.9.0
+    ├── atomos: 0.1.3 -> 1.0.0
+    ├── base64: 0.1.1 -> 0.3.0
+    ├── bigdecimal: 3.1.3 -> 4.1.2
+    ├── bundler: 2.4.10 -> 4.0.12
+    ├── cgi: 0.3.6 -> 0.5.1
+    ├── colored2: 3.1.2 -> 4.0.3
+    ├── concurrent-ruby: 1.3.5 -> 1.3.6
+    ├── connection_pool: 2.5.5 -> 3.0.2
+    ├── csv: 3.2.6 -> 3.3.5
+    ├── date: 3.3.3 -> 3.5.1
+    ├── debug: 1.7.1 -> 1.11.1
+    ├── delegate: 0.3.0 -> 0.6.1
+    ├── did_you_mean: 1.6.3 -> 2.0.0
+    ├── digest: 3.1.1 -> 3.2.1
+    ├── drb: 2.1.1 -> 2.2.3
+    ├── english: 0.7.2 -> 0.8.1
+    ├── erb: 4.0.2 -> 6.0.4
+    ├── error_highlight: 0.5.1 -> 0.7.1
+    ├── etc: 1.4.2 -> 1.4.6
+    ├── ethon: 0.15.0 -> 0.18.0
+    ├── fcntl: 1.0.2 -> 1.3.0
+    ├── ffi: 1.17.2 -> 1.17.4
+    ├── fiddle: 1.1.1 -> 1.1.8
+    ├── fileutils: 1.7.0 -> 1.8.0
+    ├── find: 0.1.1 -> 0.2.0
+    ├── forwardable: 1.3.3 -> 1.4.0
+    ├── fuzzy_match: 2.0.4 -> 2.1.0
+    ├── getoptlong: 0.2.0 -> 0.2.1
+    ├── i18n: 1.14.7 -> 1.14.8
+    ├── io-console: 0.6.0 -> 0.8.2
+    ├── io-nonblock: 0.2.0 -> 0.3.2
+    ├── io-wait: 0.3.0 -> 0.4.0
+    ├── ipaddr: 1.2.5 -> 1.2.9
+    ├── irb: 1.6.2 -> 1.18.0
+    ├── json: 2.6.3 -> 2.19.5
+    ├── logger: 1.5.3 -> 1.7.0
+    ├── matrix: 0.4.2 -> 0.4.3
+    ├── mcp: 0.8.0 -> 0.17.0
+    ├── minitest: 5.16.3 -> 6.0.6
+    ├── mutex_m: 0.1.2 -> 0.3.0
+    ├── net-ftp: 0.2.0 -> 0.3.9
+    ├── net-http: 0.3.2 -> 0.9.1
+    ├── net-imap: 0.3.4 -> 0.6.4
+    ├── net-protocol: 0.2.1 -> 0.2.2
+    ├── net-smtp: 0.3.3 -> 0.5.1
+    ├── nkf: 0.1.2 -> 0.2.0
+    ├── observer: 0.1.1 -> 0.1.2
+    ├── open-uri: 0.3.0 -> 0.5.0
+    ├── open3: 0.1.2 -> 0.2.1
+    ├── openssl: 3.1.0 -> 4.0.2
+    ├── optparse: 0.3.1 -> 0.8.1
+    ├── ostruct: 0.5.5 -> 0.6.3
+    ├── parallel: 1.27.0 -> 2.1.0
+    ├── parser: 3.3.10.2 -> 3.3.11.1
+    ├── pathname: 0.2.1 -> 0.5.0
+    ├── power_assert: 2.0.3 -> 3.0.1
+    ├── pp: 0.4.0 -> 0.6.3
+    ├── prettyprint: 0.1.1 -> 0.2.0
+    ├── prime: 0.1.2 -> 0.1.4
+    ├── pstore: 0.1.2 -> 0.2.1
+    ├── psych: 5.0.1 -> 5.3.1
+    ├── public_suffix: 4.0.7 -> 7.0.5
+    ├── racc: 1.6.2 -> 1.8.1
+    ├── rake: 13.0.6 -> 13.4.2
+    ├── rbs: 2.8.2 -> 4.0.2
+    ├── rdoc: 6.5.0 -> 7.2.0
+    ├── readline: 0.0.3 -> 0.0.4
+    ├── readline-ext: 0.1.5 -> 0.2.0
+    ├── regexp_parser: 2.11.3 -> 2.12.0
+    ├── reline: 0.3.2 -> 0.6.3
+    ├── resolv: 0.2.2 -> 0.7.1
+    ├── resolv-replace: 0.1.1 -> 0.2.0
+    ├── rinda: 0.1.1 -> 0.2.0
+    ├── rss: 0.2.9 -> 0.3.2
+    ├── rubocop: 1.85.1 -> 1.86.2
+    ├── ruby-macho: 2.5.1 -> 5.0.0
+    ├── set: 1.0.3 -> 1.1.3
+    ├── shellwords: 0.1.0 -> 0.2.2
+    ├── singleton: 0.1.1 -> 0.3.0
+    ├── stringio: 3.0.4 -> 3.2.0
+    ├── strscan: 3.0.5 -> 3.1.8
+    ├── syntax_suggest: 1.0.2 -> 3.0.0
+    ├── syslog: 0.1.1 -> 0.4.0
+    ├── tempfile: 0.1.3 -> 0.3.1
+    ├── test-unit: 3.5.7 -> 3.7.7
+    ├── time: 0.2.2 -> 0.4.2
+    ├── timeout: 0.3.1 -> 0.6.1
+    ├── tmpdir: 0.1.3 -> 0.3.1
+    ├── tsort: 0.1.1 -> 0.2.0
+    ├── typeprof: 0.21.3 -> 0.32.0
+    ├── typhoeus: 1.5.0 -> 1.6.0
+    ├── un: 0.2.1 -> 0.3.0
+    ├── uri: 0.12.1 -> 1.1.1
+    ├── weakref: 0.1.2 -> 0.1.4
+    ├── yaml: 0.2.1 -> 0.4.0
+    └── zlib: 3.0.0 -> 3.2.3
+```
+
+## Per-Toolchain Details
+
+### 🍺 [WARN] Brew
+**Version:** 5.1.12-60-gd8deaca
+**Formulae:** 72
+
+| Package | Current | Latest |
+|---------|---------|--------|
+| yvgude/lean-ctx/lean-ctx | 3.5.10 | 3.6.13 |
+| codex | 0.130.0 | 0.132.0 |
+| crossover | 26.0.0 | 26.1.0 |
+| stats | 2.11.42 | 2.12.14 |
+| transmission | 4.0.6 | 4.1.1 |
+
+> 5 outdated package(s)
+
+###  [PASS] npm
+**Node:** v24.15.0
+
+###  [PASS] pnpm
+**Node:** v24.15.0 | **pnpm:** 11.1.2
+
+###  [SKIP] Yarn
+> yarn not installed
+
+###  [PASS] Bun
+**bun:** 1.3.14
+
+###  [PASS] Deno
+**deno:** deno 2.5.4 (stable, release, aarch64-apple-darwin)
+
+###  [PASS] pip
+**Python:** Python 3.14.3
+
+###  [WARN] Gem
+**Ruby:** ruby 3.2.2 (2023-03-30 revision e51014f9c0) [arm64-darwin24]
+
+| Package | Current | Latest |
+|---------|---------|--------|
+| CFPropertyList | 3.0.8 | 4.0.0 |
+| abbrev | 0.1.1 | 0.1.2 |
+| activesupport | 7.2.3 | 8.1.3 |
+| addressable | 2.8.8 | 2.9.0 |
+| atomos | 0.1.3 | 1.0.0 |
+| base64 | 0.1.1 | 0.3.0 |
+| bigdecimal | 3.1.3 | 4.1.2 |
+| bundler | 2.4.10 | 4.0.12 |
+| cgi | 0.3.6 | 0.5.1 |
+| colored2 | 3.1.2 | 4.0.3 |
+| concurrent-ruby | 1.3.5 | 1.3.6 |
+| connection_pool | 2.5.5 | 3.0.2 |
+| csv | 3.2.6 | 3.3.5 |
+| date | 3.3.3 | 3.5.1 |
+| debug | 1.7.1 | 1.11.1 |
+| delegate | 0.3.0 | 0.6.1 |
+| did_you_mean | 1.6.3 | 2.0.0 |
+| digest | 3.1.1 | 3.2.1 |
+| drb | 2.1.1 | 2.2.3 |
+| english | 0.7.2 | 0.8.1 |
+| erb | 4.0.2 | 6.0.4 |
+| error_highlight | 0.5.1 | 0.7.1 |
+| etc | 1.4.2 | 1.4.6 |
+| ethon | 0.15.0 | 0.18.0 |
+| fcntl | 1.0.2 | 1.3.0 |
+| ffi | 1.17.2 | 1.17.4 |
+| fiddle | 1.1.1 | 1.1.8 |
+| fileutils | 1.7.0 | 1.8.0 |
+| find | 0.1.1 | 0.2.0 |
+| forwardable | 1.3.3 | 1.4.0 |
+| fuzzy_match | 2.0.4 | 2.1.0 |
+| getoptlong | 0.2.0 | 0.2.1 |
+| i18n | 1.14.7 | 1.14.8 |
+| io-console | 0.6.0 | 0.8.2 |
+| io-nonblock | 0.2.0 | 0.3.2 |
+| io-wait | 0.3.0 | 0.4.0 |
+| ipaddr | 1.2.5 | 1.2.9 |
+| irb | 1.6.2 | 1.18.0 |
+| json | 2.6.3 | 2.19.5 |
+| logger | 1.5.3 | 1.7.0 |
+| matrix | 0.4.2 | 0.4.3 |
+| mcp | 0.8.0 | 0.17.0 |
+| minitest | 5.16.3 | 6.0.6 |
+| mutex_m | 0.1.2 | 0.3.0 |
+| net-ftp | 0.2.0 | 0.3.9 |
+| net-http | 0.3.2 | 0.9.1 |
+| net-imap | 0.3.4 | 0.6.4 |
+| net-protocol | 0.2.1 | 0.2.2 |
+| net-smtp | 0.3.3 | 0.5.1 |
+| nkf | 0.1.2 | 0.2.0 |
+| observer | 0.1.1 | 0.1.2 |
+| open-uri | 0.3.0 | 0.5.0 |
+| open3 | 0.1.2 | 0.2.1 |
+| openssl | 3.1.0 | 4.0.2 |
+| optparse | 0.3.1 | 0.8.1 |
+| ostruct | 0.5.5 | 0.6.3 |
+| parallel | 1.27.0 | 2.1.0 |
+| parser | 3.3.10.2 | 3.3.11.1 |
+| pathname | 0.2.1 | 0.5.0 |
+| power_assert | 2.0.3 | 3.0.1 |
+| pp | 0.4.0 | 0.6.3 |
+| prettyprint | 0.1.1 | 0.2.0 |
+| prime | 0.1.2 | 0.1.4 |
+| pstore | 0.1.2 | 0.2.1 |
+| psych | 5.0.1 | 5.3.1 |
+| public_suffix | 4.0.7 | 7.0.5 |
+| racc | 1.6.2 | 1.8.1 |
+| rake | 13.0.6 | 13.4.2 |
+| rbs | 2.8.2 | 4.0.2 |
+| rdoc | 6.5.0 | 7.2.0 |
+| readline | 0.0.3 | 0.0.4 |
+| readline-ext | 0.1.5 | 0.2.0 |
+| regexp_parser | 2.11.3 | 2.12.0 |
+| reline | 0.3.2 | 0.6.3 |
+| resolv | 0.2.2 | 0.7.1 |
+| resolv-replace | 0.1.1 | 0.2.0 |
+| rinda | 0.1.1 | 0.2.0 |
+| rss | 0.2.9 | 0.3.2 |
+| rubocop | 1.85.1 | 1.86.2 |
+| ruby-macho | 2.5.1 | 5.0.0 |
+| set | 1.0.3 | 1.1.3 |
+| shellwords | 0.1.0 | 0.2.2 |
+| singleton | 0.1.1 | 0.3.0 |
+| stringio | 3.0.4 | 3.2.0 |
+| strscan | 3.0.5 | 3.1.8 |
+| syntax_suggest | 1.0.2 | 3.0.0 |
+| syslog | 0.1.1 | 0.4.0 |
+| tempfile | 0.1.3 | 0.3.1 |
+| test-unit | 3.5.7 | 3.7.7 |
+| time | 0.2.2 | 0.4.2 |
+| timeout | 0.3.1 | 0.6.1 |
+| tmpdir | 0.1.3 | 0.3.1 |
+| tsort | 0.1.1 | 0.2.0 |
+| typeprof | 0.21.3 | 0.32.0 |
+| typhoeus | 1.5.0 | 1.6.0 |
+| un | 0.2.1 | 0.3.0 |
+| uri | 0.12.1 | 1.1.1 |
+| weakref | 0.1.2 | 0.1.4 |
+| yaml | 0.2.1 | 0.4.0 |
+| zlib | 3.0.0 | 3.2.3 |
+
+> 100 outdated gem(s)
+
+### 🦀 [PASS] Cargo
+**Rust:** rustc 1.93.0 (254b59607 2026-01-19) | **Cargo:** cargo 1.93.0 (083ac5135 2025-12-15)
+
+> cargo-outdated not installed (run: cargo install cargo-outdated)
+
+### 🐳 [FAIL] Docker
+**Version:** unknown
+
+> Docker daemon not running
+
+
+============================================================
+CMD TOOL: /scan (via cmd tool)
+============================================================
+PASS: cmd('/scan')
+Length: 8181 chars
+First line: # Envexa Health Report
+
+
+============================================================
+CMD TOOL: /status (via cmd tool)
+============================================================
+PASS: cmd('/status')
+# Envexa Status
+
+| Tool     | Status           |
+|----------|------------------|
+| Brew     | WARN   (5)      |
+| npm      | PASS            |
+| pnpm     | PASS            |
+| Yarn     | SKIP            |
+| Bun      | PASS            |
+| Deno     | PASS            |
+| pip      | PASS            |
+| Gem      | WARN   (100)    |
+| Cargo    | PASS            |
+| Docker   | FAIL            |
+
+Run `/envexa:scan` for full report or `/envexa:outdated` for details.
+
+
+============================================================
+CMD TOOL: /outdated (via cmd tool)
+============================================================
+PASS: cmd('/outdated')
+Length: 3296 chars
+First 200:
+# Outdated Packages
+
+## Brew (5 outdated)
+
+- **yvgude/lean-ctx/lean-ctx**: 3.5.10 -> 3.6.13
+- **codex**: 0.130.0 -> 0.132.0
+- **crossover**: 26.0.0 -> 26.1.0
+- **stats**: 2.11.42 -> 2.12.14
+- **transm
+
+
+============================================================
+CMD TOOL: /help
+============================================================
+PASS: cmd('/help')
+Envexa slash commands — type these in chat or pass to the cmd tool:
+
+  /scan [chain]       — Full health scan (chain: all|brew|npm|pnpm|yarn|bun|deno|pip|gem|cargo|docker)
+  /outdated [chain]   — Check outdated packages only
+  /status             — Quick dashboard summary
+  /upgrade <tool>     — Upgrade a toolchain (pip currently supported)
+  /report             — Show the latest cached report
+  /help               — Show this message
+
+Examples:
+  /scan brew          — Scan only Homebrew
+  /scan pnpm          — Scan only pnpm
+  /upgrade pip        — Upgrade pip to latest
+  /status             — One-line health check
+
+

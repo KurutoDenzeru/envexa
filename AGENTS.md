@@ -55,6 +55,20 @@ Then confirm:
 
 ---
 
+## Slash commands
+
+When the user types a `/` command in chat (e.g. `/scan`, `/status`), use the `envexa_cmd` tool to handle it. Do NOT call individual scan/outdated tools unless the user explicitly asks.
+
+Available via `envexa_cmd`:
+- `/scan [chain]` → full health scan
+- `/outdated [chain]` → outdated packages only
+- `/status` → quick dashboard
+- `/upgrade <tool>` → upgrade a toolchain
+- `/report` → latest cached report
+- `/help` → show all commands
+
+The MCP prompts (`/envexa:scan`, `/envexa:status`, `/envexa:outdated`) also appear in the `/` menu as an alternative.
+
 ## MCP tool patterns
 
 - Each tool gets a short, one-line `description=` that starts with "Envexa — "

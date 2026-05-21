@@ -1,37 +1,53 @@
-# Envexa
+# 🔍 Envexa
 
-**DevEnv Health Monitor** — an MCP server that snapshots your entire development environment across six toolchains and surfaces outdated packages, version mismatches, unused dependencies, and runtime issues.
-
----
-
-## Features
-
-- **Six toolchains** — Homebrew, Node/npm, Python/pip, Ruby/gem, Rust/cargo, Docker
-- **Outdated detection** — per-toolchain lists with current vs. latest versions
-- **Cross-project mismatch scanning** — finds version conflicts across `package.json`, `Cargo.toml`, and `pyproject.toml`
-- **Unused dependency analysis** — powered by `depcheck` for npm projects
-- **Dashboard + tree report** — compact summary table followed by a hierarchical outdated tree and per-toolchain detail tables
-- **Slash commands** — preset quick commands via the `cmd` tool (`/scan`, `/outdated`, `/status`, `/upgrade pip`, `/help`)
-- **Persistent state** — latest scan is cached to `report.json` for offline reads and resource access
+**DevEnv Health Monitor** — an MCP server that snapshots your dev environment and surfaces outdated packages, version mismatches, unused deps, and runtime issues.
 
 ---
 
-## Quick start
+## Table of Contents
 
-### Prerequisites
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [Slash Commands](#slash-commands)
+- [MCP Tools](#mcp-tools)
+- [MCP Resources](#mcp-resources)
+- [MCP Prompts](#mcp-prompts)
+- [Toolchains](#toolchains)
+- [Sample Output](#sample-output)
+- [Project Structure](#project-structure)
+- [Development](#development)
 
-- Python 3.12+
-- [uv](https://docs.astral.sh/uv/)
+---
 
-### Install
+## Overview
+
+Ever wonder what's rotting in your dev environment? Run one scan and Envexa tells you:
+
+- Which Homebrew formulae and casks are outdated
+- Which npm/pip/gem packages need updating
+- If your Docker daemon is running and how much disk it's using
+- Version conflicts for the same dependency across multiple projects
+- Unused dependencies in your npm projects
+
+All results are cached to `report.json` so you can read them offline or compare over time.
+
+---
+
+## Quick Start
+
+**Prerequisites:** Python 3.12+, [uv](https://docs.astral.sh/uv/)
 
 ```bash
+# Install
 uv sync
+
+# Test a full scan (no MCP server needed)
+uv run python -c "from src.scanner import run_scan, format_report; print(format_report(run_scan('all')))"
 ```
 
 ### Register with opencode
 
-Add to your `~/.config/opencode/opencode.json`:
+Add to `~/.config/opencode/opencode.json`:
 
 ```json
 {
@@ -47,80 +63,119 @@ Add to your `~/.config/opencode/opencode.json`:
 }
 ```
 
-Then restart opencode or reload its MCP servers.
+Then restart opencode or reload MCP servers.
 
 ---
 
-## MCP tools
+## Slash Commands
+
+Type these directly in chat or pass to the `envexa_cmd` tool:
+
+| Command | What it does |
+|---------|--------------|
+| `/scan [chain]` | Full health scan (default: all toolchains) |
+| `/outdated [chain]` | Outdated packages only |
+| `/status` | Quick dashboard summary |
+| `/upgrade pip` | Upgrade pip to latest |
+| `/report` | Show the last cached report |
+| `/help` | Show all available slash commands |
+
+Examples: `/scan brew`, `/scan pnpm`, `/status`
+
+> **Pro tip:** When the AI agent is active, just type `/scan` in chat and it'll handle the tool call for you.
+
+---
+
+## MCP Tools
 
 | Tool | Description |
-|---|---|
-| `scan` | Full health scan of all (or a single) toolchain |
-| `check_outdated` | Outdated packages only, by toolchain |
-| `check_mismatches` | Version conflicts across project directories |
-| `find_unused` | Unused deps in a project (npm via depcheck) |
-| `get_report` | Latest cached report as markdown |
-| `brew_status` | Quick Homebrew scan |
-| `npm_status` | Quick npm/Node scan |
-| `pip_status` | Quick Python/pip scan |
-| `pip_upgrade` | Upgrade pip to latest |
-| `cmd` | Slash-command relay (`/scan`, `/outdated brew`, `/status`, `/upgrade pip`, `/help`) |
+|------|-------------|
+| `envexa_scan` | Full health scan of all or one toolchain |
+| `envexa_check_outdated` | Outdated packages only |
+| `envexa_check_mismatches` | Version conflicts across projects |
+| `envexa_find_unused` | Unused deps in an npm project |
+| `envexa_get_report` | Latest cached report as markdown |
+| `envexa_brew_status` | Homebrew only |
+| `envexa_npm_status` | npm/Node only |
+| `envexa_pip_status` | Python/pip only |
+| `envexa_pip_upgrade` | Upgrade pip |
+| `envexa_cmd` | Slash-command relay (see above) |
 
-## MCP resources
+---
 
-| URI | MIME | Description |
-|---|---|---|
-| `envexa://report` | `text/markdown` | Latest full report |
-| `envexa://report/raw` | `application/json` | Latest report as raw JSON |
+## MCP Resources
+
+| URI | Type | What you get |
+|-----|------|-------------|
+| `envexa://report` | `text/markdown` | Formatted health report |
+| `envexa://report/raw` | `application/json` | Raw JSON for scripting |
+
+---
+
+## MCP Prompts
+
+These appear in opencode's `/` menu — no parameters needed, they run immediately:
+
+| Menu entry | What it does |
+|------------|-------------|
+| `/envexa:envexa_scan` | Full health report |
+| `/envexa:envexa_status` | Full health report (same as scan) |
+| `/envexa:envexa_outdated` | Outdated packages across all toolchains |
 
 ---
 
 ## Toolchains
 
 | Toolchain | What's checked |
-|---|---|
-| **Homebrew** | Outdated formulae and casks (with versions), installed formula count |
-| **Node/npm** | Runtime version, global package outdated list |
-| **Python/pip** | Runtime version, global pip outdated list |
-| **Ruby/gem** | Runtime version, outdated gem list |
-| **Rust/cargo** | Runtime version, `cargo-outdated` tool availability |
-| **Docker** | Daemon connectivity, disk usage by type, dangling image count |
+|-----------|----------------|
+| **Homebrew** | Outdated formulae + casks, install count |
+| **npm** | Runtime version, outdated global packages |
+| **pnpm** | Runtime version, outdated global packages |
+| **Yarn** | Availability check (if installed) |
+| **Bun** | Runtime version, outdated global packages |
+| **Deno** | Runtime version, outdated global packages |
+| **pip** | Runtime version, outdated packages |
+| **Gem** | Runtime version, outdated gem list |
+| **Cargo** | Runtime version, cargo-outdated tool check |
+| **Docker** | Daemon connectivity, disk usage, dangling images |
 
 ---
 
-## Sample output
+## Sample Output
 
 ```
-| Toolchain | Status       | Version                        |
-|-----------|-------------|--------------------------------|
-| Brew      | WARN (5)    | 5.1.12                        |
-| Npm       | PASS        | v24.15.0                      |
-| Pip       | PASS        | Python 3.14.3                 |
-| Gem       | WARN (100)  | ruby 3.2.2                    |
-| Cargo     | PASS        | rustc 1.93.0                  |
-| Docker    | FAIL        | daemon not running            |
+| Toolchain  | Status               | Version |
+|------------|----------------------|---------|
+| 🍺 Brew    | ⚠️ WARN (5)         | 5.1.12  |
+|  npm     | ✅ PASS             | v24.15.0 |
+|  pnpm    | ✅ PASS             | v11.1.2 |
+|  Yarn    | ⏭️ SKIP             |         |
+|  Bun     | ✅ PASS             | 1.3.14  |
+|  Deno    | ✅ PASS             | 2.5.4   |
+|  pip     | ✅ PASS             | Python 3.14.3 |
+|  Gem     | ⚠️ WARN (100)       | ruby 3.2.2 |
+| 🦀 Cargo   | ✅ PASS             | rustc 1.93.0 |
+| 🐳 Docker  | ❌ FAIL             | daemon not running |
 ```
 
 ---
 
-## Project structure
+## Project Structure
 
 ```
 envexa/
-├── pyproject.toml        # Python project config
+├── pyproject.toml           # Dependencies + metadata
 ├── src/
-│   ├── server.py         # MCP server entry (tools + resources)
-│   ├── scanner.py        # Scan orchestration + report formatting
-│   ├── mismatches.py     # Cross-project version conflict detection
-│   ├── unused.py         # Unused dependency finder
-│   └── toolchains/       # One module per toolchain
-│       ├── brew.py
-│       ├── npm.py
-│       ├── pip.py
-│       ├── gem.py
-│       ├── cargo.py
-│       └── docker.py
-└── report.json           # Cached scan results
+│   ├── server.py            # MCP server entry point (tools, prompts, resources)
+│   ├── scanner.py           # Scan orchestration + report formatting
+│   ├── mismatches.py        # Cross-project version conflict detection
+│   ├── unused.py            # Unused dependency analysis (via depcheck)
+│   └── toolchains/          # One scanner per toolchain
+│       ├── brew.py / npm.py / pip.py / gem.py / cargo.py / docker.py
+│       ├── pnpm.py / yarn.py / bun.py / deno.py
+├── AGENTS.md                # Instructions for AI assistants
+├── report.json              # Cached scan results (gitignored)
+├── test_output.txt          # Verification test results (gitignored)
 ```
 
 ---
@@ -128,13 +183,13 @@ envexa/
 ## Development
 
 ```bash
-# Install dependencies
+# Install
 uv sync
 
-# Test a full scan locally
+# Run a scan locally
 uv run python -c "from src.scanner import run_scan, format_report; print(format_report(run_scan('all')))"
 
-# Start the MCP server (stdio)
+# Start MCP server (stdio)
 uv run python -m src.server
 ```
 
@@ -142,4 +197,4 @@ uv run python -m src.server
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT
