@@ -3,19 +3,37 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .toolchains import brew, npm, pip, gem, cargo, docker
+from .toolchains import brew, npm, pip, gem, cargo, docker, pnpm, yarn, bun, deno
 
 REPORT_FILE = Path(__file__).resolve().parent.parent / "report.json"
 
 SCANNERS = {
     "brew": brew.scan,
     "npm": npm.scan,
+    "pnpm": pnpm.scan,
+    "yarn": yarn.scan,
+    "bun": bun.scan,
+    "deno": deno.scan,
     "pip": pip.scan,
     "gem": gem.scan,
     "cargo": cargo.scan,
     "docker": docker.scan,
 }
 
+_ICONS = {
+    "brew": "🍺",
+    "npm": "",
+    "pnpm": "",
+    "yarn": "",
+    "bun": "",
+    "deno": "",
+    "pip": "",
+    "gem": "",
+    "cargo": "🦀",
+    "docker": "🐳",
+}
+
+_STATUS_EMOJI = {"ok": "✅", "warning": "⚠️", "error": "❌", "skipped": "⏭️"}
 _LABELS = {"ok": "PASS", "warning": "WARN", "error": "FAIL", "skipped": "SKIP"}
 
 
@@ -65,22 +83,24 @@ def format_report(report: dict = None) -> str:
     dashboard_rows = []
 
     for tool, res in results.items():
+        icon = _ICONS.get(tool, "")
         outdated_items = _extract_outdated(res)
         if outdated_items:
             outdated_all[tool] = outdated_items
 
+        status_emoji = _STATUS_EMOJI.get(res["status"], "")
         status_text = {"ok": "PASS", "warning": f"WARN ({len(outdated_items)})", "error": "FAIL", "skipped": "SKIP"}.get(res["status"], "?")
-        version_keys = {"version": "Version", "node_version": "Node", "python_version": "Python", "ruby_version": "Ruby", "rustc_version": "Rust"}
+        version_keys = {"version": "Version", "node_version": "Node", "python_version": "Python", "ruby_version": "Ruby", "rustc_version": "Rust", "pnpm_version": "pnpm", "yarn_version": "yarn", "bun_version": "bun", "deno_version": "deno"}
         ver_str = ""
         for k in version_keys:
             if k in res and res[k]:
                 ver_str = res[k]
                 break
-        dashboard_rows.append(f"| {tool.title():8} | {status_text:<18} | {ver_str} |")
+        dashboard_rows.append(f"| {icon} {tool.title():7} | {status_emoji} {status_text:<16} | {ver_str} |")
 
     lines.append("## Dashboard")
-    lines.append(f"| {'Toolchain':8} | {'Status':<18} | {'Version'} |")
-    lines.append(f"|{'-'*10}|{'-'*20}|{'-'*20}|")
+    lines.append(f"| {'Toolchain':10} | {'Status':<20} | {'Version'} |")
+    lines.append(f"|{'-'*12}|{'-'*22}|{'-'*20}|")
     for row in dashboard_rows:
         lines.append(row)
     lines.append("")
@@ -90,10 +110,11 @@ def format_report(report: dict = None) -> str:
         lines.append("```")
         tool_names = list(outdated_all.keys())
         for i, tool in enumerate(tool_names):
+            icon = _ICONS.get(tool, "")
             items = outdated_all[tool]
             is_last_tool = i == len(tool_names) - 1
             tool_prefix = "└── " if is_last_tool else "├── "
-            lines.append(f"{tool_prefix}{tool.title()} ({len(items)})")
+            lines.append(f"{tool_prefix}{icon} {tool.title()} ({len(items)})")
             indent_prefix = "    " if is_last_tool else "│   "
             for j, item in enumerate(items):
                 sub_prefix = "└── " if j == len(items) - 1 else "├── "
@@ -105,15 +126,16 @@ def format_report(report: dict = None) -> str:
     lines.append("## Per-Toolchain Details")
     lines.append("")
     for tool, res in results.items():
+        icon = _ICONS.get(tool, "")
         label = _LABELS.get(res["status"], "?")
-        lines.append(f"### [{label}] {tool.title()}")
+        lines.append(f"### {icon} [{label}] {tool.title()}")
 
         if res["status"] == "skipped":
             lines.append(f"> {res['issues'][0] if res['issues'] else 'Skipped'}")
             lines.append("")
             continue
 
-        version_labels = {"version": "Version", "node_version": "Node", "python_version": "Python", "ruby_version": "Ruby", "rustc_version": "Rust", "cargo_version": "Cargo"}
+        version_labels = {"version": "Version", "node_version": "Node", "python_version": "Python", "ruby_version": "Ruby", "rustc_version": "Rust", "cargo_version": "Cargo", "pnpm_version": "pnpm", "yarn_version": "yarn", "bun_version": "bun", "deno_version": "deno"}
         ver_parts = []
         for k, v in version_labels.items():
             if k in res and res[k]:

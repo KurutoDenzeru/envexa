@@ -15,7 +15,7 @@ REPORT_FILE = Path(__file__).resolve().parent.parent / "report.json"
 # ── Core tools ──────────────────────────────────────────────────────────
 
 @mcp.tool(
-    description="Envexa — scan dev environment toolchains (brew, node, python, ruby, cargo, docker). chain: all|brew|npm|pip|gem|cargo|docker"
+    description="Envexa — scan dev environment toolchains. chain: all|brew|npm|pnpm|yarn|bun|deno|pip|gem|cargo|docker"
 )
 def scan(chain: str = "all") -> str:
     report = scanner.run_scan(chain)
@@ -25,7 +25,7 @@ def scan(chain: str = "all") -> str:
 
 
 @mcp.tool(
-    description="Envexa — check for outdated packages. chain: all|brew|npm|pip|gem|cargo|docker"
+    description="Envexa — check for outdated packages. chain: all|brew|npm|pnpm|yarn|bun|deno|pip|gem|cargo|docker"
 )
 def check_outdated(chain: str = "all") -> str:
     report = scanner.run_scan(chain)
@@ -97,7 +97,7 @@ def get_report() -> str:
 
 _CMD_HELP = """Available commands:
 
-  /scan [chain]       — Full health scan (chain: all|brew|npm|pip|gem|cargo|docker)
+  /scan [chain]       — Full health scan (chain: all|brew|npm|pnpm|yarn|bun|deno|pip|gem|cargo|docker)
   /outdated [chain]   — Check outdated packages only
   /status             — Quick dashboard summary
   /upgrade <tool>     — Upgrade a toolchain (pip currently supported)
@@ -106,6 +106,7 @@ _CMD_HELP = """Available commands:
 
 Examples:
   /scan brew          — Scan only Homebrew
+  /scan pnpm          — Scan only pnpm
   /upgrade pip        — Upgrade pip to latest
   /status             — One-line health check
 """
@@ -137,7 +138,7 @@ def cmd(command: str) -> str:
         report = scanner.run_scan("all")
         results = report["results"]
         rows = []
-        for tool in ("brew", "npm", "pip", "gem", "cargo", "docker"):
+        for tool in ("brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker"):
             if tool not in results:
                 continue
             res = results[tool]
@@ -193,7 +194,7 @@ def prompt_status() -> list[dict]:
     report = scanner.run_scan("all")
     results = report["results"]
     rows = []
-    for tool in ("brew", "npm", "pip", "gem", "cargo", "docker"):
+    for tool in ("brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker"):
         if tool not in results:
             continue
         res = results[tool]
@@ -246,6 +247,26 @@ def brew_status() -> str:
 @mcp.tool(description="Envexa — scan only npm/Node.js")
 def npm_status() -> str:
     return scan("npm")
+
+
+@mcp.tool(description="Envexa — scan only pnpm")
+def pnpm_status() -> str:
+    return scan("pnpm")
+
+
+@mcp.tool(description="Envexa — scan only Yarn")
+def yarn_status() -> str:
+    return scan("yarn")
+
+
+@mcp.tool(description="Envexa — scan only Bun")
+def bun_status() -> str:
+    return scan("bun")
+
+
+@mcp.tool(description="Envexa — scan only Deno")
+def deno_status() -> str:
+    return scan("deno")
 
 
 @mcp.tool(description="Envexa — scan only Python/pip")
