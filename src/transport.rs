@@ -316,10 +316,8 @@ fn handle_request(
             };
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
-        "resources/list" => {
-            serde_json::to_value(serde_json::json!({"resources": resources}))
-                .map_err(|e| e.to_string())
-        }
+        "resources/list" => serde_json::to_value(serde_json::json!({"resources": resources}))
+            .map_err(|e| e.to_string()),
         "resources/read" => {
             let params = params.ok_or_else(|| "Missing params".to_string())?;
             let uri = params["uri"]
