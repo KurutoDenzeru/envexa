@@ -127,11 +127,11 @@ def cmd(command: str) -> str:
         return _CMD_HELP
 
     if cmd_name in ("/scan", "scan"):
-        chain = args[0] if args else "all"
+        chain = (args[0] if args else "all").strip() or "all"
         return scan(chain)
 
     if cmd_name in ("/outdated", "outdated"):
-        chain = args[0] if args else "all"
+        chain = (args[0] if args else "all").strip() or "all"
         return check_outdated(chain)
 
     if cmd_name in ("/status", "status"):
@@ -183,6 +183,7 @@ def cmd(command: str) -> str:
 
 @mcp.prompt(name="envexa:scan", description="Scan dev environment toolchains")
 def prompt_scan(chain: str = "all") -> list[dict]:
+    chain = chain.strip() or "all"
     report = scanner.run_scan(chain)
     if "error" in report:
         return [{"role": "user", "content": report["error"]}]
@@ -216,6 +217,7 @@ def prompt_status() -> list[dict]:
 
 @mcp.prompt(name="envexa:outdated", description="Check outdated packages")
 def prompt_outdated(chain: str = "all") -> list[dict]:
+    chain = chain.strip() or "all"
     report = scanner.run_scan(chain)
     results = report["results"]
     lines = ["# Outdated Packages\n"]
