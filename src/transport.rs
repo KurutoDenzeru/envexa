@@ -78,6 +78,7 @@ impl JsonRpcResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InitializeParams {
     #[serde(default)]
     pub protocol_version: String,
@@ -88,6 +89,7 @@ pub struct InitializeParams {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InitializeResult {
     pub protocol_version: String,
     pub capabilities: ServerCapabilities,
@@ -113,6 +115,7 @@ pub struct ServerInfo {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ToolDescription {
     pub name: String,
     pub description: String,
@@ -159,6 +162,7 @@ pub struct PromptMessage {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ResourceDescription {
     pub uri: String,
     pub name: String,
@@ -172,6 +176,7 @@ pub struct ReadResourceResult {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ResourceContent {
     pub uri: String,
     pub mime_type: String,
@@ -277,7 +282,9 @@ fn handle_request(
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "ping" => Ok(Value::Object(serde_json::Map::new())),
-        "tools/list" => serde_json::to_value(tools).map_err(|e| e.to_string()),
+        "tools/list" => {
+            serde_json::to_value(serde_json::json!({"tools": tools})).map_err(|e| e.to_string())
+        }
         "tools/call" => {
             let params = params.ok_or_else(|| "Missing params".to_string())?;
             let name = params["name"]
@@ -291,7 +298,9 @@ fn handle_request(
             };
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
-        "prompts/list" => serde_json::to_value(prompts).map_err(|e| e.to_string()),
+        "prompts/list" => {
+            serde_json::to_value(serde_json::json!({"prompts": prompts})).map_err(|e| e.to_string())
+        }
         "prompts/get" => {
             let params = params.ok_or_else(|| "Missing params".to_string())?;
             let name = params["name"]
@@ -307,7 +316,10 @@ fn handle_request(
             };
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
-        "resources/list" => serde_json::to_value(resources).map_err(|e| e.to_string()),
+        "resources/list" => {
+            serde_json::to_value(serde_json::json!({"resources": resources}))
+                .map_err(|e| e.to_string())
+        }
         "resources/read" => {
             let params = params.ok_or_else(|| "Missing params".to_string())?;
             let uri = params["uri"]
