@@ -201,8 +201,8 @@ def prompt_status() -> list[dict]:
         res = results[tool]
         label = {"ok": "PASS", "warning": "WARN", "error": "FAIL", "skipped": "SKIP"}.get(res["status"], "?")
         n = len(scanner._extract_outdated(res))
-        detail = f"({n})" if n else ""
-        rows.append(f"| {tool.title():8} | {label:<6} {detail:<8} |")
+        status_text = f"{label} ({n})" if n else label
+        rows.append(f"| {tool.title():8} | {status_text:<16} |")
     content = "\n".join([
         "# Envexa Status",
         "",

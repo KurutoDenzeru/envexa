@@ -38,6 +38,7 @@ _LABELS = {"ok": "PASS", "warning": "WARN", "error": "FAIL", "skipped": "SKIP"}
 
 
 def run_scan(chain: str = "all"):
+    chain = (chain or "").strip() or "all"
     if chain == "all":
         results = {name: fn() for name, fn in SCANNERS.items()}
     elif chain in SCANNERS:
