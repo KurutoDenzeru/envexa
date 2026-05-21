@@ -186,8 +186,8 @@ def prompt_scan(chain: str = "all") -> list[dict]:
     chain = chain.strip() or "all"
     report = scanner.run_scan(chain)
     if "error" in report:
-        return [{"role": "user", "content": report["error"]}]
-    return [{"role": "user", "content": scanner.format_report(report)}]
+        return [{"role": "assistant", "content": report["error"]}]
+    return [{"role": "assistant", "content": scanner.format_report(report)}]
 
 
 @mcp.prompt(name="envexa:status", description="Quick dashboard summary")
@@ -212,7 +212,7 @@ def prompt_status() -> list[dict]:
         "",
         "Run `/envexa:scan` for full report.",
     ])
-    return [{"role": "user", "content": content}]
+    return [{"role": "assistant", "content": content}]
 
 
 @mcp.prompt(name="envexa:outdated", description="Check outdated packages")
@@ -235,7 +235,7 @@ def prompt_outdated(chain: str = "all") -> list[dict]:
             lines.append("")
     if not has_anything:
         lines = ["All packages are up to date!"]
-    return [{"role": "user", "content": "\n".join(lines)}]
+    return [{"role": "assistant", "content": "\n".join(lines)}]
 
 
 # ── Quick-access single-chain tools ─────────────────────────────────────
