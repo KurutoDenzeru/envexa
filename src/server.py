@@ -178,6 +178,107 @@ def cmd(command: str) -> str:
     return f"Unknown command: `{command}`\n\n{_CMD_HELP}"
 
 
+# ── Slash-command prompts (appear in / menu as /envexa:scan:mcp etc.) ───
+
+@mcp.prompt(name="envexa:scan", description="Scan dev environment toolchains")
+def prompt_scan(chain: str = "all") -> list[dict]:
+    report = scanner.run_scan(chain)
+    if "error" in report:
+        return [{"role": "user", "content": report["error"]}]
+    return [{"role": "user", "content": scanner.format_report(report)}]
+
+
+@mcp.prompt(name="envexa:status", description="Quick dashboard summary")
+def prompt_status() -> list[dict]:
+    report = scanner.run_scan("all")
+    results = report["results"]
+    rows = []
+    for tool in ("brew", "npm", "pip", "gem", "cargo", "docker"):
+        if tool not in results:
+            continue
+        res = results[tool]
+        label = {"ok": "PASS", "warning": "WARN", "error": "FAIL", "skipped": "SKIP"}.get(res["status"], "?")
+        n = len(scanner._extract_outdated(res))
+        detail = f"({n})" if n else ""
+        rows.append(f"| {tool.title():8} | {label:<6} {detail:<8} |")
+    content = "\n".join([
+        "# Envexa Status",
+        "",
+        f"| {'Tool':8} | {'Status':<16} |",
+        f"|{'-'*10}|{'-'*18}|",
+        *rows,
+        "",
+        "Run `/envexa:scan` for full report or `/envexa:outdated` for details.",
+    ])
+    return [{"role": "user", "content": content}]
+
+
+@mcp.prompt(name="envexa:outdated", description="Check outdated packages")
+def prompt_outdated(chain: str = "all") -> list[dict]:
+    report = scanner.run_scan(chain)
+    results = report["results"]
+    lines = ["# Outdated Packages\n"]
+    has_anything = False
+    for tool, res in results.items():
+        items = []
+        for key in ("outdated_formulae", "outdated_casks", "outdated_global", "outdated"):
+            if key in res and res[key]:
+                items.extend(res[key])
+        if items:
+            has_anything = True
+            lines.append(f"## {tool.title()} ({len(items)} outdated)\n")
+            for item in items:
+                lines.append(f"- **{item['name']}**: {item.get('current', '?')} -> {item.get('latest', '?')}")
+            lines.append("")
+    if not has_anything:
+        lines = ["All packages are up to date!"]
+    return [{"role": "user", "content": "\n".join(lines)}]
+
+
+@mcp.prompt(name="envexa:upgrade", description="Upgrade a toolchain (pip)")
+def prompt_upgrade(tool: str = "pip") -> list[dict]:
+    if tool.lower() != "pip":
+        return [{"role": "user", "content": f"Upgrade not implemented for `{tool}`. Supported: pip"}]
+    if not shutil.which("pip3"):
+        return [{"role": "user", "content": "pip3 not found."}]
+    result = subprocess.run(
+        ["pip3", "install", "--upgrade", "pip"],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode == 0:
+        return [{"role": "user", "content": f"pip upgraded successfully.\n```\n{result.stdout.strip()}\n```"}]
+    return [{"role": "user", "content": f"pip upgrade failed.\n```\n{result.stderr.strip()}\n```"}]
+
+
+@mcp.prompt(name="envexa:report", description="Show the latest cached report")
+def prompt_report() -> list[dict]:
+    if not REPORT_FILE.exists():
+        return [{"role": "user", "content": "No report available. Run `/envexa:scan` first."}]
+    report = json.loads(REPORT_FILE.read_text())
+    return [{"role": "user", "content": scanner.format_report(report)}]
+
+
+@mcp.prompt(name="envexa:help", description="Show available envexa commands")
+def prompt_help() -> list[dict]:
+    content = """# Envexa Slash Commands
+
+| Command | Description |
+|---|---|
+| `/envexa:scan [chain]` | Full health scan (chain: all, brew, npm, pip, gem, cargo, docker) |
+| `/envexa:status` | Quick dashboard summary |
+| `/envexa:outdated [chain]` | Check outdated packages |
+| `/envexa:upgrade [tool]` | Upgrade a toolchain (pip) |
+| `/envexa:report` | Show latest cached report |
+| `/envexa:help` | Show this message |
+
+**Examples:**
+- `/envexa:scan brew` — Scan only Homebrew
+- `/envexa:upgrade pip` — Upgrade pip to latest
+- `/envexa:status` — One-line health check
+"""
+    return [{"role": "user", "content": content}]
+
+
 # ── Quick-access single-chain tools ─────────────────────────────────────
 
 
