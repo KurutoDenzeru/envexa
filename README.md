@@ -1,6 +1,6 @@
 # Envexa
 
-**DevEnv Health Scanner** — snapshots your dev environment and surfaces outdated packages, version mismatches, and runtime issues. Pure CLI, no MCP overhead.
+**DevEnv Health Scanner** — snapshots your dev environment and surfaces outdated packages, version mismatches, and runtime issues.
 
 ---
 

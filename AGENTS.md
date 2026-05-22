@@ -19,19 +19,21 @@
 |---------|---------|
 | `cargo build` | Debug build |
 | `cargo build --release` | Optimized build |
-| `cargo run` | Run MCP server |
+| `cargo run` | Run CLI |
 | `cargo fmt` | Format all code |
 | `cargo clippy` | Lint check |
 | `cargo test` | Run tests |
 
-Quick test (brew scan):
+Quick test:
 ```bash
-printf '{"jsonrpc":"2.0","id":1,"method":"initialize"...' | cargo run | python3 -c "..."
+cargo run -- scan brew
+cargo run -- status
+cargo run -- --help
 ```
 
 ---
 
-## Rust & MCP Conventions
+## Rust Conventions
 
 - `serde::{Serialize, Deserialize}` derive for all protocol types
 - `anyhow::Result` for fallible functions; no unwrap/expect in production
@@ -55,26 +57,14 @@ printf '{"jsonrpc":"2.0","id":1,"method":"initialize"...' | cargo run | python3 
 Before marking done, run:
 
 ```bash
-cargo build && printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n{"jsonrpc":"2.0","method":"notifications/initialized"}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"envexa_scan","arguments":{"chain":"all"}}}\n' | cargo run > /dev/null && echo "PASS"
+cargo build && cargo clippy && cargo fmt --check
 ```
 
 Then confirm:
 - No crashes on missing CLI tools
 - New scanners follow `pub async fn scan() -> ScanResult`
-- New tools registered in `server.rs` and README
 - Changed report format → show sample
 - New dependency → call out in summary
-
----
-
-## MCP Tools
-
-- Registered in `server.rs` as `ToolDescription` with name, description, input_schema
-- Descriptions start with `"Envexa — "`
-- Return `Value::String(markdown)`
-- Handlers under ~50 LOC; compose via `scanner.rs`
-- `block_in_place` + `Handle::current().block_on` for async sync calls
-- `/` commands: `/scan`, `/outdated`, `/status`, `/upgrade`, `/report`, `/help`
 
 ---
 
