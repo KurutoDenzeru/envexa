@@ -15,6 +15,7 @@ pub enum View {
     Outdated,
     Scanning,
     PackageDetail,
+    Updating,
 }
 
 pub struct App {
@@ -107,7 +108,7 @@ impl App {
                             }
                         }
                         KeyCode::Char('y') | KeyCode::Char('Y') => {
-                            self.run_detail_updates();
+                            self.do_detail_updates(&mut terminal)?;
                         }
                         KeyCode::Down | KeyCode::Char('n') => {
                             let n = self.detail_items.len().saturating_sub(1);
@@ -147,8 +148,7 @@ impl App {
                         if matches!(self.view, View::Outdated)
                             && !self.checked_outdated.is_empty() =>
                     {
-                        let msg = self.run_checked_updates();
-                        self.detail_message = msg;
+                        self.do_checked_updates(&mut terminal)?;
                     }
                     KeyCode::Char(' ') => {
                         if matches!(self.view, View::Outdated) {
@@ -222,17 +222,35 @@ impl App {
         self.view = View::PackageDetail;
     }
 
-    fn run_detail_updates(&mut self) {
+    fn do_detail_updates(
+        &mut self,
+        terminal: &mut DefaultTerminal,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let tool = match &self.detail_tool {
             Some(t) => t.clone(),
-            None => return,
+            None => return Ok(()),
         };
-        let mut updated = 0usize;
-        let mut failed = 0usize;
-        let mut errors = vec![];
-        for (i, item) in self.detail_items.iter().enumerate() {
-            if self.detail_checked.contains(&i) {
-                match run_update(&tool, item) {
+        let work: Vec<(String, OutdatedItem)> = self
+            .detail_items
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| self.detail_checked.contains(i))
+            .map(|(_, item)| (tool.clone(), item.clone()))
+            .collect();
+        self.detail_checked.clear();
+        if work.is_empty() {
+            return Ok(());
+        }
+
+        self.view = View::Updating;
+        let _count = work.len();
+
+        let handle = std::thread::spawn(move || {
+            let mut updated = 0usize;
+            let mut failed = 0usize;
+            let mut errors = vec![];
+            for (tool, item) in &work {
+                match run_update(tool, item) {
                     Ok(_) => updated += 1,
                     Err(e) => {
                         failed += 1;
@@ -240,50 +258,96 @@ impl App {
                     }
                 }
             }
+            if errors.is_empty() {
+                format!("\u{2714} Updated {updated} package(s)")
+            } else {
+                let e = errors.join("; ");
+                format!("\u{2714} Updated {updated} | \u{2716} Failed {failed}: {e}")
+            }
+        });
+
+        loop {
+            terminal.draw(|frame| crate::ui::render(frame, self))?;
+            self.throbber_state.calc_next();
+            if handle.is_finished() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
         }
-        self.detail_checked.clear();
-        if errors.is_empty() {
-            self.detail_message = format!("\u{2714} Updated {updated} package(s)");
-        } else {
-            let e = errors.join("; ");
-            self.detail_message =
-                format!("\u{2714} Updated {updated} | \u{2716} Failed {failed}: {e}");
-        }
+
+        let result = handle.join().unwrap();
+        self.detail_message = result;
+        self.view = View::PackageDetail;
+        Ok(())
     }
 
-    fn run_checked_updates(&mut self) -> String {
+    fn collect_checked_work(&self) -> Vec<(String, OutdatedItem)> {
         let report = match &self.report {
             Some(r) => r,
-            None => return "No scan data".into(),
+            None => return vec![],
         };
+        let mut work = vec![];
         let mut idx = 0usize;
-        let mut updated = 0usize;
-        let mut failed = 0usize;
-        let mut errors = vec![];
         for tool in &scanner::tool_order() {
             if let Some(res) = report.results.get(*tool) {
                 for item in &scanner::extract_outdated(res) {
                     if self.checked_outdated.contains(&idx) {
-                        let tool_display = scanner::display_name(tool).to_string();
-                        match run_update(&tool_display, item) {
-                            Ok(_) => updated += 1,
-                            Err(e) => {
-                                failed += 1;
-                                errors.push(format!("{}: {}", item.name, e));
-                            }
-                        }
+                        work.push((scanner::display_name(tool).to_string(), item.clone()));
                     }
                     idx += 1;
                 }
             }
         }
+        work
+    }
+
+    fn do_checked_updates(
+        &mut self,
+        terminal: &mut DefaultTerminal,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let work = self.collect_checked_work();
         self.checked_outdated.clear();
-        if errors.is_empty() {
-            format!("\u{2714} Updated {updated} package(s)")
-        } else {
-            let e = errors.join("; ");
-            format!("\u{2714} Updated {updated} | \u{2716} Failed {failed}: {e}")
+        if work.is_empty() {
+            return Ok(());
         }
+
+        self.view = View::Updating;
+        let _count = work.len();
+
+        let handle = std::thread::spawn(move || {
+            let mut updated = 0usize;
+            let mut failed = 0usize;
+            let mut errors = vec![];
+            for (tool, item) in &work {
+                match run_update(tool, item) {
+                    Ok(_) => updated += 1,
+                    Err(e) => {
+                        failed += 1;
+                        errors.push(format!("{}: {}", item.name, e));
+                    }
+                }
+            }
+            if errors.is_empty() {
+                format!("\u{2714} Updated {updated} package(s)")
+            } else {
+                let e = errors.join("; ");
+                format!("\u{2714} Updated {updated} | \u{2716} Failed {failed}: {e}")
+            }
+        });
+
+        loop {
+            terminal.draw(|frame| crate::ui::render(frame, self))?;
+            self.throbber_state.calc_next();
+            if handle.is_finished() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+
+        let result = handle.join().unwrap();
+        self.detail_message = result;
+        self.view = View::Outdated;
+        Ok(())
     }
 
     fn filtered_tools(&self) -> Vec<&'static str> {
@@ -347,6 +411,7 @@ impl App {
                 let n = self.detail_items.len().saturating_sub(1);
                 self.detail_selection = self.detail_selection.min(n);
             }
+            View::Updating => {}
         }
     }
 
@@ -409,6 +474,7 @@ impl App {
                 let n = self.detail_items.len().saturating_sub(1);
                 self.detail_selection = self.detail_selection.saturating_add(1).min(n);
             }
+            View::Updating => {}
         }
     }
 
@@ -420,6 +486,7 @@ impl App {
             View::Outdated => self.outdated_selection = self.outdated_selection.saturating_sub(1),
             View::Scanning => {}
             View::PackageDetail => self.detail_selection = self.detail_selection.saturating_sub(1),
+            View::Updating => {}
         }
     }
 }

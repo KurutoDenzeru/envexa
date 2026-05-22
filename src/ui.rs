@@ -76,7 +76,7 @@ fn tab_bar(frame: &mut Frame, area: Rect, app: &App) {
     let selected = match app.view {
         View::Dashboard => 0,
         View::Outdated => 1,
-        View::Scanning | View::PackageDetail => app.tab_index,
+        View::Scanning | View::PackageDetail | View::Updating => app.tab_index,
     };
     let tabs = Tabs::new(titles)
         .select(selected)
@@ -92,6 +92,15 @@ fn tab_bar(frame: &mut Frame, area: Rect, app: &App) {
 
 fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
     let (text, style) = match app.view {
+        View::Updating => (
+            Line::from(vec![Span::styled(
+                " Updating packages... ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            )]),
+            Style::default().fg(Color::White).bg(Color::Black),
+        ),
         View::PackageDetail => {
             let msg = if !app.detail_message.is_empty() {
                 format!("  {}", app.detail_message)
@@ -635,6 +644,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         View::Outdated => render_outdated(frame, chunks[4], app),
         View::Scanning => render_scanning(frame, chunks[4], app),
         View::PackageDetail => render_package_detail(frame, chunks[4], app),
+        View::Updating => render_updating(frame, chunks[4], app),
     }
 }
 
@@ -709,4 +719,26 @@ fn render_package_detail(frame: &mut Frame, area: Rect, app: &App) {
     .column_spacing(1);
 
     frame.render_widget(table, area);
+}
+
+fn render_updating(frame: &mut Frame, area: Rect, app: &mut App) {
+    let throbber = throbber_widgets_tui::Throbber::default()
+        .label("Updating packages...")
+        .style(Style::default().fg(Color::Green))
+        .throbber_style(
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        )
+        .throbber_set(throbber_widgets_tui::BRAILLE_EIGHT)
+        .use_type(throbber_widgets_tui::WhichUse::Spin);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Updating ")
+        .border_style(Style::default().fg(Color::Green));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    frame.render_stateful_widget(throbber, inner, &mut app.throbber_state);
 }
