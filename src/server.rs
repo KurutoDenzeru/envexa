@@ -1,6 +1,7 @@
 use serde_json::Value;
 use std::collections::HashMap;
 
+use crate::cli;
 use crate::scanner::{self, ReportCache};
 use crate::toolchains;
 use crate::transport::*;
@@ -230,10 +231,10 @@ impl McpServer {
             "envexa_bun_status" => self.scan_single("bun"),
             "envexa_deno_status" => self.scan_single("deno"),
             "envexa_pip_status" => self.scan_single("pip"),
-            "envexa_pip_upgrade" => Ok(Value::String(self.cmd_handler("/upgrade pip"))),
+            "envexa_pip_upgrade" => Ok(Value::String(cli::execute("/upgrade pip"))),
             "envexa_cmd" => {
                 let cmd = str_val(args, "command");
-                Ok(Value::String(self.cmd_handler(&cmd)))
+                Ok(Value::String(cli::execute(&cmd)))
             }
             _ => Err(format!("Unknown tool: {name}")),
         }
@@ -299,112 +300,5 @@ impl McpServer {
             }
             _ => Err(format!("Unknown resource: {uri}")),
         }
-    }
-
-    fn cmd_handler(&self, input: &str) -> String {
-        let parts: Vec<&str> = input.split_whitespace().collect();
-        if parts.is_empty() {
-            return self.cmd_help();
-        }
-
-        let cmd = parts[0].trim_start_matches('/');
-        let args = &parts[1..];
-
-        match cmd {
-            "help" | "h" => self.cmd_help(),
-            "scan" => {
-                let chain = args.first().copied().unwrap_or("all");
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current()
-                        .block_on(async { scanner::scan_and_cache(&self.cache, chain).await })
-                })
-            }
-            "outdated" => {
-                let chain = args.first().copied().unwrap_or("all");
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        let results = if chain == "all" {
-                            toolchains::scan_all().await
-                        } else if let Some(res) = toolchains::scan_one(chain).await {
-                            let mut map = HashMap::new();
-                            map.insert(chain.to_string(), res);
-                            map
-                        } else {
-                            return format!("Unknown chain: {chain}. Options: all, brew, npm, pnpm, yarn, bun, deno, pip, gem, cargo, docker");
-                        };
-                        let report = scanner::Report {
-                            timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
-                            results,
-                        };
-                        scanner::format_outdated(&report)
-                    })
-                })
-            }
-            "status" => tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    let results = toolchains::scan_all().await;
-                    let report = scanner::Report {
-                        timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
-                        results,
-                    };
-                    scanner::format_status(&report)
-                })
-            }),
-            "report" => tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    match self.cache.get().await {
-                        Some(report) => scanner::format_report(&report),
-                        None => "No report available. Run `scan` first.".into(),
-                    }
-                })
-            }),
-            "upgrade" => {
-                if args.is_empty() {
-                    return "Specify what to upgrade: `/upgrade pip`".into();
-                }
-                let target = args[0];
-                if target == "pip" {
-                    run_shell(&["pip3", "install", "--upgrade", "pip"])
-                } else {
-                    format!("Upgrade not implemented for `{target}`. Supported: pip")
-                }
-            }
-            _ => format!("Unknown command: `{input}`\n\n{}", self.cmd_help()),
-        }
-    }
-
-    fn cmd_help(&self) -> String {
-        let mut s = String::new();
-        s.push_str("Envexa slash commands — type these in chat or pass to the cmd tool:\n\n");
-        s.push_str("  /scan [chain]       — Full health scan (chain: all|brew|npm|pnpm|yarn|bun|deno|pip|gem|cargo|docker)\n");
-        s.push_str("  /outdated [chain]   — Check outdated packages only\n");
-        s.push_str("  /status             — Quick dashboard summary\n");
-        s.push_str("  /upgrade <tool>     — Upgrade a toolchain (pip currently supported)\n");
-        s.push_str("  /report             — Show the latest cached report\n");
-        s.push_str("  /help               — Show this message\n\n");
-        s.push_str("Examples:\n");
-        s.push_str("  /scan brew          — Scan only Homebrew\n");
-        s.push_str("  /scan pnpm          — Scan only pnpm\n");
-        s.push_str("  /upgrade pip        — Upgrade pip to latest\n");
-        s.push_str("  /status             — One-line health check\n");
-        s
-    }
-}
-
-fn run_shell(args: &[&str]) -> String {
-    match std::process::Command::new(args[0])
-        .args(&args[1..])
-        .output()
-    {
-        Ok(output) => {
-            if output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                format!("Command succeeded.\n```\n{stdout}\n```")
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                format!("Command failed.\n```\n{stderr}\n```")
-            }
-        }
-        Err(e) => format!("Failed to execute: {e}"),
     }
 }

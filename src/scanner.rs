@@ -79,7 +79,7 @@ pub struct ReportCache {
     inner: Arc<Mutex<Option<Report>>>,
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Report {
     pub timestamp: String,
     pub results: HashMap<String, ScanResult>,
