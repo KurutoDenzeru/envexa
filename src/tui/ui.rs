@@ -1,8 +1,8 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table, Tabs},
+    widgets::{Block, Borders, Cell, LineGauge, Paragraph, Row, Table, Tabs},
     Frame,
 };
 use tui_piechart::{LegendAlignment, LegendLayout, LegendPosition, PieChart, PieSlice, Resolution};
@@ -34,41 +34,39 @@ fn source_style(source: &str) -> Style {
     }
 }
 
-fn title_bar(frame: &mut Frame, area: Rect, app: &App) {
-    let title = vec![
-        Span::raw(" \u{1f6a7} "),
-        Span::styled(
-            "envexa",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            concat!(" v", env!("CARGO_PKG_VERSION")),
-            Style::default().fg(Color::DarkGray),
-        ),
-        Span::raw("  "),
-        Span::styled("By KurutoDenzeru", Style::default().fg(Color::DarkGray)),
-        Span::raw(" \u{2503} "),
-    ];
-    let status = match &app.report {
-        Some(r) => {
-            let n = scanner::count_outdated(r);
-            if n > 0 {
-                Span::styled(format!("{n} outdated"), Style::default().fg(Color::Yellow))
-            } else {
-                Span::styled("up to date", Style::default().fg(Color::Green))
-            }
-        }
-        None => Span::styled("no data", Style::default().fg(Color::DarkGray)),
-    };
-    let mut spans: Vec<Span> = title;
-    spans.push(status);
-    let bar = Line::from(spans);
+fn title_bar(frame: &mut Frame, area: Rect, _app: &App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(6),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ])
+        .split(area);
+
+    let art = Paragraph::new(Text::from(ENVEXA_LOGO))
+        .alignment(Alignment::Center)
+        .style(Style::default().fg(Color::Cyan));
+    frame.render_widget(art, chunks[1]);
+
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled("By KurutoDenzeru", Style::default().fg(Color::DarkGray)),
+            Span::raw(" \u{2502} "),
+            Span::styled(
+                concat!("v", env!("CARGO_PKG_VERSION")),
+                Style::default().fg(Color::DarkGray),
+            ),
+        ]))
+        .alignment(Alignment::Center),
+        chunks[2],
+    );
+
     let block = Block::default()
         .borders(Borders::BOTTOM)
         .border_style(Style::default().fg(Color::DarkGray));
-    frame.render_widget(Paragraph::new(bar).block(block), area);
+    frame.render_widget(block, chunks[3]);
 }
 
 fn tab_bar(frame: &mut Frame, area: Rect, app: &App) {
@@ -261,41 +259,32 @@ fn dashboard_stats_line(frame: &mut Frame, area: Rect, report: &crate::scanner::
     frame.render_widget(Paragraph::new(Line::from(items)).block(block), area);
 }
 
+const ENVEXA_LOGO: &str = "\
+███████╗███╗   ██╗██╗   ██╗███████╗██╗  ██╗ █████╗ \n\
+██╔════╝████╗  ██║██║   ██║██╔════╝╚██╗██╔╝██╔══██╗\n\
+█████╗  ██╔██╗ ██║██║   ██║█████╗   ╚███╔╝ ███████║\n\
+██╔══╝  ██║╚██╗██║╚██╗ ██╔╝██╔══╝   ██╔██╗ ██╔══██║\n\
+███████╗██║ ╚████║ ╚████╔╝ ███████╗██╔╝ ██╗██║  ██║\n\
+╚══════╝╚═╝  ╚═══╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝";
+
 fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
     let report = match &app.report {
         Some(r) => r,
         None => {
             let text = Paragraph::new(Text::from(vec![
                 Line::from(""),
-                Line::from(vec![
-                    Span::raw("  "),
-                    Span::styled(
-                        "\u{2728} Envexa",
-                        Style::default()
-                            .fg(Color::Cyan)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                ]),
-                Line::from(""),
-                Line::from(vec![Span::raw(
-                    "  Scan your dev environment to get started.",
+                Line::from(vec![Span::styled(
+                    "Press [S] to scan your environment",
+                    Style::default().fg(Color::DarkGray),
                 )]),
-                Line::from(""),
                 Line::from(vec![
-                    Span::styled("  \u{25B6} Press [S]", Style::default().fg(Color::Green)),
-                    Span::raw(" to scan all toolchains"),
-                ]),
-                Line::from(vec![
-                    Span::styled("  \u{25B6} Press [O]", Style::default().fg(Color::Yellow)),
-                    Span::raw(" to view outdated packages"),
+                    Span::styled("[S]", Style::default().fg(Color::Green)),
+                    Span::raw(" Scan  "),
+                    Span::styled("[O]", Style::default().fg(Color::Yellow)),
+                    Span::raw(" Outdated"),
                 ]),
             ]))
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(" Welcome ")
-                    .border_style(Style::default().fg(Color::Cyan)),
-            );
+            .alignment(Alignment::Center);
             frame.render_widget(text, area);
             return;
         }
@@ -348,10 +337,34 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
 
     let right_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(2), Constraint::Min(1)])
+        .constraints([Constraint::Length(4), Constraint::Min(1)])
         .split(layout[1]);
 
-    dashboard_stats_line(frame, right_chunks[0], report);
+    let top_panel = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(2),
+        ])
+        .split(right_chunks[0]);
+
+    let total = pass + warn + fail + skip;
+    let health = if total > 0 {
+        pass as f64 / total as f64
+    } else {
+        0.0
+    };
+
+    frame.render_widget(
+        LineGauge::default()
+            .filled_style(Style::default().fg(Color::Green))
+            .unfilled_style(Style::default().fg(Color::DarkGray))
+            .ratio(health),
+        top_panel[0],
+    );
+
+    dashboard_stats_line(frame, top_panel[1], report);
 
     let summary = Paragraph::new(Line::from(vec![
         Span::styled(" [S]", Style::default().fg(Color::Green)),
@@ -367,7 +380,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
     ]))
     .style(Style::default().fg(Color::White))
     .block(Block::default().borders(Borders::NONE));
-    frame.render_widget(summary, right_chunks[0]);
+    frame.render_widget(summary, top_panel[2]);
 
     let q = app.search_query.to_lowercase();
     let mut category_tables: Vec<Table> = Vec::new();
@@ -695,7 +708,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(2), // title bar
+            Constraint::Length(9), // title bar (1 pad + 6 art + 1 subtitle + 1 border)
             Constraint::Length(1), // tab bar
             Constraint::Length(1), // gap
             Constraint::Length(1), // shortcuts (status_bar)
