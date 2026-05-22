@@ -7,8 +7,8 @@ use ratatui::{
 };
 use tui_piechart::{LegendAlignment, LegendLayout, LegendPosition, PieChart, PieSlice, Resolution};
 
-use crate::app::{App, View};
 use crate::scanner;
+use crate::tui::app::{App, View};
 
 fn status_style(status: &str) -> Style {
     match status {
@@ -398,13 +398,53 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             let label = scanner::status_label(&res.status);
             let style = status_style(&res.status);
             let ver = scanner::first_version(res);
-            let outdated_count = scanner::extract_outdated(res).len();
-            let outdated_str = if outdated_count > 0 {
-                outdated_count.to_string()
-            } else {
-                String::new()
+            let (outdated_str, issues_str): (String, &str) = match *tool {
+                "security" => {
+                    let n = res.vulnerabilities.len();
+                    (
+                        if n > 0 { n.to_string() } else { String::new() },
+                        res.vulnerabilities
+                            .first()
+                            .map(|v| Box::leak(Box::new(format!("{} {}", n, v.severity))) as &str)
+                            .unwrap_or(res.issues.first().map(|s| s.as_str()).unwrap_or("")),
+                    )
+                }
+                "audit" => {
+                    let n = res.audit_items.len();
+                    (
+                        String::new(),
+                        if n > 0 {
+                            Box::leak(Box::new(format!("{n} item(s)")))
+                        } else {
+                            res.issues.first().map(|s| s.as_str()).unwrap_or("")
+                        },
+                    )
+                }
+                "cleanup" => {
+                    let _total = res
+                        .cleanup_items
+                        .iter()
+                        .filter_map(|c| c.size.as_ref())
+                        .count();
+                    (
+                        String::new(),
+                        res.cleanup_items
+                            .first()
+                            .and_then(|c| c.size.as_deref())
+                            .unwrap_or(res.issues.first().map(|s| s.as_str()).unwrap_or("")),
+                    )
+                }
+                _ => {
+                    let outdated_count = scanner::extract_outdated(res).len();
+                    let outdated_str = if outdated_count > 0 {
+                        outdated_count.to_string()
+                    } else {
+                        String::new()
+                    };
+                    let issues_str = res.issues.first().map(|s| s.as_str()).unwrap_or("");
+                    (outdated_str, issues_str)
+                }
             };
-            let issues_str = res.issues.first().map(|s| s.as_str()).unwrap_or("");
             Some((tool, display, label, style, ver, outdated_str, issues_str))
         })
         .enumerate()
@@ -653,6 +693,16 @@ fn render_package_detail(frame: &mut Frame, area: Rect, app: &App) {
         Some(t) => t.clone(),
         None => return,
     };
+
+    match app.detail_key.as_deref() {
+        Some("security") => render_vulnerabilities(frame, area, &tool, app),
+        Some("audit") => render_audit_items(frame, area, &tool, app),
+        Some("cleanup") => render_cleanup_items(frame, area, &tool, app),
+        _ => render_outdated_detail(frame, area, &tool, app),
+    }
+}
+
+fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
     let items = &app.detail_items;
 
     let header_cells = ["", " Package ", " Source ", " Current ", " Latest "]
@@ -715,6 +765,176 @@ fn render_package_detail(frame: &mut Frame, area: Rect, app: &App) {
             .title(format!(" {tool} — Outdated Packages ({}) ", items.len()))
             .title_bottom(sub)
             .border_style(Style::default().fg(Color::Cyan)),
+    )
+    .column_spacing(1);
+
+    frame.render_widget(table, area);
+}
+
+fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
+    let items = &app.detail_vulns;
+    let header_cells = [
+        " Package ",
+        " Severity ",
+        " CVE ",
+        " Title ",
+        " Patched In ",
+    ]
+    .iter()
+    .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
+    let header = Row::new(header_cells)
+        .style(Style::default().bg(Color::Blue).fg(Color::White))
+        .height(1);
+
+    let rows: Vec<Row> = items
+        .iter()
+        .enumerate()
+        .map(|(i, v)| {
+            let sel = i == app.detail_selection;
+            let cve = v.cve.as_deref().unwrap_or("-");
+            let mut row = Row::new(vec![
+                Cell::from(v.package.as_str()),
+                Cell::from(v.severity.as_str()).style(match v.severity.as_str() {
+                    "critical" => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                    "high" => Style::default().fg(Color::Red),
+                    "moderate" => Style::default().fg(Color::Yellow),
+                    _ => Style::default().fg(Color::DarkGray),
+                }),
+                Cell::from(cve),
+                Cell::from(v.title.as_str()),
+                Cell::from(v.patched_version.as_str()),
+            ]);
+            if sel {
+                row = row.style(
+                    Style::default()
+                        .bg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD),
+                );
+            }
+            row
+        })
+        .collect();
+
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Min(16),
+            Constraint::Length(10),
+            Constraint::Length(15),
+            Constraint::Min(20),
+            Constraint::Length(14),
+        ],
+    )
+    .header(header)
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" {tool} — Vulnerabilities ({}) ", items.len()))
+            .border_style(Style::default().fg(Color::Red)),
+    )
+    .column_spacing(1);
+
+    frame.render_widget(table, area);
+}
+
+fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
+    let items = &app.detail_audits;
+    let header_cells = [" Name ", " Current ", " Note "]
+        .iter()
+        .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
+    let header = Row::new(header_cells)
+        .style(Style::default().bg(Color::Blue).fg(Color::White))
+        .height(1);
+
+    let rows: Vec<Row> = items
+        .iter()
+        .enumerate()
+        .map(|(i, a)| {
+            let sel = i == app.detail_selection;
+            let mut row = Row::new(vec![
+                Cell::from(a.name.as_str()),
+                Cell::from(a.current.as_str()),
+                Cell::from(a.note.as_str()),
+            ]);
+            if sel {
+                row = row.style(
+                    Style::default()
+                        .bg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD),
+                );
+            }
+            row
+        })
+        .collect();
+
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Min(16),
+            Constraint::Length(10),
+            Constraint::Min(30),
+        ],
+    )
+    .header(header)
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" {tool} — Audit Items ({}) ", items.len()))
+            .border_style(Style::default().fg(Color::Yellow)),
+    )
+    .column_spacing(1);
+
+    frame.render_widget(table, area);
+}
+
+fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
+    let items = &app.detail_cleanup;
+    let header_cells = [" Category ", " Description ", " Size ", " Command "]
+        .iter()
+        .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
+    let header = Row::new(header_cells)
+        .style(Style::default().bg(Color::Blue).fg(Color::White))
+        .height(1);
+
+    let rows: Vec<Row> = items
+        .iter()
+        .enumerate()
+        .map(|(i, c)| {
+            let sel = i == app.detail_selection;
+            let size = c.size.as_deref().unwrap_or("-");
+            let cmd = c.command.as_deref().unwrap_or("-");
+            let mut row = Row::new(vec![
+                Cell::from(c.category.as_str()),
+                Cell::from(c.description.as_str()),
+                Cell::from(size),
+                Cell::from(cmd),
+            ]);
+            if sel {
+                row = row.style(
+                    Style::default()
+                        .bg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD),
+                );
+            }
+            row
+        })
+        .collect();
+
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(12),
+            Constraint::Min(24),
+            Constraint::Length(10),
+            Constraint::Min(20),
+        ],
+    )
+    .header(header)
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" {tool} — Cleanup ({}) ", items.len()))
+            .border_style(Style::default().fg(Color::Green)),
     )
     .column_spacing(1);
 

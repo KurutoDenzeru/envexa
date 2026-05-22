@@ -9,6 +9,7 @@ use throbber_widgets_tui::ThrobberState;
 use crate::config;
 use crate::scanner::{self, OutdatedItem, Report};
 use crate::toolchains;
+use crate::toolchains::{AuditItem, CleanupItem, VulnerabilityInfo};
 
 pub enum View {
     Dashboard,
@@ -29,8 +30,12 @@ pub struct App {
     pub throbber_state: ThrobberState,
 
     pub detail_tool: Option<String>,
+    pub detail_key: Option<String>,
     pub detail_selection: usize,
     pub detail_items: Vec<OutdatedItem>,
+    pub detail_vulns: Vec<VulnerabilityInfo>,
+    pub detail_audits: Vec<AuditItem>,
+    pub detail_cleanup: Vec<CleanupItem>,
     pub detail_checked: HashSet<usize>,
     pub detail_message: String,
 
@@ -50,8 +55,12 @@ impl App {
             search_query: String::new(),
             throbber_state: ThrobberState::default(),
             detail_tool: None,
+            detail_key: None,
             detail_selection: 0,
             detail_items: Vec::new(),
+            detail_vulns: Vec::new(),
+            detail_audits: Vec::new(),
+            detail_cleanup: Vec::new(),
             detail_checked: HashSet::new(),
             detail_message: String::new(),
             checked_outdated: HashSet::new(),
@@ -63,7 +72,7 @@ impl App {
         terminal.clear()?;
 
         loop {
-            terminal.draw(|frame| crate::ui::render(frame, self))?;
+            terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
 
             if let Event::Key(key) = event::read()? {
                 if key.kind != KeyEventKind::Press {
@@ -100,18 +109,29 @@ impl App {
 
                 if matches!(self.view, View::PackageDetail) {
                     match key.code {
-                        KeyCode::Char(' ') => {
+                        KeyCode::Char(' ')
+                            if !matches!(
+                                self.detail_key.as_deref(),
+                                Some("security") | Some("audit") | Some("cleanup")
+                            ) =>
+                        {
                             if self.detail_checked.contains(&self.detail_selection) {
                                 self.detail_checked.remove(&self.detail_selection);
                             } else {
                                 self.detail_checked.insert(self.detail_selection);
                             }
                         }
-                        KeyCode::Char('y') | KeyCode::Char('Y') => {
+                        KeyCode::Char(' ') => {}
+                        KeyCode::Char('y') | KeyCode::Char('Y')
+                            if !matches!(
+                                self.detail_key.as_deref(),
+                                Some("security") | Some("audit") | Some("cleanup")
+                            ) =>
+                        {
                             self.do_detail_updates(&mut terminal)?;
                         }
                         KeyCode::Down | KeyCode::Char('n') => {
-                            let n = self.detail_items.len().saturating_sub(1);
+                            let n = self.detail_len().saturating_sub(1);
                             self.detail_selection = self.detail_selection.saturating_add(1).min(n);
                         }
                         KeyCode::Up | KeyCode::Char('p') => {
@@ -121,9 +141,8 @@ impl App {
                             self.view = View::Dashboard;
                             self.tab_index = 0;
                             self.detail_tool = None;
-                            self.detail_items.clear();
-                            self.detail_checked.clear();
-                            self.detail_message.clear();
+                            self.detail_key = None;
+                            self.clear_detail();
                         }
                         _ => {}
                     }
@@ -210,15 +229,56 @@ impl App {
             Some(r) => r,
             None => return,
         };
-        let items = scanner::extract_outdated(res);
-        if items.is_empty() {
-            return;
-        }
+
         self.detail_tool = Some(scanner::display_name(tool).to_string());
+        self.detail_key = Some(tool.to_string());
         self.detail_selection = 0;
-        self.detail_items = items;
         self.detail_checked.clear();
         self.detail_message.clear();
+
+        match *tool {
+            "security" => {
+                let vulns = scanner::extract_vulnerabilities(res);
+                if vulns.is_empty() {
+                    return;
+                }
+                self.detail_vulns = vulns.to_vec();
+                self.detail_items.clear();
+                self.detail_audits.clear();
+                self.detail_cleanup.clear();
+            }
+            "audit" => {
+                let audits = scanner::extract_audit_items(res);
+                if audits.is_empty() {
+                    return;
+                }
+                self.detail_audits = audits.to_vec();
+                self.detail_items.clear();
+                self.detail_vulns.clear();
+                self.detail_cleanup.clear();
+            }
+            "cleanup" => {
+                let cleanup = scanner::extract_cleanup_items(res);
+                if cleanup.is_empty() {
+                    return;
+                }
+                self.detail_cleanup = cleanup.to_vec();
+                self.detail_items.clear();
+                self.detail_vulns.clear();
+                self.detail_audits.clear();
+            }
+            _ => {
+                let items = scanner::extract_outdated(res);
+                if items.is_empty() {
+                    return;
+                }
+                self.detail_items = items;
+                self.detail_vulns.clear();
+                self.detail_audits.clear();
+                self.detail_cleanup.clear();
+            }
+        }
+
         self.view = View::PackageDetail;
     }
 
@@ -267,7 +327,7 @@ impl App {
         });
 
         loop {
-            terminal.draw(|frame| crate::ui::render(frame, self))?;
+            terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
             self.throbber_state.calc_next();
             if handle.is_finished() {
                 break;
@@ -336,7 +396,7 @@ impl App {
         });
 
         loop {
-            terminal.draw(|frame| crate::ui::render(frame, self))?;
+            terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
             self.throbber_state.calc_next();
             if handle.is_finished() {
                 break;
@@ -408,7 +468,7 @@ impl App {
             }
             View::Scanning => {}
             View::PackageDetail => {
-                let n = self.detail_items.len().saturating_sub(1);
+                let n = self.detail_len().saturating_sub(1);
                 self.detail_selection = self.detail_selection.min(n);
             }
             View::Updating => {}
@@ -428,7 +488,7 @@ impl App {
         });
 
         loop {
-            terminal.draw(|frame| crate::ui::render(frame, self))?;
+            terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
             self.throbber_state.calc_next();
             if handle.is_finished() {
                 break;
@@ -450,7 +510,7 @@ impl App {
         self.dashboard_selection = 0;
         std::thread::sleep(Duration::from_millis(200));
 
-        terminal.draw(|frame| crate::ui::render(frame, self))?;
+        terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
         Ok(())
     }
 
@@ -471,7 +531,7 @@ impl App {
             }
             View::Scanning => {}
             View::PackageDetail => {
-                let n = self.detail_items.len().saturating_sub(1);
+                let n = self.detail_len().saturating_sub(1);
                 self.detail_selection = self.detail_selection.saturating_add(1).min(n);
             }
             View::Updating => {}
@@ -488,6 +548,24 @@ impl App {
             View::PackageDetail => self.detail_selection = self.detail_selection.saturating_sub(1),
             View::Updating => {}
         }
+    }
+
+    fn detail_len(&self) -> usize {
+        match self.detail_key.as_deref() {
+            Some("security") => self.detail_vulns.len(),
+            Some("audit") => self.detail_audits.len(),
+            Some("cleanup") => self.detail_cleanup.len(),
+            _ => self.detail_items.len(),
+        }
+    }
+
+    fn clear_detail(&mut self) {
+        self.detail_items.clear();
+        self.detail_vulns.clear();
+        self.detail_audits.clear();
+        self.detail_cleanup.clear();
+        self.detail_checked.clear();
+        self.detail_message.clear();
     }
 }
 
