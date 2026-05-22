@@ -90,20 +90,25 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
         Line::from(vec![
             Span::styled("Search:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
             Span::raw(query),
+            Span::styled("  Esc", Style::default().fg(Color::DarkGray)),
+            Span::raw(" clear"),
         ])
     } else {
         let hints = vec![
-            Span::styled(" S", Style::default().fg(Color::Green)),
+            Span::styled(" [S]", Style::default().fg(Color::Green)),
             Span::raw("can "),
-            Span::styled("O", Style::default().fg(Color::Yellow)),
+            Span::styled("[O]", Style::default().fg(Color::Yellow)),
             Span::raw("utdated "),
-            Span::styled("/", Style::default().fg(Color::Cyan)),
-            Span::raw("earch "),
+            Span::styled("[/]", Style::default().fg(Color::Cyan)),
+            Span::raw("Search "),
             Span::styled("\u{2190}\u{2192}", Style::default().fg(Color::DarkGray)),
             Span::raw(" tabs "),
             Span::styled("\u{2191}\u{2193}", Style::default().fg(Color::DarkGray)),
-            Span::raw(" nav "),
-            Span::styled("Q", Style::default().fg(Color::Red)),
+            Span::raw(" nav  "),
+            Span::styled("^C", Style::default().fg(Color::Red)),
+            Span::styled(" Exit", Style::default().fg(Color::Red)),
+            Span::raw("  "),
+            Span::styled("[Q]", Style::default().fg(Color::DarkGray)),
             Span::raw("uit"),
         ];
         Line::from(hints)
@@ -123,6 +128,70 @@ fn truncated_cell(text: &str, max: usize) -> Cell<'static> {
     Cell::from(display)
 }
 
+fn count_statuses(report: &crate::scanner::Report) -> (usize, usize, usize, usize) {
+    let mut pass = 0usize;
+    let mut warn = 0;
+    let mut fail = 0;
+    let mut skip = 0;
+    for tool in &crate::scanner::tool_order() {
+        if let Some(res) = report.results.get(*tool) {
+            match res.status.as_str() {
+                "ok" => pass += 1,
+                "warning" => warn += 1,
+                "error" => fail += 1,
+                "skipped" => skip += 1,
+                _ => {}
+            }
+        }
+    }
+    (pass, warn, fail, skip)
+}
+
+fn scan_age(timestamp: &str) -> String {
+    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(timestamp, "%Y-%m-%dT%H:%M:%S") {
+        let elapsed = chrono::Local::now().naive_local() - dt;
+        let mins = elapsed.num_minutes();
+        if mins < 1 {
+            "just now".into()
+        } else if mins < 60 {
+            format!("{mins}m ago")
+        } else {
+            format!("{}h ago", elapsed.num_hours())
+        }
+    } else {
+        String::new()
+    }
+}
+
+fn dashboard_stats_line(frame: &mut Frame, area: Rect, report: &crate::scanner::Report) {
+    let (pass, warn, fail, skip) = count_statuses(report);
+    let outdated = crate::scanner::count_outdated(report);
+    let age = scan_age(&report.timestamp);
+    let items = vec![
+        Span::styled(format!(" \u{25CF} {pass} "), Style::default().fg(Color::Green)),
+        Span::raw(" "),
+        Span::styled(format!("\u{25CF} {warn} "), Style::default().fg(Color::Yellow)),
+        Span::raw(" "),
+        Span::styled(format!("\u{25CF} {fail} "), Style::default().fg(Color::Red)),
+        Span::raw(" "),
+        Span::styled(format!("\u{25CF} {skip} "), Style::default().fg(Color::DarkGray)),
+        Span::raw("  "),
+        Span::styled(
+            format!("\u{25C9} {outdated} outdated"),
+            Style::default().fg(if outdated > 0 { Color::Yellow } else { Color::Green }),
+        ),
+        Span::raw("  "),
+        Span::styled(
+            format!("\u{23F0} {age}"),
+            Style::default().fg(Color::DarkGray),
+        ),
+    ];
+    let block = Block::default()
+        .borders(Borders::NONE)
+        .style(Style::default().bg(Color::Black));
+    frame.render_widget(Paragraph::new(Line::from(items)).block(block), area);
+}
+
 fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
     let report = match &app.report {
         Some(r) => r,
@@ -130,9 +199,9 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             let text = Paragraph::new(Text::from(vec![
                 Line::from(""),
                 Line::from(vec![
-                    Span::raw("  Welcome to "),
+                    Span::raw("  "),
                     Span::styled(
-                        "Envexa",
+                        "\u{2728} Envexa",
                         Style::default()
                             .fg(Color::Cyan)
                             .add_modifier(Modifier::BOLD),
@@ -140,25 +209,41 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
                 ]),
                 Line::from(""),
                 Line::from(vec![
-                    Span::raw("  Press "),
+                    Span::raw("  Scan your dev environment to get started."),
+                ]),
+                Line::from(""),
+                Line::from(vec![
                     Span::styled(
-                        "S",
-                        Style::default()
-                            .fg(Color::Green)
-                            .add_modifier(Modifier::BOLD),
+                        "  \u{25B6} Press [S]",
+                        Style::default().fg(Color::Green),
                     ),
-                    Span::raw(" to scan your dev environment."),
+                    Span::raw(" to scan all toolchains"),
+                ]),
+                Line::from(vec![
+                    Span::styled(
+                        "  \u{25B6} Press [O]",
+                        Style::default().fg(Color::Yellow),
+                    ),
+                    Span::raw(" to view outdated packages"),
                 ]),
             ]))
             .block(
                 Block::default()
                     .borders(Borders::ALL)
+                    .title(" Welcome ")
                     .border_style(Style::default().fg(Color::Cyan)),
             );
             frame.render_widget(text, area);
             return;
         }
     };
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .split(area);
+
+    dashboard_stats_line(frame, chunks[0], report);
 
     let header_cells = ["", " Toolchain ", " Status ", " Version ", " Outdated ", " Issues "]
         .iter()
@@ -251,7 +336,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
     )
     .column_spacing(1);
 
-    frame.render_widget(table, area);
+    frame.render_widget(table, chunks[1]);
 }
 
 fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
