@@ -490,11 +490,11 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
         let cat_header = Row::new(
             [
                 "",
-                " Toolchain ",
-                " Status ",
-                " Version ",
-                " Outdated ",
-                " Issues ",
+                "Toolchain ",
+                "Status ",
+                "Version ",
+                "Outdated ",
+                "Issues ",
             ]
             .iter()
             .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD)),
@@ -564,11 +564,11 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
 
     let header_cells = [
         "",
-        " Toolchain ",
-        " Source ",
-        " Package ",
-        " Current ",
-        " Latest ",
+        "Toolchain ",
+        "Source ",
+        "Package ",
+        "Current ",
+        "Latest ",
     ]
     .iter()
     .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
@@ -746,7 +746,7 @@ fn render_package_detail(frame: &mut Frame, area: Rect, app: &App) {
 fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
     let items = &app.detail_items;
 
-    let header_cells = ["", " Package ", " Source ", " Current ", " Latest "]
+    let header_cells = ["", "Package ", "Source ", "Current ", "Latest "]
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
@@ -814,15 +814,9 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
 
 fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
     let items = &app.detail_vulns;
-    let header_cells = [
-        " Package ",
-        " Severity ",
-        " CVE ",
-        " Title ",
-        " Patched In ",
-    ]
-    .iter()
-    .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
+    let header_cells = ["Package ", "Severity ", "CVE ", "Title ", "Patched In "]
+        .iter()
+        .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
         .style(Style::default().bg(Color::Blue).fg(Color::White))
         .height(1);
@@ -880,7 +874,7 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
 
 fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
     let items = &app.detail_audits;
-    let header_cells = [" Name ", " Current ", " Note "]
+    let header_cells = ["Name ", "Current ", "Note "]
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
@@ -930,7 +924,7 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
 
 fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
     let items = &app.detail_cleanup;
-    let header_cells = [" Category ", " Description ", " Size ", " Command "]
+    let header_cells = ["Category ", "Description ", "Size ", "Command "]
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
