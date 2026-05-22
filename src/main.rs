@@ -1,9 +1,8 @@
-mod app;
 mod cli;
 mod config;
 mod scanner;
 mod toolchains;
-mod ui;
+mod tui;
 
 use std::io::IsTerminal;
 
@@ -14,7 +13,9 @@ async fn main() -> anyhow::Result<()> {
     if args.len() > 1 {
         cli::run().await
     } else if std::io::stdin().is_terminal() {
-        app::App::new().run().map_err(|e| anyhow::anyhow!("{e}"))
+        tui::app::App::new()
+            .run()
+            .map_err(|e| anyhow::anyhow!("{e}"))
     } else {
         cli::run().await
     }

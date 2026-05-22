@@ -41,15 +41,18 @@ fn ensure() -> std::io::Result<()> {
     std::fs::create_dir_all(dir())
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct UserConfig {
     pub cache_ttl_days: u64,
+    pub project_path: Option<String>,
 }
 
 impl Default for UserConfig {
     fn default() -> Self {
-        Self { cache_ttl_days: 7 }
+        Self {
+            cache_ttl_days: 7,
+            project_path: None,
+        }
     }
 }
 

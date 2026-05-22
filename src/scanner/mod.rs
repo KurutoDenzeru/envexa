@@ -1,14 +1,6 @@
 use std::collections::HashMap;
 
-use crate::toolchains::ScanResult;
-
-#[derive(Debug, Clone)]
-pub struct OutdatedItem {
-    pub source: String,
-    pub name: String,
-    pub current: String,
-    pub latest: String,
-}
+use crate::toolchains::{AuditItem, CleanupItem, ScanResult, VulnerabilityInfo};
 
 struct Table {
     headers: Vec<String>,
@@ -104,11 +96,46 @@ const DISPLAY_NAMES: &[(&str, &str)] = &[
     ("gem", "Gem"),
     ("cargo", "Cargo"),
     ("docker", "Docker"),
+    ("project", "Project"),
+    ("security", "Security"),
+    ("audit", "Audit"),
+    ("cleanup", "Cleanup"),
 ];
 
-pub fn tool_order() -> [&'static str; 10] {
+#[derive(Debug, Clone)]
+pub struct OutdatedItem {
+    pub source: String,
+    pub name: String,
+    pub current: String,
+    pub latest: String,
+}
+
+pub struct ToolCategory {
+    pub name: &'static str,
+    pub tools: &'static [&'static str],
+}
+
+pub fn tool_categories() -> [ToolCategory; 3] {
     [
-        "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker",
+        ToolCategory {
+            name: "System & Runtime",
+            tools: &["brew", "cargo", "docker", "pip", "gem"],
+        },
+        ToolCategory {
+            name: "Web Development",
+            tools: &["npm", "pnpm", "yarn", "bun", "deno"],
+        },
+        ToolCategory {
+            name: "Project Tooling",
+            tools: &["project", "security", "audit", "cleanup"],
+        },
+    ]
+}
+
+pub fn tool_order() -> [&'static str; 14] {
+    [
+        "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
+        "security", "audit", "cleanup",
     ]
 }
 
@@ -165,7 +192,22 @@ pub fn extract_outdated(res: &ScanResult) -> Vec<OutdatedItem> {
     items
 }
 
+pub fn extract_vulnerabilities(res: &ScanResult) -> &[VulnerabilityInfo] {
+    &res.vulnerabilities
+}
+
+pub fn extract_audit_items(res: &ScanResult) -> &[AuditItem] {
+    &res.audit_items
+}
+
+pub fn extract_cleanup_items(res: &ScanResult) -> &[CleanupItem] {
+    &res.cleanup_items
+}
+
 pub fn first_version(res: &ScanResult) -> String {
+    if let Some(ref pt) = res.project_type {
+        return pt.clone();
+    }
     let fields = [
         "version",
         "node_version",
@@ -205,12 +247,24 @@ pub fn format_report(report: &Report) -> String {
     lines.push(String::new());
 
     let mut outdated_all: HashMap<&str, Vec<OutdatedItem>> = HashMap::new();
+    let mut vuln_all: HashMap<&str, Vec<VulnerabilityInfo>> = HashMap::new();
+    let mut audit_all: HashMap<&str, Vec<AuditItem>> = HashMap::new();
+    let mut cleanup_all: HashMap<&str, Vec<CleanupItem>> = HashMap::new();
 
     for tool in &tool_order() {
         if let Some(res) = results.get(*tool) {
             let items = extract_outdated(res);
             if !items.is_empty() {
                 outdated_all.insert(tool, items);
+            }
+            if !res.vulnerabilities.is_empty() {
+                vuln_all.insert(tool, res.vulnerabilities.clone());
+            }
+            if !res.audit_items.is_empty() {
+                audit_all.insert(tool, res.audit_items.clone());
+            }
+            if !res.cleanup_items.is_empty() {
+                cleanup_all.insert(tool, res.cleanup_items.clone());
             }
         }
     }
@@ -242,6 +296,58 @@ pub fn format_report(report: &Report) -> String {
             }
         }
         lines.push(ot.render());
+        lines.push(String::new());
+    }
+
+    if !vuln_all.is_empty() {
+        lines.push("## Vulnerabilities".into());
+        let mut vt = Table::new();
+        vt.header(&["Toolchain", "Package", "Severity", "Patched"]);
+        for tool in &tool_order() {
+            if let Some(items) = vuln_all.get(tool) {
+                let display = display_name(tool);
+                for v in items {
+                    vt.add_row(&[display, &v.package, &v.severity, &v.patched_version]);
+                }
+            }
+        }
+        lines.push(vt.render());
+        lines.push(String::new());
+    }
+
+    if !audit_all.is_empty() {
+        lines.push("## Audit".into());
+        let mut at = Table::new();
+        at.header(&["Toolchain", "Name", "Current", "Note"]);
+        for tool in &tool_order() {
+            if let Some(items) = audit_all.get(tool) {
+                let display = display_name(tool);
+                for a in items {
+                    at.add_row(&[display, &a.name, &a.current, &a.note]);
+                }
+            }
+        }
+        lines.push(at.render());
+        lines.push(String::new());
+    }
+
+    if !cleanup_all.is_empty() {
+        lines.push("## Cleanup".into());
+        for tool in &tool_order() {
+            if let Some(items) = cleanup_all.get(tool) {
+                let display = display_name(tool);
+                for c in items {
+                    lines.push(format!(
+                        "- **[{display}]** {} — {}",
+                        c.description,
+                        c.size.as_deref().unwrap_or("?")
+                    ));
+                    if let Some(ref cmd) = c.command {
+                        lines.push(format!("  `{cmd}`"));
+                    }
+                }
+            }
+        }
         lines.push(String::new());
     }
 
@@ -300,6 +406,10 @@ pub fn format_report(report: &Report) -> String {
                 lines.push(format!("**Formulae:** {count}"));
             }
 
+            if let Some(ref pt) = res.project_type {
+                lines.push(format!("**Project type:** {pt}"));
+            }
+
             if let Some(ref disk) = res.disk_usage {
                 if let Some(obj) = disk.as_object() {
                     for (typ, info) in obj {
@@ -317,6 +427,34 @@ pub fn format_report(report: &Report) -> String {
                     pt.add_row(&[&item.name, &item.current, &item.latest]);
                 }
                 lines.push(pt.render());
+            }
+
+            if !res.vulnerabilities.is_empty() {
+                lines.push("Vulnerabilities:".into());
+                let mut vt = Table::new();
+                vt.header(&["Package", "Severity", "Patched"]);
+                for v in &res.vulnerabilities {
+                    vt.add_row(&[&v.package, &v.severity, &v.patched_version]);
+                }
+                lines.push(vt.render());
+            }
+
+            if !res.audit_items.is_empty() {
+                lines.push("Audit items:".into());
+                for a in &res.audit_items {
+                    lines.push(format!("- **{}:** {} ({})", a.name, a.note, a.current));
+                }
+            }
+
+            if !res.cleanup_items.is_empty() {
+                lines.push("Cleanup:".into());
+                for c in &res.cleanup_items {
+                    lines.push(format!(
+                        "- {} — {}",
+                        c.description,
+                        c.size.as_deref().unwrap_or("?")
+                    ));
+                }
             }
 
             for issue in &res.issues {
