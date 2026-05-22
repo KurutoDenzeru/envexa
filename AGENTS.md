@@ -20,7 +20,7 @@
 | `cargo build` | Debug build |
 | `cargo build --release` | Optimized build |
 | `cargo run` | Launches interactive TUI (no args, TTY) |
-| `cargo run -- status` | CLI mode (args present) |
+| `cargo run -- scan` | CLI scan mode (args present) |
 | `cargo fmt` | Format all code |
 | `cargo clippy` | Lint check |
 | `cargo test` | Run tests |
@@ -55,7 +55,9 @@ cargo run -- --help       # CLI help
 - Input: `crossterm::event::read()` loop with `KeyCode` matching; `s`=scan, `o`=outdated, `h`/`Esc`=home, `q`=quit, `arrows`=navigate/switch tabs
 - Color convention: `ok`=green, `warning`=yellow, `error`=red, `skipped`=darkgray
 - Table navigation: `dashboard_selection` / `outdated_selection` tracked per view
-- ratatui widgets used: `Table` (dashboard/outdated), `Tabs` (tab bar), `Gauge` (scan progress), `Paragraph` (text), `Block` (borders/titles), `Row`/`Cell` (table data)
+- ratatui widgets used: `Table` (dashboard/outdated), `Tabs` (tab bar), `Gauge`/`LineGauge` (readiness/health), `BarChart` (tooling signal distribution), `Paragraph` (text), `Block` (borders/titles), `Row`/`Cell` (table data)
+- third-party widgets are allowed when they add clear scan readability; existing examples: `tui-piechart` for overview status distribution and `throbber-widgets-tui` for scan/update activity
+- Project Tooling dashboard should keep Project, Security, and Audit visible as first-class signals, not just generic issue rows
 - No obvious comments — explain *why*, not *what*
 - Conventional commits: `type(scope): description`
 - One logical change per commit, no `--no-verify`, no force push
