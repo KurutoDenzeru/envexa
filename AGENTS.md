@@ -27,8 +27,8 @@
 
 Quick test:
 ```bash
-cargo run -- scan brew    # CLI scan
 cargo run                 # Interactive TUI
+cargo run -- scan         # CLI scan (full report to stdout)
 cargo run -- --help       # CLI help
 ```
 
@@ -52,9 +52,10 @@ cargo run -- --help       # CLI help
 - Render functions live in `ui.rs` — one function per view, called by `render()` dispatcher
 - Use `ratatui::init()` / `ratatui::restore()` in `App::run()` for terminal lifecycle
 - Blocking scan: set `View::Scanning`, draw frame, then `block_on` scan — freezes UI for 3-4s (acceptable for v1)
-- Input: `crossterm::event::read()` loop with `KeyCode` matching; `s`=scan, `o`=outdated, `h`=home, `q`=quit, `Esc`=back, `jk/arrows`=navigate
+- Input: `crossterm::event::read()` loop with `KeyCode` matching; `s`=scan, `o`=outdated, `h`/`Esc`=home, `q`=quit, `arrows`=navigate/switch tabs
 - Color convention: `ok`=green, `warning`=yellow, `error`=red, `skipped`=darkgray
 - Table navigation: `dashboard_selection` / `outdated_selection` tracked per view
+- ratatui widgets used: `Table` (dashboard/outdated), `Tabs` (tab bar), `Gauge` (scan progress), `Paragraph` (text), `Block` (borders/titles), `Row`/`Cell` (table data)
 - No obvious comments — explain *why*, not *what*
 - Conventional commits: `type(scope): description`
 - One logical change per commit, no `--no-verify`, no force push
@@ -87,11 +88,9 @@ cargo build && cargo clippy -- -D warnings && cargo fmt --check
 
 CLI output verification — manually run and visually inspect:
 1. `cargo run -- --help` — help text renders correctly
-2. `cargo run -- scan brew` — scan output is readable
-3. `cargo run -- status` — status table is aligned
-4. `cargo run -- outdated` — outdated table is correct
-5. `cargo run -- info` — info displays
-6. `cargo run` (no args, in terminal) — TUI launches, can navigate with arrows, `S` triggers scan, `O` shows outdated, `Q` quits
+2. `cargo run -- scan` — full report printed to stdout
+3. `cargo run -- update` — update check message (no-op if latest)
+4. `cargo run` (no args, in terminal) — TUI launches, `S` triggers scan, `O` shows outdated, arrows navigate, `Q` quits
 
 Do not push if any of these produce warnings or malformed output. Fix first, then push.
 

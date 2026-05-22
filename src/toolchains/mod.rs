@@ -133,6 +133,7 @@ pub async fn scan_all() -> HashMap<String, ScanResult> {
     results
 }
 
+#[allow(dead_code)]
 pub async fn scan_one(name: &str) -> Option<ScanResult> {
     match name {
         "brew" => Some(brew::scan().await),

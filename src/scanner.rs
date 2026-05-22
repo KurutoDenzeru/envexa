@@ -304,6 +304,7 @@ pub fn format_report(report: &Report) -> String {
     lines.join("\n")
 }
 
+#[allow(dead_code)]
 pub fn format_status(report: &Report) -> String {
     let results = &report.results;
     let mut lines = vec![];
@@ -337,6 +338,7 @@ pub fn count_outdated(report: &Report) -> usize {
         .sum()
 }
 
+#[allow(dead_code)]
 pub fn format_outdated(report: &Report) -> String {
     let results = &report.results;
 

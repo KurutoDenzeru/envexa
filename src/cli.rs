@@ -1,4 +1,3 @@
-use clap::CommandFactory;
 use clap::Parser;
 
 use crate::config;
@@ -8,7 +7,12 @@ use crate::toolchains;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Parser)]
-#[command(name = "envexa", version = VERSION, about = "Dev environment health scanner")]
+#[command(
+    name = "envexa",
+    version = VERSION,
+    about = "Dev environment health scanner",
+    after_help = "Run with no arguments to launch the interactive TUI."
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -16,26 +20,13 @@ struct Cli {
 
 #[derive(clap::Subcommand)]
 enum Commands {
-    #[command(about = "Full health scan of all or one toolchain")]
+    #[command(about = "Full health scan (CLI output, for scripting)")]
     Scan {
-        chain: Option<String>,
         #[arg(long, default_value = "7")]
         ttl: u64,
     },
-    #[command(about = "Quick dashboard summary")]
-    Status,
-    #[command(about = "Check outdated packages only")]
-    Outdated { chain: Option<String> },
-    #[command(about = "Show the latest cached report")]
-    Report,
-    #[command(about = "Upgrade a toolchain (pip currently supported)")]
-    Upgrade { tool: String },
     #[command(about = "Self-update to latest release")]
     Update,
-    #[command(about = "Show version and system info")]
-    Info,
-    #[command(about = "Remove cache and config")]
-    Uninstall,
 }
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -43,7 +34,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     match cli.command {
         Some(cmd) => run_cmd(cmd).await,
         None => {
-            Cli::command().print_help()?;
+            // This path is only reached with --help/--version flags,
+            // or if no-args routes here (but main.rs routes no-args to TUI)
             Ok(())
         }
     }
@@ -51,18 +43,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 async fn run_cmd(cmd: Commands) -> Result<(), anyhow::Error> {
     match cmd {
-        Commands::Scan { chain, ttl } => {
-            let chain = chain.as_deref().unwrap_or("all");
-            let results = if chain == "all" {
-                toolchains::scan_all().await
-            } else if let Some(res) = toolchains::scan_one(chain).await {
-                let mut map = std::collections::HashMap::new();
-                map.insert(chain.to_string(), res);
-                map
-            } else {
-                eprintln!("Unknown chain: {chain}");
-                std::process::exit(1);
-            };
+        Commands::Scan { ttl } => {
+            let results = toolchains::scan_all().await;
             let report = Report {
                 timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
                 results,
@@ -70,105 +52,13 @@ async fn run_cmd(cmd: Commands) -> Result<(), anyhow::Error> {
             if let Err(e) = config::write_cache(&report, ttl) {
                 eprintln!("Warning: failed to write cache: {e}");
             }
-            println!("{}", format_report(&report));
-        }
-        Commands::Status => {
-            let text = if let Some(entry) = config::read_cache() {
-                if config::cache_expired(&entry) {
-                    let r = fresh_scan().await;
-                    println!("{}", scanner::format_status(&r));
-                    return Ok(());
-                }
-                scanner::format_status(&entry.report)
-            } else {
-                let r = fresh_scan().await;
-                println!("{}", scanner::format_status(&r));
-                return Ok(());
-            };
-            println!("{text}");
-        }
-        Commands::Outdated { chain } => {
-            let chain = chain.as_deref().unwrap_or("all");
-            let results = if chain == "all" {
-                toolchains::scan_all().await
-            } else if let Some(res) = toolchains::scan_one(chain).await {
-                let mut map = std::collections::HashMap::new();
-                map.insert(chain.to_string(), res);
-                map
-            } else {
-                eprintln!("Unknown chain: {chain}");
-                std::process::exit(1);
-            };
-            let report = Report {
-                timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
-                results,
-            };
-            println!("{}", scanner::format_outdated(&report));
-        }
-        Commands::Report => match config::read_cache() {
-            Some(entry) => {
-                if config::cache_expired(&entry) {
-                    eprintln!("Cache expired (cached {})", entry.cached_at);
-                }
-                println!("{}", format_report(&entry.report));
-            }
-            None => {
-                eprintln!("No cached report. Run `envexa scan` first.");
-                std::process::exit(1);
-            }
-        },
-        Commands::Upgrade { tool } => {
-            upgrade_tool(&tool).await;
+            println!("{}", scanner::format_report(&report));
         }
         Commands::Update => {
             self_update().await;
         }
-        Commands::Info => {
-            print_info();
-        }
-        Commands::Uninstall => {
-            uninstall();
-        }
     }
     Ok(())
-}
-
-async fn fresh_scan() -> Report {
-    let results = toolchains::scan_all().await;
-    Report {
-        timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
-        results,
-    }
-}
-
-fn format_report(report: &Report) -> String {
-    scanner::format_report(report)
-}
-
-async fn upgrade_tool(tool: &str) {
-    match tool {
-        "pip" => {
-            let output = std::process::Command::new("pip3")
-                .args(["install", "--upgrade", "pip"])
-                .output();
-            match output {
-                Ok(o) if o.status.success() => {
-                    let stdout = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                    println!("pip upgraded successfully.\n{stdout}");
-                }
-                Ok(o) => {
-                    let stderr = String::from_utf8_lossy(&o.stderr).trim().to_string();
-                    eprintln!("Upgrade failed:\n{stderr}");
-                }
-                Err(e) => {
-                    eprintln!("Failed to execute pip3: {e}");
-                }
-            }
-        }
-        _ => {
-            eprintln!("Upgrade not implemented for `{tool}`. Supported: pip");
-        }
-    }
 }
 
 async fn self_update() {
@@ -287,94 +177,5 @@ async fn fetch_latest_tag() -> Option<String> {
         serde_json::from_str::<serde_json::Value>(&body)
             .ok()
             .and_then(|v| v["tag_name"].as_str().map(|s| s.to_string()))
-    }
-}
-
-fn print_info() {
-    let exe = std::env::current_exe().unwrap_or_default();
-    let exe_size = std::fs::metadata(&exe).map(|m| m.len()).unwrap_or(0);
-    let exe_str = exe.to_string_lossy().to_string();
-    let cache_info = match config::read_cache() {
-        Some(entry) => {
-            let expired = config::cache_expired(&entry);
-            let status = if expired { "expired" } else { "fresh" };
-            format!(
-                "{} ({}, cached {}, TTL: {}d)",
-                cache_path_display(),
-                status,
-                &entry.cached_at[..10],
-                entry.ttl_days
-            )
-        }
-        None => "none".to_string(),
-    };
-
-    let config_path = config_path_display();
-    let config_exists = std::path::Path::new(&config_path).exists();
-
-    println!("Envexa v{} — Dev Environment Scanner", VERSION);
-    println!("Binary:   {} ({})", exe_str, human_size(exe_size));
-    println!("Cache:    {}", cache_info);
-    println!(
-        "Config:   {} ({})",
-        config_path,
-        if config_exists { "present" } else { "not set" }
-    );
-    println!("Source:   https://github.com/KurutoDenzeru/envexa");
-    println!("Chains:   brew, npm, pnpm, yarn, bun, deno, pip, gem, cargo, docker");
-}
-
-fn cache_path_display() -> String {
-    let d = config::dir();
-    d.join("cache.json").to_string_lossy().to_string()
-}
-
-fn config_path_display() -> String {
-    let d = config::dir();
-    d.join("config.json").to_string_lossy().to_string()
-}
-
-fn human_size(bytes: u64) -> String {
-    if bytes < 1024 {
-        format!("{bytes} B")
-    } else if bytes < 1024 * 1024 {
-        format!("{:.1} KB", bytes as f64 / 1024.0)
-    } else {
-        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
-    }
-}
-
-fn uninstall() {
-    let exe = std::env::current_exe().unwrap_or_default();
-    let cache = config::dir();
-
-    println!("This will remove:");
-    println!("  Binary: {}", exe.display());
-    println!("  Cache:  {}", cache.display());
-    print!("Are you sure? [y/N] ");
-    use std::io::Write;
-    std::io::stdout().flush().ok();
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input).ok();
-    if input.trim().eq_ignore_ascii_case("y") {
-        let _ = config::remove_all();
-        if exe.exists() {
-            #[cfg(unix)]
-            {
-                if std::fs::remove_file(&exe).is_err() {
-                    eprintln!(
-                        "Could not remove binary at {}. Remove it manually.",
-                        exe.display()
-                    );
-                }
-            }
-            #[cfg(windows)]
-            {
-                eprintln!("Binary at {}. Remove it manually.", exe.display());
-            }
-        }
-        println!("Envexa has been removed.");
-    } else {
-        println!("Cancelled.");
     }
 }

@@ -92,6 +92,7 @@ pub fn write_cache(report: &Report, ttl_days: u64) -> std::io::Result<()> {
     std::fs::write(cache_path(), serde_json::to_string_pretty(&entry)?)
 }
 
+#[allow(dead_code)]
 pub fn cache_expired(entry: &CacheEntry) -> bool {
     chrono::NaiveDateTime::parse_from_str(&entry.cached_at, "%Y-%m-%dT%H:%M:%S")
         .map(|dt| {
@@ -101,6 +102,7 @@ pub fn cache_expired(entry: &CacheEntry) -> bool {
         .unwrap_or(true)
 }
 
+#[allow(dead_code)]
 pub fn remove_all() -> std::io::Result<()> {
     let d = dir();
     if d.exists() {
