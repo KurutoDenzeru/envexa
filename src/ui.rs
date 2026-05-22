@@ -2,10 +2,12 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Table, Tabs},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table, Tabs},
     Frame,
 };
-use tui_piechart::{PieChart, PieSlice};
+use tui_piechart::{
+    LegendAlignment, LegendLayout, LegendPosition, PieChart, PieSlice, Resolution,
+};
 
 use crate::app::{App, View};
 use crate::scanner;
@@ -45,6 +47,11 @@ fn title_bar(frame: &mut Frame, area: Rect, app: &App) {
         ),
         Span::styled(
             concat!(" v", env!("CARGO_PKG_VERSION")),
+            Style::default().fg(Color::DarkGray),
+        ),
+        Span::raw("  "),
+        Span::styled(
+            "By KurutoDenzeru",
             Style::default().fg(Color::DarkGray),
         ),
         Span::raw(" \u{2503} "),
@@ -218,15 +225,12 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
                     ),
                 ]),
                 Line::from(""),
-                Line::from(vec![
-                    Span::raw("  Scan your dev environment to get started."),
-                ]),
+                Line::from(vec![Span::raw(
+                    "  Scan your dev environment to get started.",
+                )]),
                 Line::from(""),
                 Line::from(vec![
-                    Span::styled(
-                        "  \u{25B6} Press [S]",
-                        Style::default().fg(Color::Green),
-                    ),
+                    Span::styled("  \u{25B6} Press [S]", Style::default().fg(Color::Green)),
                     Span::raw(" to scan all toolchains"),
                 ]),
                 Line::from(vec![
@@ -250,24 +254,41 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
 
     let layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Length(35), Constraint::Min(1)])
+        .constraints([Constraint::Length(46), Constraint::Min(1)])
         .split(area);
 
     let (pass, warn, fail, skip) = count_statuses(report);
 
+    let pass_label = format!("PASS ({pass})");
+    let warn_label = format!("WARN ({warn})");
+    let fail_label = format!("FAIL ({fail})");
+    let skip_label = format!("SKIP ({skip})");
+
     let mut slices = Vec::new();
-    if pass > 0 { slices.push(PieSlice::new("PASS", pass as f64, Color::Green)); }
-    if warn > 0 { slices.push(PieSlice::new("WARN", warn as f64, Color::Yellow)); }
-    if fail > 0 { slices.push(PieSlice::new("FAIL", fail as f64, Color::Red)); }
-    if skip > 0 { slices.push(PieSlice::new("SKIP", skip as f64, Color::DarkGray)); }
+    if pass > 0 {
+        slices.push(PieSlice::new(&pass_label, pass as f64, Color::Green));
+    }
+    if warn > 0 {
+        slices.push(PieSlice::new(&warn_label, warn as f64, Color::Yellow));
+    }
+    if fail > 0 {
+        slices.push(PieSlice::new(&fail_label, fail as f64, Color::Red));
+    }
+    if skip > 0 {
+        slices.push(PieSlice::new(&skip_label, skip as f64, Color::DarkGray));
+    }
 
     if slices.is_empty() {
         slices.push(PieSlice::new("EMPTY", 1.0, Color::DarkGray));
     }
 
     let piechart = PieChart::new(slices)
+        .resolution(Resolution::Braille)
         .show_legend(true)
-        .show_percentages(true)
+        .legend_position(LegendPosition::Top)
+        .legend_layout(LegendLayout::Horizontal)
+        .legend_alignment(LegendAlignment::Center)
+        .show_percentages(false)
         .block(
             Block::default()
                 .borders(Borders::ALL)
@@ -278,10 +299,26 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
 
     let right_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .constraints([Constraint::Length(2), Constraint::Min(1)])
         .split(layout[1]);
 
     dashboard_stats_line(frame, right_chunks[0], report);
+
+    let summary = Paragraph::new(Line::from(vec![
+        Span::styled(" [S]", Style::default().fg(Color::Green)),
+        Span::raw("can  "),
+        Span::styled("[O]", Style::default().fg(Color::Yellow)),
+        Span::raw("utdated  "),
+        Span::styled("[/]", Style::default().fg(Color::Cyan)),
+        Span::raw("Search  "),
+        Span::styled("^C", Style::default().fg(Color::Red)),
+        Span::raw(" Exit  "),
+        Span::styled("[Q]", Style::default().fg(Color::DarkGray)),
+        Span::raw("uit"),
+    ]))
+    .style(Style::default().fg(Color::White))
+    .block(Block::default().borders(Borders::NONE));
+    frame.render_widget(summary, right_chunks[0]);
 
     let header_cells = ["", " Toolchain ", " Status ", " Version ", " Outdated ", " Issues "]
         .iter()
@@ -349,9 +386,9 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
     let subtitle = if filtered {
         format!(" Details  ({count} matched) ")
     } else if total_outdated > 0 {
-        format!(" Details  |  {total_outdated} outdated ")
+        format!(" Details  ·  {total_outdated} outdated ")
     } else {
-        " Details  |  all up to date ".into()
+        " Details  ·  all up to date ".into()
     };
 
     let table = Table::new(
@@ -498,49 +535,29 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(table, area);
 }
 
-fn render_scanning(frame: &mut Frame, area: Rect, _app: &App) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
-        .split(area);
-
-    let text = Paragraph::new(Text::from(vec![
-        Line::from(""),
-        Line::from(vec![Span::styled(
-            "  Scanning ",
-            Style::default().fg(Color::Cyan),
-        )]),
-        Line::from(""),
-        Line::from("  Checking Homebrew, npm, pnpm, Yarn, Bun, Deno,"),
-        Line::from("  pip, Gem, Cargo, and Docker..."),
-    ]))
-    .block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title(" Envexa ")
-            .border_style(Style::default().fg(Color::Cyan)),
-    );
-    frame.render_widget(text, chunks[0]);
-
-    let gauge = Gauge::default()
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" Progress ")
-                .border_style(Style::default().fg(Color::DarkGray)),
-        )
-        .gauge_style(
+fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
+    let throbber = throbber_widgets_tui::Throbber::default()
+        .label("Scanning all toolchains...")
+        .style(Style::default().fg(Color::Cyan))
+        .throbber_style(
             Style::default()
                 .fg(Color::Cyan)
-                .bg(Color::Black)
                 .add_modifier(Modifier::BOLD),
         )
-        .percent(50)
-        .label("running...");
-    frame.render_widget(gauge, chunks[1]);
+        .throbber_set(throbber_widgets_tui::BRAILLE_EIGHT)
+        .use_type(throbber_widgets_tui::WhichUse::Spin);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Envexa ")
+        .border_style(Style::default().fg(Color::Cyan));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    frame.render_stateful_widget(throbber, inner, &mut app.throbber_state);
 }
 
-pub fn render(frame: &mut Frame, app: &App) {
+pub fn render(frame: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([

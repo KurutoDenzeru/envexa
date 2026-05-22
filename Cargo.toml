@@ -14,3 +14,4 @@ clap = { version = "4", features = ["derive"] }
 ratatui = "0.30"
 crossterm = "0.28"
 tui-piechart = "0.3.3"
+throbber-widgets-tui = "0.11.0"

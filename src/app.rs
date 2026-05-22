@@ -3,6 +3,8 @@ use std::time::Duration;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::DefaultTerminal;
 
+use throbber_widgets_tui::ThrobberState;
+
 use crate::config;
 use crate::scanner::{self, Report};
 use crate::toolchains;
@@ -21,6 +23,7 @@ pub struct App {
     pub tab_index: usize,
     pub search_mode: bool,
     pub search_query: String,
+    pub throbber_state: ThrobberState,
 }
 
 impl App {
@@ -34,6 +37,7 @@ impl App {
             tab_index: 0,
             search_mode: false,
             search_query: String::new(),
+            throbber_state: ThrobberState::default(),
         }
     }
 
@@ -189,15 +193,23 @@ impl App {
         terminal: &mut DefaultTerminal,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.view = View::Scanning;
-        terminal.draw(|frame| crate::ui::render(frame, self))?;
 
-        let results = std::thread::spawn(|| {
+        let handle = std::thread::spawn(|| {
             tokio::runtime::Runtime::new()
                 .expect("Failed to create scan runtime")
                 .block_on(toolchains::scan_all())
-        })
-        .join()
-        .expect("Scan thread panicked");
+        });
+
+        loop {
+            terminal.draw(|frame| crate::ui::render(frame, self))?;
+            self.throbber_state.calc_next();
+            if handle.is_finished() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+
+        let results = handle.join().expect("Scan thread panicked");
 
         let report = Report {
             timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
