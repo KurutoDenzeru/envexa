@@ -1,6 +1,6 @@
-# 🔍 Envexa
+# 🚧 Envexa
 
-**DevEnv Health Monitor** — an MCP server that snapshots your dev environment and surfaces outdated packages, version mismatches, unused deps, and runtime issues.
+**DevEnv Health Monitor** — snapshots your dev environment, surfaces outdated packages, version mismatches, unused deps, and runtime issues. Runs as either an **MCP server** (for AI agents) or a **CLI tool** (direct terminal use).
 
 ---
 
@@ -8,6 +8,7 @@
 
 - [Overview](#overview)
 - [Quick Start](#quick-start)
+- [CLI Usage](#cli-usage)
 - [Slash Commands](#slash-commands)
 - [MCP Tools](#mcp-tools)
 - [MCP Resources](#mcp-resources)
@@ -28,20 +29,53 @@ Ever wonder what's rotting in your dev environment? Run one scan and Envexa tell
 - Which npm/pip/gem packages need updating
 - If your Docker daemon is running and how much disk it's using
 
-Results are cached in memory so you can re-read them without re-scanning.
+Results are cached to `~/.envexa/cache.json` so you can re-read them across terminal sessions without re-scanning.
+
+Envexa auto-detects its mode:
+- **Args present** or **stdin is a terminal** → CLI mode
+- **stdin is piped** → MCP server mode (for AI agents)
 
 ---
 
 ## Quick Start
 
-**Prerequisites:** [Rust](https://rustup.rs/) toolchain
+### Build from source
 
 ```bash
-# Build
 cargo build --release
+```
 
-# Test the MCP server (sends initialize + scan, prints report)
-printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n{"jsonrpc":"2.0","method":"notifications/initialized"}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"envexa_scan","arguments":{"chain":"brew"}}}\n' | ./target/release/envexa
+### One-line install (curl)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/KurutoDenzeru/envexa/main/scripts/install.sh | bash
+```
+
+Detects OS/arch, downloads the latest release binary from GitHub, installs to `~/.local/bin/envexa`.
+
+### Self-update
+
+```bash
+envexa update
+```
+
+Downloads the latest release from GitHub and atomically swaps the binary. Works on macOS, Linux, and Windows.
+
+---
+
+## CLI Usage
+
+```bash
+envexa scan [chain]       Full health scan (chain: all|brew|npm|pnpm|yarn|bun|deno|pip|gem|cargo|docker)
+envexa status             Quick dashboard summary
+envexa outdated [chain]   Outdated packages only
+envexa report             Show the latest cached report
+envexa upgrade pip        Upgrade pip to latest
+envexa update             Self-update to latest release
+envexa info               Show version and system info
+envexa uninstall          Remove cache and config
+envexa --help             Show help
+envexa --version          Show version
 ```
 
 ### Register with opencode
@@ -65,13 +99,16 @@ Then restart opencode or reload MCP servers.
 
 ## Slash Commands
 
-These are **Envexa-specific** commands — use the `envexa:` prefix to distinguish from other agents (codex, claude, gemini, opencode) that also expose `/status` and similar commands:
+These are **Envexa-specific** commands — use inside an MCP host that supports slash commands, or pass via `envexa_cmd`:
 
 | Command | What it does |
 |---------|--------------|
-| `/envexa:scan` | Full health scan (default: all toolchains) |
-| `/envexa:outdated` | Outdated packages only |
-| `/envexa:status` | Quick dashboard summary (Envexa-specific) |
+| `/scan` | Full health scan (default: all toolchains) |
+| `/outdated` | Outdated packages only |
+| `/status` | Quick dashboard summary |
+| `/report` | Latest cached report |
+| `/upgrade` | Upgrade a toolchain (pip supported) |
+| `/help` | Show available commands |
 
 ---
 
@@ -107,13 +144,11 @@ All 10 toolchains run concurrently via `tokio::join!`. Full scan completes in ~3
 
 ## MCP Prompts
 
-These appear in opencode's `/` menu — the `envexa:` prefix ensures they don't conflict with other agents:
-
 | Menu entry | What it does |
 |------------|-------------|
-| `/envexa:envexa_scan` | Full health report |
-| `/envexa:envexa_status` | Quick dashboard summary |
-| `/envexa:envexa_outdated` | Outdated packages across all toolchains |
+| `envexa_scan` | Full health report |
+| `envexa_status` | Quick dashboard summary |
+| `envexa_outdated` | Outdated packages across all toolchains |
 
 ---
 
@@ -137,18 +172,18 @@ These appear in opencode's `/` menu — the `envexa:` prefix ensures they don't 
 ## Sample Output
 
 ```
-| Toolchain | Status | Version |
-|-----------|--------|---------|
-| 🍺 Brew    | ⚠️ WARN (6)         | 5.1.12  |
-|  npm     | ⚠️ WARN (3)         | 11.14.1 |
-|  pnpm    | ✅ PASS             | v24.15.0 |
-|  Yarn    | ⏭️ SKIP             |         |
-|  Bun     | ✅ PASS             | 1.3.14  |
-|  Deno    | ✅ PASS             | 2.5.4   |
-|  pip     | ✅ PASS             | Python 3.14.3 |
-|  Gem     | ⚠️ WARN (100)       | ruby 3.2.2 |
-| 🦀 Cargo   | ✅ PASS             | rustc 1.93.0 |
-| 🐳 Docker  | ✅ PASS             | 29.4.0  |
+| Toolchain | Status         | Version     |
+|-----------|----------------|-------------|
+| Brew      | WARN (6)       | 5.1.12      |
+| npm       | WARN (3)       | 11.14.1     |
+| pnpm      | PASS           | v24.15.0    |
+| Yarn      | SKIP           |             |
+| Bun       | PASS           | 1.3.14      |
+| Deno      | PASS           | 2.5.4       |
+| pip       | PASS           | Python 3.14.3 |
+| Gem       | WARN (100)     | ruby 3.2.2  |
+| Cargo     | PASS           | rustc 1.93.0 |
+| Docker    | PASS           | 29.4.0      |
 ```
 
 ---
@@ -159,40 +194,35 @@ These appear in opencode's `/` menu — the `envexa:` prefix ensures they don't 
 envexa/
 ├── Cargo.toml               # Dependencies + metadata
 ├── src/
-│   ├── main.rs              # Entry point + tokio stdin/stdout loop
+│   ├── main.rs              # Entry point — auto-detects CLI vs MCP mode
+│   ├── cli.rs               # Clap CLI parser + slash-command executor
+│   ├── config.rs            # File-backed cache (~/.envexa/cache.json) + TTL
 │   ├── transport.rs         # JSON-RPC MCP protocol (hand-rolled, no SDK)
 │   ├── server.rs            # Tool/prompt/resource registration + dispatch
-│   ├── scanner.rs           # Scan orchestration + markdown formatting + cache
+│   ├── scanner.rs           # Scan orchestration + ASCII table formatting + cache
 │   └── toolchains/          # One scanner per toolchain
 │       ├── mod.rs           # ScanResult type + scan_all() concurrent dispatcher
 │       ├── brew.rs / npm.rs / pip.rs / gem.rs / cargo.rs / docker.rs
 │       ├── pnpm.rs / yarn.rs / bun.rs / deno.rs
+├── scripts/
+│   └── install.sh           # Curl-based install script (detects OS/arch)
+├── .github/
+│   └── workflows/           # CI + release build matrix
 ├── AGENTS.md                # Instructions for AI assistants
-├── report.json              # Cached scan results (gitignored)
 ```
 
 ---
 
-## Development
+## Contributing
 
-```bash
-# Build + run (debug)
-cargo run
+Contributions are always welcome, whether you're fixing bugs, improving docs, or shipping new features that make the project better for everyone.
 
-# Build optimized
-cargo build --release
+Check out [Contributing.md](Contributing) to learn how to get started and follow the recommended workflow.
 
-# Test a scan (extracts report text from JSON-RPC)
-printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n{"jsonrpc":"2.0","method":"notifications/initialized"}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"envexa_scan","arguments":{"chain":"brew"}}}\n' | cargo run | python3 -c "
-import sys, json
-for line in sys.stdin:
-    d = json.loads(line)
-    if d.get('result',{}).get('content'):
-        print(d['result']['content'][0]['text'])
-"
-
----
+<!-- Please adhere to this project's Code of Conduct. -->
 
 ## License
 
-MIT
+This project is released under the MIT License, giving you the freedom to use, modify, and distribute the code with minimal restrictions.
+
+For the full legal text, see the [MIT](LICENSE) file.
