@@ -1,10 +1,10 @@
 # Envexa
 
-**DevEnv Health Scanner** — interactive TUI that scans your dev environment and surfaces outdated packages. Just run `envexa`.
+**Scan your dev environment. Surface outdated packages.** Envexa is a fast, interactive TUI that checks 10 toolchains at once and shows you exactly what needs updating.
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 ### One-line install
 
@@ -23,7 +23,7 @@ cargo build --release
 
 ---
 
-## Usage
+## 📖 Usage
 
 ```
 envexa            Launch interactive TUI
@@ -31,7 +31,7 @@ envexa scan       Full scan (CLI output, for scripting)
 envexa update     Self-update to latest release
 ```
 
-### TUI Keybindings
+### ⌨️ TUI Keybindings
 
 | Key | Action |
 |-----|--------|
@@ -40,10 +40,10 @@ envexa update     Self-update to latest release
 | `/` | Enter search/filter mode |
 | `←` `→` / `J` `L` | Switch between tabs |
 | `↑` `↓` / `N` `P` | Navigate rows |
-| `Q` | Quit (works even during search) |
+| `Ctrl+C` / `Q` | Quit |
 | `Esc` / `H` | Back to Dashboard |
 
-### TUI Search
+### 🔍 TUI Search
 
 Press `/` to enter search mode — the bottom bar becomes a search prompt. Type to filter the current view:
 
@@ -52,20 +52,20 @@ Press `/` to enter search mode — the bottom bar becomes a search prompt. Type 
 
 Press `Esc` to clear filter & exit, `Enter` to keep the filter active.
 
-### TUI Columns
+### 📊 TUI Columns
 
-**Dashboard:** Indicator (▸), Toolchain, Status, Version, Outdated (#), Issues  
-**Outdated:** Indicator (▸), Toolchain, Source, Package, Current, Latest
+**Dashboard:** ▸ Indicator, Toolchain, Status, Version, Outdated (#), Issues  
+**Outdated:** ▸ Indicator, Toolchain, Source, Package, Current, Latest
 
 ---
 
-## Cache
+## 💾 Cache
 
 Scan results are cached to `~/.envexa/cache.json` (TTL: 7 days). The TUI loads cached data on launch — press `S` to refresh.
 
 ---
 
-## Self-Update
+## 🔄 Self-Update
 
 ```bash
 envexa update
@@ -73,13 +73,15 @@ envexa update
 
 Downloads the latest prebuilt binary from GitHub Releases and atomically replaces the current binary. Works on macOS, Linux, and Windows.
 
+> **Development builds** skip the release check — run `cargo build --release` first.
+
 ---
 
-## Performance
+## ⚡ Performance
 
-All 10 toolchains run concurrently via `tokio::join!`. Full scan completes in ~3-4 seconds. Release binary is 3.2MB — no Python, no Node, no runtime dependencies.
+All 10 toolchains run concurrently via `tokio::join!`. Full scan completes in ~3-4 seconds. Release binary is 3.8MB — no Python, no Node, no runtime dependencies.
 
-## Toolchains
+## 🔧 Toolchains
 
 | Toolchain | What's checked |
 |-----------|----------------|
@@ -96,7 +98,7 @@ All 10 toolchains run concurrently via `tokio::join!`. Full scan completes in ~3
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 envexa/
@@ -119,10 +121,16 @@ envexa/
 
 ---
 
-## Contributing
+## 🤝🏻 Contributing
 
-Contributions are always welcome. Check out [Contributing.md](Contributing) to get started.
+Contributions are always welcome, whether you're fixing bugs, improving docs, or shipping new features that make the project better for everyone.
 
-## License
+Check out [Contributing.md](Contributing) to learn how to get started and follow the recommended workflow.
 
-MIT — see the [LICENSE](LICENSE) file.
+<!-- Please adhere to this project's `Code of Conduct`. -->
+
+## ⚖️ License
+
+This project is released under the MIT License, giving you the freedom to use, modify, and distribute the code with minimal restrictions.
+
+For the full legal text, see the [MIT](LICENSE) file.

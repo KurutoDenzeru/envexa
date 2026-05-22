@@ -191,8 +191,13 @@ impl App {
         self.view = View::Scanning;
         terminal.draw(|frame| crate::ui::render(frame, self))?;
 
-        let results =
-            tokio::runtime::Handle::current().block_on(async { toolchains::scan_all().await });
+        let results = std::thread::spawn(|| {
+            tokio::runtime::Runtime::new()
+                .expect("Failed to create scan runtime")
+                .block_on(toolchains::scan_all())
+        })
+        .join()
+        .expect("Scan thread panicked");
 
         let report = Report {
             timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),

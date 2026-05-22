@@ -55,7 +55,12 @@ async fn run_cmd(cmd: Commands) -> Result<(), anyhow::Error> {
             println!("{}", scanner::format_report(&report));
         }
         Commands::Update => {
-            self_update().await;
+            if cfg!(debug_assertions) {
+                println!("envexa development build — update checking is disabled");
+                println!("Run `cargo build --release` for production and `envexa update` to update.");
+            } else {
+                self_update().await;
+            }
         }
     }
     Ok(())

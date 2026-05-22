@@ -85,38 +85,41 @@ fn tab_bar(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
-    let bar = if app.search_mode {
+    let (text, style) = if app.search_mode {
         let query = format!(" / {}█", app.search_query);
-        Line::from(vec![
-            Span::styled("Search:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::raw(query),
-            Span::styled("  Esc", Style::default().fg(Color::DarkGray)),
-            Span::raw(" clear"),
-        ])
+        (
+            Line::from(vec![
+                Span::styled("Search:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                Span::raw(query),
+                Span::styled("  Esc", Style::default().fg(Color::DarkGray)),
+                Span::raw(" clear"),
+            ]),
+            Style::default(),
+        )
     } else {
-        let hints = vec![
-            Span::styled(" [S]", Style::default().fg(Color::Green)),
-            Span::raw("can "),
-            Span::styled("[O]", Style::default().fg(Color::Yellow)),
-            Span::raw("utdated "),
-            Span::styled("[/]", Style::default().fg(Color::Cyan)),
-            Span::raw("Search "),
-            Span::styled("\u{2190}\u{2192}", Style::default().fg(Color::DarkGray)),
-            Span::raw(" tabs "),
-            Span::styled("\u{2191}\u{2193}", Style::default().fg(Color::DarkGray)),
-            Span::raw(" nav  "),
-            Span::styled("^C", Style::default().fg(Color::Red)),
-            Span::styled(" Exit", Style::default().fg(Color::Red)),
-            Span::raw("  "),
-            Span::styled("[Q]", Style::default().fg(Color::DarkGray)),
-            Span::raw("uit"),
-        ];
-        Line::from(hints)
+        (
+            Line::from(vec![
+                Span::styled(" [S]", Style::default().fg(Color::Green)),
+                Span::raw("can "),
+                Span::styled("[O]", Style::default().fg(Color::Yellow)),
+                Span::raw("utdated "),
+                Span::styled("[/]", Style::default().fg(Color::Cyan)),
+                Span::raw("earch "),
+                Span::styled("\u{2190}\u{2192}", Style::default().fg(Color::DarkGray)),
+                Span::raw(" tabs "),
+                Span::styled("\u{2191}\u{2193}", Style::default().fg(Color::DarkGray)),
+                Span::raw(" nav  "),
+                Span::styled("^C", Style::default().fg(Color::Red)),
+                Span::styled(" Exit", Style::default().fg(Color::Red)),
+                Span::raw("  "),
+                Span::styled("[Q]", Style::default().fg(Color::DarkGray)),
+                Span::raw("uit"),
+            ]),
+            Style::default().fg(Color::White).bg(Color::Black),
+        )
     };
-    let block = Block::default()
-        .borders(Borders::TOP)
-        .border_style(Style::default().fg(Color::DarkGray));
-    frame.render_widget(Paragraph::new(bar).block(block), area);
+    let block = Block::default().style(style);
+    frame.render_widget(Paragraph::new(text).block(block), area);
 }
 
 fn truncated_cell(text: &str, max: usize) -> Cell<'static> {

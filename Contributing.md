@@ -16,26 +16,28 @@ git clone https://github.com/KurutoDenzeru/envexa.git
 cargo build
 ```
 
-4. Test the MCP server.
+4. Run the TUI (no arguments).
 
 ```bash
-printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n{"jsonrpc":"2.0","method":"notifications/initialized"}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"envexa_scan","arguments":{"chain":"brew"}}}\n' | cargo run | python3 -c "
-import sys, json
-for line in sys.stdin:
-    d = json.loads(line)
-    if d.get('result',{}).get('content'):
-        print(d['result']['content'][0]['text'])
-"
+cargo run
+```
+
+5. Run a full CLI scan.
+
+```bash
+cargo run -- scan
 ```
 
 ## Project Layout
 
 ```
 src/
-├── main.rs           # Entry point + tokio stdin/stdout loop
-├── transport.rs      # JSON-RPC MCP protocol (hand-rolled)
-├── server.rs         # Tool/prompt/resource dispatch
-├── scanner.rs        # Scan orchestration + formatting + cache
+├── main.rs           # Entry — no args = TUI, args = CLI
+├── app.rs            # App state, event loop, scan dispatch
+├── ui.rs             # ratatui render functions
+├── cli.rs            # CLI subcommands (scan, update)
+├── config.rs         # File-backed cache (~/.envexa/cache.json)
+├── scanner.rs        # Scan orchestration + formatting
 └── toolchains/
     ├── mod.rs        # ScanResult type + concurrent scan_all()
     ├── brew.rs / npm.rs / pip.rs / gem.rs / cargo.rs / docker.rs
@@ -77,8 +79,13 @@ https://www.conventionalcommits.org/ or check out the
 Build and test the full scan:
 
 ```bash
-cargo build
-printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n{"jsonrpc":"2.0","method":"notifications/initialized"}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"envexa_scan","arguments":{"chain":"all"}}}\n' | cargo run > /dev/null && echo "PASS"
+cargo build && cargo run -- scan > /dev/null && echo "PASS"
 ```
 
-Please ensure the server compiles and responds to MCP requests correctly when submitting a pull request.
+Run clippy and format checks:
+
+```bash
+cargo clippy -- -D warnings && cargo fmt --check
+```
+
+Please ensure the project compiles, passes clippy, and runs without errors when submitting a pull request.
