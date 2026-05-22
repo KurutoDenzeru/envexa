@@ -369,22 +369,9 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
     .block(Block::default().borders(Borders::NONE));
     frame.render_widget(summary, right_chunks[0]);
 
-    let header_cells = [
-        "",
-        " Toolchain ",
-        " Status ",
-        " Version ",
-        " Outdated ",
-        " Issues ",
-    ]
-    .iter()
-    .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
-    let header = Row::new(header_cells)
-        .style(Style::default().bg(Color::Blue).fg(Color::White))
-        .height(1);
-
     let q = app.search_query.to_lowercase();
-    let mut rows: Vec<Row> = Vec::new();
+    let mut category_tables: Vec<Table> = Vec::new();
+    let mut category_heights: Vec<u16> = Vec::new();
     let mut tool_index = 0;
 
     for cat in scanner::tool_categories() {
@@ -409,19 +396,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             continue;
         }
 
-        rows.push(
-            Row::new(vec![
-                Cell::from(""),
-                Cell::from(format!("── {} ──", cat.name)),
-                Cell::from(""),
-                Cell::from(""),
-                Cell::from(""),
-                Cell::from(""),
-            ])
-            .style(Style::default().fg(Color::DarkGray))
-            .height(1),
-        );
-
+        let mut rows: Vec<Row> = Vec::new();
         for tool in visible_tools {
             let res = report.results.get(*tool).unwrap();
             let display = scanner::display_name(tool);
@@ -496,40 +471,69 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             rows.push(row);
             tool_index += 1;
         }
+
+        let h = 2 + 1 + rows.len() as u16;
+
+        let cat_header = Row::new(
+            [
+                "",
+                " Toolchain ",
+                " Status ",
+                " Version ",
+                " Outdated ",
+                " Issues ",
+            ]
+            .iter()
+            .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD)),
+        )
+        .style(Style::default().bg(Color::Blue).fg(Color::White))
+        .height(1);
+
+        let table = Table::new(
+            rows,
+            [
+                Constraint::Length(2),
+                Constraint::Length(14),
+                Constraint::Length(8),
+                Constraint::Length(18),
+                Constraint::Length(8),
+                Constraint::Min(15),
+            ],
+        )
+        .header(cat_header)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(format!(" {} ", cat.name))
+                .border_style(Style::default().fg(Color::Cyan)),
+        )
+        .column_spacing(1);
+
+        category_heights.push(h);
+        category_tables.push(table);
     }
 
+    let constraints: Vec<Constraint> = category_heights
+        .iter()
+        .map(|h| Constraint::Length(*h))
+        .collect();
+
     let total_outdated = scanner::count_outdated(report);
-    let filtered = app.search_mode && !q.is_empty();
-    let count = rows.len();
-    let subtitle = if filtered {
-        format!(" Details  ({count} matched) ")
-    } else if total_outdated > 0 {
-        format!(" Details  ·  {total_outdated} outdated ")
-    } else {
-        " Details  ·  all up to date ".into()
-    };
-
-    let table = Table::new(
-        rows,
-        [
-            Constraint::Length(2),
-            Constraint::Length(14),
-            Constraint::Length(8),
-            Constraint::Length(18),
-            Constraint::Length(8),
-            Constraint::Min(15),
-        ],
-    )
-    .header(header)
-    .block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title(subtitle)
-            .border_style(Style::default().fg(Color::Cyan)),
-    )
-    .column_spacing(1);
-
-    frame.render_widget(table, right_chunks[1]);
+    if !constraints.is_empty() {
+        let cat_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(constraints)
+            .split(right_chunks[1]);
+        for (i, table) in category_tables.into_iter().enumerate() {
+            frame.render_widget(table, cat_chunks[i]);
+        }
+    } else if !q.is_empty() && total_outdated > 0 {
+        let text = Paragraph::new(Text::from(Line::from(Span::raw(
+            "No matches found for filter.",
+        ))))
+        .style(Style::default().fg(Color::DarkGray));
+        frame.render_widget(text, right_chunks[1]);
+    }
 }
 
 fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
