@@ -1,156 +1,114 @@
-# 🚧 Envexa
+# Envexa
 
-**DevEnv Health Monitor** — snapshots your dev environment, surfaces outdated packages, version mismatches, unused deps, and runtime issues. Runs as either an **MCP server** (for AI agents) or a **CLI tool** (direct terminal use).
+**DevEnv Health Scanner** — snapshots your dev environment and surfaces outdated packages, version mismatches, and runtime issues. Pure CLI, no MCP overhead.
 
 ---
 
 ## Table of Contents
 
-- [Overview](#overview)
 - [Quick Start](#quick-start)
-- [CLI Usage](#cli-usage)
-- [Slash Commands](#slash-commands)
-- [MCP Tools](#mcp-tools)
-- [MCP Resources](#mcp-resources)
-- [MCP Prompts](#mcp-prompts)
+- [Usage](#usage)
+- [Commands](#commands)
+- [Cache](#cache)
+- [Self-Update](#self-update)
+- [Uninstall](#uninstall)
 - [Performance](#performance)
 - [Toolchains](#toolchains)
 - [Sample Output](#sample-output)
 - [Project Structure](#project-structure)
-- [Development](#development)
-
----
-
-## Overview
-
-Ever wonder what's rotting in your dev environment? Run one scan and Envexa tells you:
-
-- Which Homebrew formulae and casks are outdated
-- Which npm/pip/gem packages need updating
-- If your Docker daemon is running and how much disk it's using
-
-Results are cached to `~/.envexa/cache.json` so you can re-read them across terminal sessions without re-scanning.
-
-Envexa auto-detects its mode:
-- **Args present** or **stdin is a terminal** → CLI mode
-- **stdin is piped** → MCP server mode (for AI agents)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
 ## Quick Start
 
-### Build from source
-
-```bash
-cargo build --release
-```
-
-### One-line install (curl)
+### One-line install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/KurutoDenzeru/envexa/main/scripts/install.sh | bash
 ```
 
-Detects OS/arch, downloads the latest release binary from GitHub, installs to `~/.local/bin/envexa`.
+Detects OS/arch, downloads the latest release binary, installs to `~/.local/bin/envexa`.
 
-### Self-update
+### Build from source
+
+```bash
+cargo build --release
+./target/release/envexa --help
+```
+
+---
+
+## Usage
+
+```bash
+envexa scan brew          Scan Homebrew only
+envexa scan               Full scan of all toolchains
+envexa status             Dashboard summary
+envexa outdated           All outdated packages
+envexa report             Show cached report
+envexa upgrade pip        Upgrade pip
+envexa update             Self-update
+envexa info               Version/system info
+envexa uninstall          Remove cache + binary
+```
+
+Results are cached to `~/.envexa/cache.json` (TTL: 7 days by default). Use `envexa report` to re-read the last scan without re-scanning.
+
+---
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `scan [chain]` | Full health scan (chain: all, brew, npm, pnpm, yarn, bun, deno, pip, gem, cargo, docker) |
+| `status` | Quick dashboard — one row per toolchain |
+| `outdated [chain]` | Table of outdated packages only |
+| `report` | Latest cached report |
+| `upgrade <tool>` | Upgrade a toolchain (pip currently supported) |
+| `update` | Self-update to latest GitHub release |
+| `info` | Binary path, cache status, version |
+| `uninstall` | Remove cache + config + binary |
+
+---
+
+## Cache
+
+Stored at `~/.envexa/cache.json`. Use `--ttl` to override:
+
+```bash
+envexa scan --ttl 1     # expire after 1 day
+envexa scan --ttl 30    # 30-day cache
+```
+
+Cache is auto-checked by `status` and `report` commands — expired caches trigger a fresh scan automatically.
+
+---
+
+## Self-Update
 
 ```bash
 envexa update
 ```
 
-Downloads the latest release from GitHub and atomically swaps the binary. Works on macOS, Linux, and Windows.
+Downloads the latest prebuilt binary from GitHub Releases and atomically replaces the current binary. Works on macOS, Linux, and Windows.
 
 ---
 
-## CLI Usage
+## Uninstall
 
 ```bash
-envexa scan [chain]       Full health scan (chain: all|brew|npm|pnpm|yarn|bun|deno|pip|gem|cargo|docker)
-envexa status             Quick dashboard summary
-envexa outdated [chain]   Outdated packages only
-envexa report             Show the latest cached report
-envexa upgrade pip        Upgrade pip to latest
-envexa update             Self-update to latest release
-envexa info               Show version and system info
-envexa uninstall          Remove cache and config
-envexa --help             Show help
-envexa --version          Show version
+envexa uninstall
 ```
 
-### Register with opencode
-
-Add to `~/.config/opencode/opencode.json`:
-
-```json
-{
-  "mcp": {
-    "envexa": {
-      "command": ["/absolute/path/to/envexa/target/release/envexa"],
-      "type": "local"
-    }
-  }
-}
-```
-
-Then restart opencode or reload MCP servers.
-
----
-
-## Slash Commands
-
-These are **Envexa-specific** commands — use inside an MCP host that supports slash commands, or pass via `envexa_cmd`:
-
-| Command | What it does |
-|---------|--------------|
-| `/scan` | Full health scan (default: all toolchains) |
-| `/outdated` | Outdated packages only |
-| `/status` | Quick dashboard summary |
-| `/report` | Latest cached report |
-| `/upgrade` | Upgrade a toolchain (pip supported) |
-| `/help` | Show available commands |
-
----
-
-## MCP Tools
-
-| Tool | Description |
-|------|-------------|
-| `envexa_scan` | Full health scan of all or one toolchain |
-| `envexa_check_outdated` | Outdated packages only |
-| `envexa_check_mismatches` | Version conflicts across projects (not yet implemented) |
-| `envexa_find_unused` | Unused deps in a project (not yet implemented) |
-| `envexa_get_report` | Latest cached report as markdown |
-| `envexa_brew_status` | Homebrew only |
-| `envexa_npm_status` | npm/Node only |
-| `envexa_pip_status` | Python/pip only |
-| `envexa_pip_upgrade` | Upgrade pip |
-| `envexa_cmd` | Slash-command relay (see above) |
+Removes `~/.envexa/cache.json`, deletes the binary, and cleans up. Prompts for confirmation first.
 
 ---
 
 ## Performance
 
-All 10 toolchains run concurrently via `tokio::join!`. Full scan completes in ~3-4 seconds wall-clock vs ~6-7 seconds sequential (Python version). The release binary is 3.2MB — no Python, no uv, no virtualenv needed.
-
-## MCP Resources
-
-| URI | Type | What you get |
-|-----|------|-------------|
-| `envexa://report` | `text/markdown` | Formatted health report (from cache) |
-| `envexa://report/raw` | `application/json` | Raw JSON for scripting (from cache) |
-
----
-
-## MCP Prompts
-
-| Menu entry | What it does |
-|------------|-------------|
-| `envexa_scan` | Full health report |
-| `envexa_status` | Quick dashboard summary |
-| `envexa_outdated` | Outdated packages across all toolchains |
-
----
+All 10 toolchains run concurrently via `tokio::join!`. Full scan completes in ~3-4 seconds. Release binary is 3.2MB — no Python, no Node, no runtime dependencies.
 
 ## Toolchains
 
@@ -172,18 +130,25 @@ All 10 toolchains run concurrently via `tokio::join!`. Full scan completes in ~3
 ## Sample Output
 
 ```
-| Toolchain | Status         | Version     |
-|-----------|----------------|-------------|
-| Brew      | WARN (6)       | 5.1.12      |
-| npm       | WARN (3)       | 11.14.1     |
-| pnpm      | PASS           | v24.15.0    |
-| Yarn      | SKIP           |             |
-| Bun       | PASS           | 1.3.14      |
-| Deno      | PASS           | 2.5.4       |
-| pip       | PASS           | Python 3.14.3 |
-| Gem       | WARN (100)     | ruby 3.2.2  |
-| Cargo     | PASS           | rustc 1.93.0 |
-| Docker    | PASS           | 29.4.0      |
+$ envexa status
+
+# Envexa Status
+**Generated:** 2026-05-22T08:57:36
+
++-----------+--------+-------+
+| Toolchain | Status | Count |
++-----------+--------+-------+
+| Brew      | WARN   | 6     |
+| npm       | WARN   | 3     |
+| pnpm      | PASS   | -     |
+| Yarn      | SKIP   | -     |
+| Bun       | PASS   | -     |
+| Deno      | PASS   | -     |
+| pip       | PASS   | -     |
+| Gem       | WARN   | 100   |
+| Cargo     | PASS   | -     |
+| Docker    | PASS   | -     |
++-----------+--------+-------+
 ```
 
 ---
@@ -194,20 +159,16 @@ All 10 toolchains run concurrently via `tokio::join!`. Full scan completes in ~3
 envexa/
 ├── Cargo.toml               # Dependencies + metadata
 ├── src/
-│   ├── main.rs              # Entry point — auto-detects CLI vs MCP mode
-│   ├── cli.rs               # Clap CLI parser + slash-command executor
+│   ├── main.rs              # Entry point — launches CLI
+│   ├── cli.rs               # Clap CLI parser + command implementations
 │   ├── config.rs            # File-backed cache (~/.envexa/cache.json) + TTL
-│   ├── transport.rs         # JSON-RPC MCP protocol (hand-rolled, no SDK)
-│   ├── server.rs            # Tool/prompt/resource registration + dispatch
-│   ├── scanner.rs           # Scan orchestration + ASCII table formatting + cache
+│   ├── scanner.rs           # Scan orchestration + ASCII table formatting
 │   └── toolchains/          # One scanner per toolchain
 │       ├── mod.rs           # ScanResult type + scan_all() concurrent dispatcher
 │       ├── brew.rs / npm.rs / pip.rs / gem.rs / cargo.rs / docker.rs
 │       ├── pnpm.rs / yarn.rs / bun.rs / deno.rs
 ├── scripts/
-│   └── install.sh           # Curl-based install script (detects OS/arch)
-├── .github/
-│   └── workflows/           # CI + release build matrix
+│   └── install.sh           # Curl-based install script
 ├── AGENTS.md                # Instructions for AI assistants
 ```
 
@@ -218,8 +179,6 @@ envexa/
 Contributions are always welcome, whether you're fixing bugs, improving docs, or shipping new features that make the project better for everyone.
 
 Check out [Contributing.md](Contributing) to learn how to get started and follow the recommended workflow.
-
-<!-- Please adhere to this project's Code of Conduct. -->
 
 ## License
 

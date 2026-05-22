@@ -1,8 +1,6 @@
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
-use crate::toolchains::{self, PackageInfo, ScanResult};
+use crate::toolchains::{PackageInfo, ScanResult};
 
 struct Table {
     headers: Vec<String>,
@@ -74,35 +72,10 @@ impl Table {
     }
 }
 
-#[derive(Clone)]
-pub struct ReportCache {
-    inner: Arc<Mutex<Option<Report>>>,
-}
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Report {
     pub timestamp: String,
     pub results: HashMap<String, ScanResult>,
-}
-
-impl ReportCache {
-    pub fn new() -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(None)),
-        }
-    }
-
-    pub async fn set(&self, report: Report) {
-        *self.inner.lock().await = Some(report);
-    }
-
-    pub async fn get(&self) -> Option<Report> {
-        self.inner.lock().await.clone()
-    }
-}
-
-fn now_iso() -> String {
-    chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string()
 }
 
 const LABELS: &[(&str, &str)] = &[
@@ -380,24 +353,4 @@ pub fn format_outdated(report: &Report) -> String {
     }
 
     format!("# Outdated Packages\n\n{}", t.render())
-}
-
-pub async fn scan_and_cache(cache: &ReportCache, chain: &str) -> String {
-    let results = if chain == "all" {
-        toolchains::scan_all().await
-    } else if let Some(res) = toolchains::scan_one(chain).await {
-        let mut map = HashMap::new();
-        map.insert(chain.to_string(), res);
-        map
-    } else {
-        return format!("Unknown chain: {chain}. Options: all, brew, npm, pnpm, yarn, bun, deno, pip, gem, cargo, docker");
-    };
-
-    let report = Report {
-        timestamp: now_iso(),
-        results,
-    };
-
-    cache.set(report.clone()).await;
-    format_report(&report)
 }

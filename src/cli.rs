@@ -16,134 +16,26 @@ struct Cli {
 
 #[derive(clap::Subcommand)]
 enum Commands {
+    #[command(about = "Full health scan of all or one toolchain")]
     Scan {
         chain: Option<String>,
         #[arg(long, default_value = "7")]
         ttl: u64,
     },
+    #[command(about = "Quick dashboard summary")]
     Status,
-    Outdated {
-        chain: Option<String>,
-    },
+    #[command(about = "Check outdated packages only")]
+    Outdated { chain: Option<String> },
+    #[command(about = "Show the latest cached report")]
     Report,
-    Upgrade {
-        tool: String,
-    },
+    #[command(about = "Upgrade a toolchain (pip currently supported)")]
+    Upgrade { tool: String },
+    #[command(about = "Self-update to latest release")]
     Update,
+    #[command(about = "Show version and system info")]
     Info,
+    #[command(about = "Remove cache and config")]
     Uninstall,
-}
-
-pub fn execute(cmd: &str) -> String {
-    let parts: Vec<&str> = cmd.split_whitespace().collect();
-    if parts.is_empty() {
-        return help_text();
-    }
-    let command = parts[0].trim_start_matches('/');
-    let args = &parts[1..];
-
-    match command {
-        "help" | "h" => help_text(),
-        "scan" => {
-            let chain = args.first().copied().unwrap_or("all");
-            tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    let results = if chain == "all" {
-                        toolchains::scan_all().await
-                    } else if let Some(res) = toolchains::scan_one(chain).await {
-                        let mut map = std::collections::HashMap::new();
-                        map.insert(chain.to_string(), res);
-                        map
-                    } else {
-                        return format!("Unknown chain: {chain}");
-                    };
-                    let report = Report {
-                        timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
-                        results,
-                    };
-                    scanner::format_report(&report)
-                })
-            })
-        }
-        "outdated" => {
-            let chain = args.first().copied().unwrap_or("all");
-            tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    let results = if chain == "all" {
-                        toolchains::scan_all().await
-                    } else if let Some(res) = toolchains::scan_one(chain).await {
-                        let mut map = std::collections::HashMap::new();
-                        map.insert(chain.to_string(), res);
-                        map
-                    } else {
-                        return format!("Unknown chain: {chain}");
-                    };
-                    let report = Report {
-                        timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
-                        results,
-                    };
-                    scanner::format_outdated(&report)
-                })
-            })
-        }
-        "status" => tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                let results = toolchains::scan_all().await;
-                let report = Report {
-                    timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
-                    results,
-                };
-                scanner::format_status(&report)
-            })
-        }),
-        "report" => match config::read_cache() {
-            Some(entry) => scanner::format_report(&entry.report),
-            None => "No report available. Run `scan` first.".into(),
-        },
-        "upgrade" => {
-            if args.is_empty() {
-                return "Specify what to upgrade: `/upgrade pip`".into();
-            }
-            let target = args[0];
-            match target {
-                "pip" => {
-                    let output = std::process::Command::new("pip3")
-                        .args(["install", "--upgrade", "pip"])
-                        .output();
-                    match output {
-                        Ok(o) if o.status.success() => {
-                            let stdout = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                            format!("Upgrade succeeded.\n```\n{stdout}\n```")
-                        }
-                        Ok(o) => {
-                            let stderr = String::from_utf8_lossy(&o.stderr).trim().to_string();
-                            format!("Upgrade failed.\n```\n{stderr}\n```")
-                        }
-                        Err(e) => format!("Failed to execute pip3: {e}"),
-                    }
-                }
-                _ => format!("Upgrade not implemented for `{target}`. Supported: pip"),
-            }
-        }
-        _ => format!("Unknown command: `{cmd}`\n\n{}", help_text()),
-    }
-}
-
-fn help_text() -> String {
-    let mut s = String::new();
-    s.push_str("Envexa slash commands — type these in chat or pass to the cmd tool:\n\n");
-    s.push_str("  /scan [chain]       — Full health scan (chain: all|brew|npm|pnpm|yarn|bun|deno|pip|gem|cargo|docker)\n");
-    s.push_str("  /outdated [chain]   — Check outdated packages only\n");
-    s.push_str("  /status             — Quick dashboard summary\n");
-    s.push_str("  /upgrade <tool>     — Upgrade a toolchain (pip currently supported)\n");
-    s.push_str("  /report             — Show the latest cached report\n");
-    s.push_str("  /help               — Show this message\n\n");
-    s.push_str("Examples:\n");
-    s.push_str("  /scan brew          — Scan only Homebrew\n");
-    s.push_str("  /scan pnpm          — Scan only pnpm\n");
-    s.push_str("  /upgrade pip        — Upgrade pip to latest\n");
-    s.push_str("  /status             — One-line health check\n");
-    s
 }
 
 pub async fn run() -> Result<(), anyhow::Error> {
