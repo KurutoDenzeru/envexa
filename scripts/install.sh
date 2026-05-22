@@ -38,9 +38,13 @@ main() {
     bin_path="${install_dir}/envexa"
 
     if [[ -f "$bin_path" ]]; then
-        echo "envexa is already installed at ${bin_path}"
-        echo "Re-run to upgrade, or remove it first."
-        exit 0
+        if file "$bin_path" | grep -qE 'Mach-O|ELF'; then
+            echo "envexa is already installed at ${bin_path}"
+            echo "Re-run to upgrade, or remove it first."
+            exit 0
+        fi
+        echo "Warning: existing file is not a valid binary, re-downloading..."
+        rm "$bin_path"
     fi
 
     mkdir -p "$install_dir"
