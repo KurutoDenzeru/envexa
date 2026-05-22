@@ -4,6 +4,76 @@ use tokio::sync::Mutex;
 
 use crate::toolchains::{self, PackageInfo, ScanResult};
 
+struct Table {
+    headers: Vec<String>,
+    rows: Vec<Vec<String>>,
+}
+
+impl Table {
+    fn new() -> Self {
+        Table {
+            headers: Vec::new(),
+            rows: Vec::new(),
+        }
+    }
+
+    fn header(&mut self, cols: &[&str]) {
+        self.headers = cols.iter().map(|c| c.to_string()).collect();
+    }
+
+    fn add_row(&mut self, cols: &[&str]) {
+        self.rows.push(cols.iter().map(|c| c.to_string()).collect());
+    }
+
+    fn render(&self) -> String {
+        let ncols = self.headers.len();
+        if ncols == 0 {
+            return String::new();
+        }
+
+        let mut widths = vec![0usize; ncols];
+        for (i, h) in self.headers.iter().enumerate() {
+            widths[i] = widths[i].max(h.len());
+        }
+        for row in &self.rows {
+            for (i, cell) in row.iter().enumerate() {
+                if i < ncols {
+                    widths[i] = widths[i].max(cell.len());
+                }
+            }
+        }
+
+        let sep_body: Vec<String> = widths.iter().map(|w| "-".repeat(w + 2)).collect();
+        let sep = format!("+{}+", sep_body.join("+"));
+
+        let fmt = |cells: &[String]| -> String {
+            let mut s = String::from("|");
+            for (i, cell) in cells.iter().enumerate() {
+                if let Some(&w) = widths.get(i) {
+                    s.push_str(&format!(" {:<w$} |", cell, w = w));
+                } else {
+                    s.push_str(&format!(" {} |", cell));
+                }
+            }
+            s
+        };
+
+        let mut out = String::new();
+        out.push_str(&sep);
+        out.push('\n');
+        out.push_str(&fmt(&self.headers));
+        out.push('\n');
+        out.push_str(&sep);
+        out.push('\n');
+        for row in &self.rows {
+            out.push_str(&fmt(row));
+            out.push('\n');
+        }
+        out.push_str(&sep);
+        out
+    }
+}
+
 #[derive(Clone)]
 pub struct ReportCache {
     inner: Arc<Mutex<Option<Report>>>,
@@ -34,26 +104,6 @@ impl ReportCache {
 fn now_iso() -> String {
     chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string()
 }
-
-const ICONS: &[(&str, &str)] = &[
-    ("brew", "🍺"),
-    ("npm", ""),
-    ("pnpm", ""),
-    ("yarn", ""),
-    ("bun", ""),
-    ("deno", ""),
-    ("pip", ""),
-    ("gem", ""),
-    ("cargo", "🦀"),
-    ("docker", "🐳"),
-];
-
-const STATUS_EMOJI: &[(&str, &str)] = &[
-    ("ok", "✅"),
-    ("warning", "⚠️"),
-    ("error", "❌"),
-    ("skipped", "⏭️"),
-];
 
 const LABELS: &[(&str, &str)] = &[
     ("ok", "PASS"),
@@ -89,22 +139,6 @@ fn display_name(tool: &str) -> &str {
         .unwrap_or(tool)
 }
 
-fn icon(tool: &str) -> &str {
-    ICONS
-        .iter()
-        .find(|(k, _)| *k == tool)
-        .map(|(_, v)| *v)
-        .unwrap_or("")
-}
-
-fn status_emoji(s: &str) -> &str {
-    STATUS_EMOJI
-        .iter()
-        .find(|(k, _)| *k == s)
-        .map(|(_, v)| *v)
-        .unwrap_or("")
-}
-
 fn status_label(s: &str) -> &str {
     LABELS
         .iter()
@@ -130,15 +164,6 @@ fn extract_outdated(res: &ScanResult) -> Vec<&PackageInfo> {
         }
     }
     items
-}
-
-fn status_text(res: &ScanResult) -> String {
-    let n = extract_outdated(res).len();
-    if res.status == "warning" {
-        format!("WARN ({n})")
-    } else {
-        status_label(&res.status).to_string()
-    }
 }
 
 fn first_version(res: &ScanResult) -> String {
@@ -181,7 +206,6 @@ pub fn format_report(report: &Report) -> String {
     lines.push(String::new());
 
     let mut outdated_all: HashMap<&str, Vec<&PackageInfo>> = HashMap::new();
-    let mut dashboard_rows = vec![];
 
     for tool in &tool_order() {
         if let Some(res) = results.get(*tool) {
@@ -189,43 +213,36 @@ pub fn format_report(report: &Report) -> String {
             if !items.is_empty() {
                 outdated_all.insert(tool, items);
             }
-
-            let icon = icon(tool);
-            let status_emoji = status_emoji(&res.status);
-            let status_txt = status_text(res);
-            let ver = first_version(res);
-            let display = display_name(tool);
-            dashboard_rows.push(format!(
-                "| {icon} {display:7} | {status_emoji} {status_txt:<16} | {ver} |"
-            ));
         }
     }
 
     lines.push("## Dashboard".into());
-    lines.push("| Toolchain | Status | Version |".into());
-    lines.push("|-----------|--------|---------|".into());
-    for row in &dashboard_rows {
-        lines.push(row.clone());
+    let mut dt = Table::new();
+    dt.header(&["Toolchain", "Status", "Version"]);
+    for tool in &tool_order() {
+        if let Some(res) = results.get(*tool) {
+            let display = display_name(tool);
+            let label = status_label(&res.status);
+            let ver = first_version(res);
+            dt.add_row(&[display, label, &ver]);
+        }
     }
+    lines.push(dt.render());
     lines.push(String::new());
 
     if !outdated_all.is_empty() {
         lines.push("## Outdated Packages".into());
-        lines.push(String::new());
-        lines.push("| Toolchain | Package | Current | Latest |".into());
-        lines.push("|-----------|---------|---------|--------|".into());
+        let mut ot = Table::new();
+        ot.header(&["Toolchain", "Package", "Current", "Latest"]);
         for tool in &tool_order() {
             if let Some(items) = outdated_all.get(tool) {
                 let display = display_name(tool);
-                let ic = icon(tool);
                 for item in items {
-                    lines.push(format!(
-                        "| {ic} {display} | {} | {} | {} |",
-                        item.name, item.current, item.latest
-                    ));
+                    ot.add_row(&[display, &item.name, &item.current, &item.latest]);
                 }
             }
         }
+        lines.push(ot.render());
         lines.push(String::new());
     }
 
@@ -234,10 +251,9 @@ pub fn format_report(report: &Report) -> String {
 
     for tool in &tool_order() {
         if let Some(res) = results.get(*tool) {
-            let ic = icon(tool);
             let label = status_label(&res.status);
             let display = display_name(tool);
-            lines.push(format!("### {ic} [{label}] {display}"));
+            lines.push(format!("### [{label}] {display}"));
 
             if res.status == "skipped" {
                 let reason = res.issues.first().map(|s| s.as_str()).unwrap_or("Skipped");
@@ -296,15 +312,12 @@ pub fn format_report(report: &Report) -> String {
 
             let outdated_items = extract_outdated(res);
             if !outdated_items.is_empty() {
-                lines.push(String::new());
-                lines.push("| Package | Current | Latest |".into());
-                lines.push("|---------|---------|--------|".into());
+                let mut pt = Table::new();
+                pt.header(&["Package", "Current", "Latest"]);
                 for item in &outdated_items {
-                    lines.push(format!(
-                        "| {} | {} | {} |",
-                        item.name, item.current, item.latest
-                    ));
+                    pt.add_row(&[&item.name, &item.current, &item.latest]);
                 }
+                lines.push(pt.render());
             }
 
             for issue in &res.issues {
@@ -324,24 +337,19 @@ pub fn format_status(report: &Report) -> String {
     lines.push("# Envexa Status".into());
     lines.push(format!("**Generated:** {}", report.timestamp));
     lines.push(String::new());
-    lines.push("| Toolchain | Status | Count |".into());
-    lines.push("|-----------|--------|-------|".into());
 
+    let mut t = Table::new();
+    t.header(&["Toolchain", "Status", "Count"]);
     for tool in &tool_order() {
         if let Some(res) = results.get(*tool) {
-            let ic = icon(tool);
-            let emoji = status_emoji(&res.status);
             let label = status_label(&res.status);
             let n = extract_outdated(res).len();
-            let count = if n > 0 {
-                format!("({n})")
-            } else {
-                String::new()
-            };
+            let count = if n > 0 { n.to_string() } else { "-".into() };
             let display = display_name(tool);
-            lines.push(format!("| {ic} {display} | {emoji} {label} | {count} |"));
+            t.add_row(&[display, label, &count]);
         }
     }
+    lines.push(t.render());
 
     lines.push(String::new());
     lines.push("Run `/envexa:scan` for full report or `/envexa:outdated` for details.".into());
@@ -350,13 +358,9 @@ pub fn format_status(report: &Report) -> String {
 
 pub fn format_outdated(report: &Report) -> String {
     let results = &report.results;
-    let mut lines = vec![
-        "# Outdated Packages".into(),
-        String::new(),
-        "| Toolchain | Package | Current | Latest |".into(),
-        "|-----------|---------|---------|--------|".into(),
-    ];
 
+    let mut t = Table::new();
+    t.header(&["Toolchain", "Package", "Current", "Latest"]);
     let mut has_anything = false;
     for tool in &tool_order() {
         if let Some(res) = results.get(*tool) {
@@ -365,10 +369,7 @@ pub fn format_outdated(report: &Report) -> String {
                 has_anything = true;
                 let display = display_name(tool);
                 for item in &items {
-                    lines.push(format!(
-                        "| {display} | {} | {} | {} |",
-                        item.name, item.current, item.latest
-                    ));
+                    t.add_row(&[display, &item.name, &item.current, &item.latest]);
                 }
             }
         }
@@ -378,7 +379,7 @@ pub fn format_outdated(report: &Report) -> String {
         return "All packages are up to date!".into();
     }
 
-    lines.join("\n")
+    format!("# Outdated Packages\n\n{}", t.render())
 }
 
 pub async fn scan_and_cache(cache: &ReportCache, chain: &str) -> String {
