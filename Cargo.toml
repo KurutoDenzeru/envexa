@@ -11,5 +11,6 @@ anyhow = "1"
 regex = "1"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
-ratatui = "0.29"
+ratatui = "0.30"
 crossterm = "0.28"
+tui-piechart = "0.3.3"

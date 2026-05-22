@@ -5,6 +5,7 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Table, Tabs},
     Frame,
 };
+use tui_piechart::{PieChart, PieSlice};
 
 use crate::app::{App, View};
 use crate::scanner;
@@ -247,12 +248,40 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
         }
     };
 
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Min(1)])
+    let layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(35), Constraint::Min(1)])
         .split(area);
 
-    dashboard_stats_line(frame, chunks[0], report);
+    let (pass, warn, fail, skip) = count_statuses(report);
+
+    let mut slices = Vec::new();
+    if pass > 0 { slices.push(PieSlice::new("PASS", pass as f64, Color::Green)); }
+    if warn > 0 { slices.push(PieSlice::new("WARN", warn as f64, Color::Yellow)); }
+    if fail > 0 { slices.push(PieSlice::new("FAIL", fail as f64, Color::Red)); }
+    if skip > 0 { slices.push(PieSlice::new("SKIP", skip as f64, Color::DarkGray)); }
+
+    if slices.is_empty() {
+        slices.push(PieSlice::new("EMPTY", 1.0, Color::DarkGray));
+    }
+
+    let piechart = PieChart::new(slices)
+        .show_legend(true)
+        .show_percentages(true)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Overview ")
+                .border_style(Style::default().fg(Color::Cyan)),
+        );
+    frame.render_widget(piechart, layout[0]);
+
+    let right_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .split(layout[1]);
+
+    dashboard_stats_line(frame, right_chunks[0], report);
 
     let header_cells = ["", " Toolchain ", " Status ", " Version ", " Outdated ", " Issues "]
         .iter()
@@ -318,11 +347,11 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
     let filtered = app.search_mode && !q.is_empty();
     let count = rows.len();
     let subtitle = if filtered {
-        format!(" Dashboard  ({count} matched) ")
+        format!(" Details  ({count} matched) ")
     } else if total_outdated > 0 {
-        format!(" Dashboard  |  {total_outdated} outdated ")
+        format!(" Details  |  {total_outdated} outdated ")
     } else {
-        " Dashboard  |  all up to date ".into()
+        " Details  |  all up to date ".into()
     };
 
     let table = Table::new(
@@ -345,7 +374,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
     )
     .column_spacing(1);
 
-    frame.render_widget(table, chunks[1]);
+    frame.render_widget(table, right_chunks[1]);
 }
 
 fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
@@ -515,21 +544,22 @@ pub fn render(frame: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Min(1),
-            Constraint::Length(1),
+            Constraint::Length(2), // title bar
+            Constraint::Length(1), // tab bar
+            Constraint::Length(1), // gap
+            Constraint::Length(1), // shortcuts (status_bar)
+            Constraint::Min(1),    // content
         ])
         .split(frame.area());
 
     title_bar(frame, chunks[0], app);
     tab_bar(frame, chunks[1], app);
+    // chunks[2] is gap, leave empty
+    status_bar(frame, chunks[3], app);
 
     match app.view {
-        View::Dashboard => render_dashboard(frame, chunks[2], app),
-        View::Outdated => render_outdated(frame, chunks[2], app),
-        View::Scanning => render_scanning(frame, chunks[2], app),
+        View::Dashboard => render_dashboard(frame, chunks[4], app),
+        View::Outdated => render_outdated(frame, chunks[4], app),
+        View::Scanning => render_scanning(frame, chunks[4], app),
     }
-
-    status_bar(frame, chunks[3], app);
 }
