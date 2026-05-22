@@ -1,12 +1,29 @@
-# Envexa
+# 🚧 Envexa
 
 **Envexa is a Rust TUI for checking local developer tooling health.** It scans system runtimes, package managers, project dependencies, security advisories, version alignment, and cleanup opportunities from one terminal dashboard.
 
 Envexa is built for fast local checks before work, before commits, or when a machine starts to drift. Run it with no args for the interactive TUI, or use `envexa scan` for scriptable Markdown output.
 
+## 📚 Table of Contents
+
+- [Highlights](#-highlights)
+- [Install](#-install)
+- [Usage](#-usage)
+- [TUI](#-tui)
+- [Project Tooling Sector](#-project-tooling-sector)
+- [Toolchains](#-toolchains)
+- [CLI Report](#-cli-report)
+- [Cache](#-cache)
+- [Development](#-development)
+- [Architecture](#-architecture)
+- [Design Notes](#-design-notes)
+- [Release](#-release)
+- [Contributing](#-contributing)
+- [License](#-license)
+
 ---
 
-## Highlights
+## ✨ Highlights
 
 - Concurrent scanner for 14 toolchains using `tokio::join!`.
 - Interactive `ratatui` dashboard with status pie chart, readiness gauges, barcharts, tables, tabs, and animated scan/update states.
@@ -17,7 +34,7 @@ Envexa is built for fast local checks before work, before commits, or when a mac
 
 ---
 
-## Install
+## 📦 Install
 
 ### One-line install
 
@@ -38,7 +55,7 @@ cargo build --release
 
 ---
 
-## Usage
+## 🚀 Usage
 
 ```bash
 envexa             # launch interactive TUI
@@ -51,7 +68,7 @@ Run Envexa from the project directory you want to inspect. To scan another path,
 
 ---
 
-## TUI
+## 🖥️ TUI
 
 The dashboard follows a dev-monitoring layout: summary visuals on the left, actionable tables on the right, and keyboard shortcuts in the footer.
 
@@ -91,16 +108,16 @@ Press `Esc` to clear the filter. Press `Enter` to keep the filter active.
 
 ---
 
-## Project Tooling Sector
+## 🧰 Project Tooling Sector
 
 Project Tooling is the local project lens inside Envexa.
 
 | Scanner | What it checks |
 |---------|----------------|
-| Project | Detects lockfiles and runs the matching package manager outdated check |
-| Security | Runs available security audit tools across JavaScript, Rust, and Python ecosystems |
-| Audit | Checks runtime/tool version alignment such as Node/npm, Python/pip, and rustc/Cargo |
-| Cleanup | Finds reclaimable package-manager and Docker cache space |
+| ✨ Project | Detects lockfiles and runs the matching package manager outdated check |
+| 🔐 Security | Runs available security audit tools across JavaScript, Rust, and Python ecosystems |
+| 🧪 Audit | Checks runtime/tool version alignment such as Node/npm, Python/pip, and rustc/Cargo |
+| 🧹 Cleanup | Finds reclaimable package-manager and Docker cache space |
 
 The TUI summarizes this sector with:
 
@@ -110,9 +127,9 @@ The TUI summarizes this sector with:
 
 ---
 
-## Toolchains
+## 🛠️ Toolchains
 
-### System & Runtime
+### 🖥️ System & Runtime
 
 | Toolchain | Checks |
 |-----------|--------|
@@ -122,7 +139,7 @@ The TUI summarizes this sector with:
 | Cargo | rustc/Cargo versions and optional `cargo-outdated` results |
 | Docker | CLI/daemon availability, disk usage, image/container cleanup signals |
 
-### Web Development
+### 🌐 Web Development
 
 | Toolchain | Checks |
 |-----------|--------|
@@ -134,7 +151,7 @@ The TUI summarizes this sector with:
 
 ---
 
-## CLI Report
+## 📄 CLI Report
 
 ```bash
 envexa scan
@@ -153,7 +170,7 @@ Use it for logs, CI notes, or PR comments when you need a plain text artifact.
 
 ---
 
-## Cache
+## 🗄️ Cache
 
 Envexa caches scan data at:
 
@@ -165,7 +182,7 @@ Default cache TTL is 7 days. The TUI reads cached results on launch and refreshe
 
 ---
 
-## Development
+## 🧑‍💻 Development
 
 ```bash
 cargo build
@@ -193,7 +210,7 @@ For TUI work, also launch `cargo run` in a real terminal and verify scan, naviga
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
 ```text
 envexa/
@@ -225,7 +242,7 @@ Scanner modules are intentionally small: one toolchain, one `pub async fn scan()
 
 ---
 
-## Design Notes
+## 🎛️ Design Notes
 
 Envexa uses built-in `ratatui` widgets where they fit cleanly: `Table`, `Tabs`, `Gauge`, `LineGauge`, and `BarChart`. It also uses focused third-party widgets where they add clear value: `tui-piechart` for the overview chart and `throbber-widgets-tui` for scan/update activity.
 
@@ -233,7 +250,7 @@ New TUI widgets should improve scan readability or action priority. Avoid decora
 
 ---
 
-## Release
+## 🚢 Release
 
 Maintainers publish macOS binaries through GitHub Releases:
 
@@ -249,7 +266,7 @@ cargo clean
 
 ---
 
-## 🤝🏻 Contributing
+## 🤝 Contributing
 
 Contributions are always welcome, whether you're fixing bugs, improving docs, or shipping new features that make the project better for everyone.
 
