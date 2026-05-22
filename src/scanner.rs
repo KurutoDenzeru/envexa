@@ -98,13 +98,13 @@ const DISPLAY_NAMES: &[(&str, &str)] = &[
     ("docker", "Docker"),
 ];
 
-fn tool_order() -> [&'static str; 10] {
+pub fn tool_order() -> [&'static str; 10] {
     [
         "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker",
     ]
 }
 
-fn display_name(tool: &str) -> &str {
+pub fn display_name(tool: &str) -> &str {
     DISPLAY_NAMES
         .iter()
         .find(|(k, _)| *k == tool)
@@ -112,7 +112,7 @@ fn display_name(tool: &str) -> &str {
         .unwrap_or(tool)
 }
 
-fn status_label(s: &str) -> &str {
+pub fn status_label(s: &str) -> &str {
     LABELS
         .iter()
         .find(|(k, _)| *k == s)
@@ -120,7 +120,7 @@ fn status_label(s: &str) -> &str {
         .unwrap_or("?")
 }
 
-fn extract_outdated(res: &ScanResult) -> Vec<&PackageInfo> {
+pub fn extract_outdated(res: &ScanResult) -> Vec<&PackageInfo> {
     let mut items = vec![];
     for key in [
         "outdated_formulae",
@@ -139,7 +139,7 @@ fn extract_outdated(res: &ScanResult) -> Vec<&PackageInfo> {
     items
 }
 
-fn first_version(res: &ScanResult) -> String {
+pub fn first_version(res: &ScanResult) -> String {
     let fields = [
         "version",
         "node_version",
@@ -327,6 +327,14 @@ pub fn format_status(report: &Report) -> String {
     lines.push(String::new());
     lines.push("Run `/envexa:scan` for full report or `/envexa:outdated` for details.".into());
     lines.join("\n")
+}
+
+pub fn count_outdated(report: &Report) -> usize {
+    report
+        .results
+        .values()
+        .map(|res| extract_outdated(res).len())
+        .sum()
 }
 
 pub fn format_outdated(report: &Report) -> String {

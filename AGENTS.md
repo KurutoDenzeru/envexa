@@ -19,16 +19,17 @@
 |---------|---------|
 | `cargo build` | Debug build |
 | `cargo build --release` | Optimized build |
-| `cargo run` | Run CLI |
+| `cargo run` | Launches interactive TUI (no args, TTY) |
+| `cargo run -- status` | CLI mode (args present) |
 | `cargo fmt` | Format all code |
 | `cargo clippy` | Lint check |
 | `cargo test` | Run tests |
 
 Quick test:
 ```bash
-cargo run -- scan brew
-cargo run -- status
-cargo run -- --help
+cargo run -- scan brew    # CLI scan
+cargo run                 # Interactive TUI
+cargo run -- --help       # CLI help
 ```
 
 ---
@@ -44,6 +45,16 @@ cargo run -- --help
 - `tokio::join!` for concurrent scanners
 - `String` over `&str` in struct fields
 - `serde_json::Value` for toolchain-specific fields
+
+## TUI Convention
+
+- App state lives in `App` struct in `app.rs` — View enum for navigation, `report: Option<Report>` for data
+- Render functions live in `ui.rs` — one function per view, called by `render()` dispatcher
+- Use `ratatui::init()` / `ratatui::restore()` in `App::run()` for terminal lifecycle
+- Blocking scan: set `View::Scanning`, draw frame, then `block_on` scan — freezes UI for 3-4s (acceptable for v1)
+- Input: `crossterm::event::read()` loop with `KeyCode` matching; `s`=scan, `o`=outdated, `h`=home, `q`=quit, `Esc`=back, `jk/arrows`=navigate
+- Color convention: `ok`=green, `warning`=yellow, `error`=red, `skipped`=darkgray
+- Table navigation: `dashboard_selection` / `outdated_selection` tracked per view
 - No obvious comments — explain *why*, not *what*
 - Conventional commits: `type(scope): description`
 - One logical change per commit, no `--no-verify`, no force push
@@ -80,6 +91,7 @@ CLI output verification — manually run and visually inspect:
 3. `cargo run -- status` — status table is aligned
 4. `cargo run -- outdated` — outdated table is correct
 5. `cargo run -- info` — info displays
+6. `cargo run` (no args, in terminal) — TUI launches, can navigate with arrows, `S` triggers scan, `O` shows outdated, `Q` quits
 
 Do not push if any of these produce warnings or malformed output. Fix first, then push.
 
