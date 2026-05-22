@@ -5,9 +5,7 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Paragraph, Row, Table, Tabs},
     Frame,
 };
-use tui_piechart::{
-    LegendAlignment, LegendLayout, LegendPosition, PieChart, PieSlice, Resolution,
-};
+use tui_piechart::{LegendAlignment, LegendLayout, LegendPosition, PieChart, PieSlice, Resolution};
 
 use crate::app::{App, View};
 use crate::scanner;
@@ -50,20 +48,14 @@ fn title_bar(frame: &mut Frame, area: Rect, app: &App) {
             Style::default().fg(Color::DarkGray),
         ),
         Span::raw("  "),
-        Span::styled(
-            "By KurutoDenzeru",
-            Style::default().fg(Color::DarkGray),
-        ),
+        Span::styled("By KurutoDenzeru", Style::default().fg(Color::DarkGray)),
         Span::raw(" \u{2503} "),
     ];
     let status = match &app.report {
         Some(r) => {
             let n = scanner::count_outdated(r);
             if n > 0 {
-                Span::styled(
-                    format!("{n} outdated"),
-                    Style::default().fg(Color::Yellow),
-                )
+                Span::styled(format!("{n} outdated"), Style::default().fg(Color::Yellow))
             } else {
                 Span::styled("up to date", Style::default().fg(Color::Green))
             }
@@ -84,7 +76,7 @@ fn tab_bar(frame: &mut Frame, area: Rect, app: &App) {
     let selected = match app.view {
         View::Dashboard => 0,
         View::Outdated => 1,
-        View::Scanning => app.tab_index,
+        View::Scanning | View::PackageDetail => app.tab_index,
     };
     let tabs = Tabs::new(titles)
         .select(selected)
@@ -99,38 +91,76 @@ fn tab_bar(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
-    let (text, style) = if app.search_mode {
-        let query = format!(" / {}█", app.search_query);
-        (
-            Line::from(vec![
-                Span::styled("Search:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-                Span::raw(query),
-                Span::styled("  Esc", Style::default().fg(Color::DarkGray)),
-                Span::raw(" clear"),
-            ]),
-            Style::default(),
-        )
-    } else {
-        (
-            Line::from(vec![
-                Span::styled(" [S]", Style::default().fg(Color::Green)),
-                Span::raw("can "),
-                Span::styled("[O]", Style::default().fg(Color::Yellow)),
-                Span::raw("utdated "),
-                Span::styled("[/]", Style::default().fg(Color::Cyan)),
-                Span::raw("earch "),
-                Span::styled("\u{2190}\u{2192}", Style::default().fg(Color::DarkGray)),
-                Span::raw(" tabs "),
-                Span::styled("\u{2191}\u{2193}", Style::default().fg(Color::DarkGray)),
-                Span::raw(" nav  "),
-                Span::styled("^C", Style::default().fg(Color::Red)),
-                Span::styled(" Exit", Style::default().fg(Color::Red)),
-                Span::raw("  "),
-                Span::styled("[Q]", Style::default().fg(Color::DarkGray)),
-                Span::raw("uit"),
-            ]),
-            Style::default().fg(Color::White).bg(Color::Black),
-        )
+    let (text, style) = match app.view {
+        View::PackageDetail => {
+            let msg = if !app.detail_message.is_empty() {
+                format!("  {}", app.detail_message)
+            } else {
+                String::new()
+            };
+            (
+                Line::from(vec![
+                    Span::styled(" [\u{2191}\u{2193}]", Style::default().fg(Color::DarkGray)),
+                    Span::raw(" nav "),
+                    Span::styled("[Space]", Style::default().fg(Color::Yellow)),
+                    Span::raw(" toggle "),
+                    Span::styled("[Y]", Style::default().fg(Color::Green)),
+                    Span::raw(" update "),
+                    Span::styled("[Esc]", Style::default().fg(Color::Red)),
+                    Span::raw(" back"),
+                    Span::styled(msg, Style::default().fg(Color::White)),
+                ]),
+                Style::default().fg(Color::White).bg(Color::Black),
+            )
+        }
+        _ if app.search_mode => {
+            let query = format!(" / {}█", app.search_query);
+            (
+                Line::from(vec![
+                    Span::styled(
+                        "Search:",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(query),
+                    Span::styled("  Esc", Style::default().fg(Color::DarkGray)),
+                    Span::raw(" clear"),
+                ]),
+                Style::default(),
+            )
+        }
+        _ => {
+            let update_msg = if matches!(app.view, View::Outdated) && !app.detail_message.is_empty()
+            {
+                format!("  {}", app.detail_message)
+            } else {
+                String::new()
+            };
+            (
+                Line::from(vec![
+                    Span::styled(" [S]", Style::default().fg(Color::Green)),
+                    Span::raw("can "),
+                    Span::styled("[O]", Style::default().fg(Color::Yellow)),
+                    Span::raw("utdated "),
+                    Span::styled("[/]", Style::default().fg(Color::Cyan)),
+                    Span::raw("earch "),
+                    Span::styled("\u{2190}\u{2192}", Style::default().fg(Color::DarkGray)),
+                    Span::raw(" tabs "),
+                    Span::styled("\u{2191}\u{2193}", Style::default().fg(Color::DarkGray)),
+                    Span::raw(" nav "),
+                    Span::styled("[U]", Style::default().fg(Color::Green)),
+                    Span::raw("pdate "),
+                    Span::styled("^C", Style::default().fg(Color::Red)),
+                    Span::styled(" Exit", Style::default().fg(Color::Red)),
+                    Span::raw("  "),
+                    Span::styled("[Q]", Style::default().fg(Color::DarkGray)),
+                    Span::raw("uit"),
+                    Span::styled(update_msg, Style::default().fg(Color::White)),
+                ]),
+                Style::default().fg(Color::White).bg(Color::Black),
+            )
+        }
     };
     let block = Block::default().style(style);
     frame.render_widget(Paragraph::new(text).block(block), area);
@@ -185,17 +215,30 @@ fn dashboard_stats_line(frame: &mut Frame, area: Rect, report: &crate::scanner::
     let outdated = crate::scanner::count_outdated(report);
     let age = scan_age(&report.timestamp);
     let items = vec![
-        Span::styled(format!(" \u{25CF} {pass} "), Style::default().fg(Color::Green)),
+        Span::styled(
+            format!(" \u{25CF} {pass} "),
+            Style::default().fg(Color::Green),
+        ),
         Span::raw(" "),
-        Span::styled(format!("\u{25CF} {warn} "), Style::default().fg(Color::Yellow)),
+        Span::styled(
+            format!("\u{25CF} {warn} "),
+            Style::default().fg(Color::Yellow),
+        ),
         Span::raw(" "),
         Span::styled(format!("\u{25CF} {fail} "), Style::default().fg(Color::Red)),
         Span::raw(" "),
-        Span::styled(format!("\u{25CF} {skip} "), Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!("\u{25CF} {skip} "),
+            Style::default().fg(Color::DarkGray),
+        ),
         Span::raw("  "),
         Span::styled(
             format!("\u{25C9} {outdated} outdated"),
-            Style::default().fg(if outdated > 0 { Color::Yellow } else { Color::Green }),
+            Style::default().fg(if outdated > 0 {
+                Color::Yellow
+            } else {
+                Color::Green
+            }),
         ),
         Span::raw("  "),
         Span::styled(
@@ -234,10 +277,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
                     Span::raw(" to scan all toolchains"),
                 ]),
                 Line::from(vec![
-                    Span::styled(
-                        "  \u{25B6} Press [O]",
-                        Style::default().fg(Color::Yellow),
-                    ),
+                    Span::styled("  \u{25B6} Press [O]", Style::default().fg(Color::Yellow)),
                     Span::raw(" to view outdated packages"),
                 ]),
             ]))
@@ -320,9 +360,16 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
     .block(Block::default().borders(Borders::NONE));
     frame.render_widget(summary, right_chunks[0]);
 
-    let header_cells = ["", " Toolchain ", " Status ", " Version ", " Outdated ", " Issues "]
-        .iter()
-        .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
+    let header_cells = [
+        "",
+        " Toolchain ",
+        " Status ",
+        " Version ",
+        " Outdated ",
+        " Issues ",
+    ]
+    .iter()
+    .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
         .style(Style::default().bg(Color::Blue).fg(Color::White))
         .height(1);
@@ -348,36 +395,34 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             } else {
                 String::new()
             };
-            let issues_str = res
-                .issues
-                .first()
-                .map(|s| s.as_str())
-                .unwrap_or("");
+            let issues_str = res.issues.first().map(|s| s.as_str()).unwrap_or("");
             Some((tool, display, label, style, ver, outdated_str, issues_str))
         })
         .enumerate()
-        .map(|(i, (_tool, display, label, style, ver, outdated_str, issues_str))| {
-            let sel = i == app.dashboard_selection;
-            let indicator = if sel { "\u{25b8} " } else { "  " };
-            let row = Row::new(vec![
-                Cell::from(indicator),
-                Cell::from(display),
-                Cell::from(label).style(style),
-                Cell::from(ver),
-                truncated_cell(&outdated_str, 8),
-                truncated_cell(issues_str, 20),
-            ])
-            .height(1);
-            if sel {
-                row.style(
-                    Style::default()
-                        .bg(Color::DarkGray)
-                        .add_modifier(Modifier::BOLD),
-                )
-            } else {
-                row
-            }
-        })
+        .map(
+            |(i, (_tool, display, label, style, ver, outdated_str, issues_str))| {
+                let sel = i == app.dashboard_selection;
+                let indicator = if sel { "\u{25b8} " } else { "  " };
+                let row = Row::new(vec![
+                    Cell::from(indicator),
+                    Cell::from(display),
+                    Cell::from(label).style(style),
+                    Cell::from(ver),
+                    truncated_cell(&outdated_str, 8),
+                    truncated_cell(issues_str, 20),
+                ])
+                .height(1);
+                if sel {
+                    row.style(
+                        Style::default()
+                            .bg(Color::DarkGray)
+                            .add_modifier(Modifier::BOLD),
+                    )
+                } else {
+                    row
+                }
+            },
+        )
         .collect();
 
     let total_outdated = scanner::count_outdated(report);
@@ -427,9 +472,16 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         }
     };
 
-    let header_cells = ["", " Toolchain ", " Source ", " Package ", " Current ", " Latest "]
-        .iter()
-        .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
+    let header_cells = [
+        "",
+        " Toolchain ",
+        " Source ",
+        " Package ",
+        " Current ",
+        " Latest ",
+    ]
+    .iter()
+    .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
         .style(Style::default().bg(Color::Blue).fg(Color::White))
         .height(1);
@@ -465,10 +517,7 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         };
         let text = Paragraph::new(Text::from(vec![
             Line::from(""),
-            Line::from(vec![Span::styled(
-                msg,
-                Style::default().fg(Color::Green),
-            )]),
+            Line::from(vec![Span::styled(msg, Style::default().fg(Color::Green))]),
         ]))
         .block(
             Block::default()
@@ -485,8 +534,14 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         .enumerate()
         .map(|(i, (tool, pkg))| {
             let sel = i == app.outdated_selection;
-            let indicator = if sel { "\u{25b8} " } else { "  " };
-            let row = Row::new(vec![
+            let checked = app.checked_outdated.contains(&i);
+            let cb = if checked { "[x]" } else { "[ ]" };
+            let indicator = if sel {
+                format!("{cb}\u{25b8}")
+            } else {
+                format!("{cb} ")
+            };
+            let mut row = Row::new(vec![
                 Cell::from(indicator),
                 Cell::from(tool.as_str()),
                 Cell::from(pkg.source.as_str()).style(source_style(&pkg.source)),
@@ -495,27 +550,29 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
                 Cell::from(pkg.latest.as_str()),
             ]);
             if sel {
-                row.style(
+                row = row.style(
                     Style::default()
                         .bg(Color::DarkGray)
                         .add_modifier(Modifier::BOLD),
-                )
-            } else {
-                row
+                );
             }
+            row
         })
         .collect();
 
     let total = items.len();
+    let checked_count = app.checked_outdated.len();
     let title = if app.search_mode && !q.is_empty() {
         format!(" Outdated Packages ({total} matched) ")
+    } else if checked_count > 0 {
+        format!(" Outdated Packages ({total})  —  {checked_count} selected ")
     } else {
         format!(" Outdated Packages ({total}) ")
     };
     let table = Table::new(
         rows,
         [
-            Constraint::Length(2),
+            Constraint::Length(5),
             Constraint::Length(10),
             Constraint::Length(8),
             Constraint::Min(18),
@@ -571,12 +628,85 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 
     title_bar(frame, chunks[0], app);
     tab_bar(frame, chunks[1], app);
-    // chunks[2] is gap, leave empty
     status_bar(frame, chunks[3], app);
 
     match app.view {
         View::Dashboard => render_dashboard(frame, chunks[4], app),
         View::Outdated => render_outdated(frame, chunks[4], app),
         View::Scanning => render_scanning(frame, chunks[4], app),
+        View::PackageDetail => render_package_detail(frame, chunks[4], app),
     }
+}
+
+fn render_package_detail(frame: &mut Frame, area: Rect, app: &App) {
+    let tool = match &app.detail_tool {
+        Some(t) => t.clone(),
+        None => return,
+    };
+    let items = &app.detail_items;
+
+    let header_cells = ["", " Package ", " Source ", " Current ", " Latest "]
+        .iter()
+        .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
+    let header = Row::new(header_cells)
+        .style(Style::default().bg(Color::Blue).fg(Color::White))
+        .height(1);
+
+    let rows: Vec<Row> = items
+        .iter()
+        .enumerate()
+        .map(|(i, item)| {
+            let sel = i == app.detail_selection;
+            let checked = app.detail_checked.contains(&i);
+            let cb = if checked { "[x]" } else { "[ ]" };
+            let indicator = if sel {
+                format!("{cb}\u{25b8}")
+            } else {
+                format!("{cb} ")
+            };
+            let mut row = Row::new(vec![
+                Cell::from(indicator),
+                Cell::from(item.name.as_str()),
+                Cell::from(item.source.as_str()).style(source_style(&item.source)),
+                Cell::from(item.current.as_str()),
+                Cell::from(item.latest.as_str()),
+            ]);
+            if sel {
+                row = row.style(
+                    Style::default()
+                        .bg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD),
+                );
+            }
+            row
+        })
+        .collect();
+
+    let sub = if !app.detail_message.is_empty() {
+        format!("  {}", app.detail_message)
+    } else {
+        String::new()
+    };
+
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(5),
+            Constraint::Min(18),
+            Constraint::Length(8),
+            Constraint::Length(18),
+            Constraint::Length(18),
+        ],
+    )
+    .header(header)
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" {tool} — Outdated Packages ({}) ", items.len()))
+            .title_bottom(sub)
+            .border_style(Style::default().fg(Color::Cyan)),
+    )
+    .column_spacing(1);
+
+    frame.render_widget(table, area);
 }
