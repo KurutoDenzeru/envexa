@@ -96,6 +96,29 @@ Do not push if any of these produce warnings or malformed output. Fix first, the
 
 ---
 
+## Release (macOS-only, built locally)
+
+```bash
+# 1. Clean build artifacts (safe — binaries live on GitHub Releases)
+cargo clean
+
+# 2. Version bump in Cargo.toml, commit
+# 3. Tag and push
+git tag vX.Y.Z && git push origin vX.Y.Z
+
+# 4. Create release + build + upload
+gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."
+scripts/build-and-upload.sh vX.Y.Z
+
+# 5. Confirm assets
+gh release view vX.Y.Z --json assets --jq '.assets[].name'
+
+# 6. Clear local build artifacts again
+cargo clean
+```
+
+---
+
 ## Recurring errors log
 
 When you make a mistake or are corrected by the developer, append it to `ERRORS.md`:

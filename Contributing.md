@@ -89,3 +89,29 @@ cargo clippy -- -D warnings && cargo fmt --check
 ```
 
 Please ensure the project compiles, passes clippy, and runs without errors when submitting a pull request.
+
+## Release (maintainers)
+
+Envexa is macOS-only and built locally (no CI). Release process:
+
+```bash
+# 1. Bump version in Cargo.toml, commit
+# 2. Tag and push
+git tag vX.Y.Z && git push origin vX.Y.Z
+
+# 3. Create GitHub release
+gh release create vX.Y.Z --title "vX.Y.Z" --notes "## What Changed
+
+..."
+
+# 4. Build both architectures + upload
+scripts/build-and-upload.sh vX.Y.Z
+
+# 5. Verify
+gh release view vX.Y.Z --json assets --jq '.assets[].name'
+
+# 6. Clean up build artifacts (reclaim ~2 GB)
+cargo clean
+```
+
+Builds two binaries: `envexa-aarch64-macos` (Apple Silicon) and `envexa-x86_64-macos` (Intel).

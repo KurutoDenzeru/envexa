@@ -18,7 +18,7 @@ Installs to `~/.local/bin/envexa`.
 
 ```bash
 cargo build --release
-./target/release/envexa
+cargo run --release -- scan   # CLI mode
 ```
 
 ---
@@ -97,7 +97,7 @@ Scan results are cached to `~/.envexa/cache.json` (TTL: 7 days). The TUI loads c
 envexa update
 ```
 
-Downloads the latest prebuilt binary from GitHub Releases and atomically replaces the current binary. Works on macOS, Linux, and Windows.
+Downloads the latest prebuilt binary from GitHub Releases and atomically replaces the current binary. Works on macOS.
 
 > **Development builds** skip the release check — run `cargo build --release` first.
 
