@@ -34,31 +34,37 @@ fn source_style(source: &str) -> Style {
 }
 
 fn title_bar(frame: &mut Frame, area: Rect, app: &App) {
-    let title = Span::styled(
-        " Envexa ",
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD),
-    );
-    let version = Span::styled(
-        concat!(" v", env!("CARGO_PKG_VERSION")),
-        Style::default().fg(Color::DarkGray),
-    );
-    let cache_status = match &app.report {
+    let title = vec![
+        Span::raw(" \u{1f6a7} "),
+        Span::styled(
+            "envexa",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            concat!(" v", env!("CARGO_PKG_VERSION")),
+            Style::default().fg(Color::DarkGray),
+        ),
+        Span::raw(" \u{2503} "),
+    ];
+    let status = match &app.report {
         Some(r) => {
             let n = scanner::count_outdated(r);
             if n > 0 {
                 Span::styled(
-                    format!(" {n} outdated "),
-                    Style::default().fg(Color::Yellow).bg(Color::Black),
+                    format!("{n} outdated"),
+                    Style::default().fg(Color::Yellow),
                 )
             } else {
-                Span::styled(" up to date ", Style::default().fg(Color::Green))
+                Span::styled("up to date", Style::default().fg(Color::Green))
             }
         }
-        None => Span::styled(" no data ", Style::default().fg(Color::DarkGray)),
+        None => Span::styled("no data", Style::default().fg(Color::DarkGray)),
     };
-    let bar = Line::from(vec![title, version, Span::raw("  "), cache_status]);
+    let mut spans: Vec<Span> = title;
+    spans.push(status);
+    let bar = Line::from(spans);
     let block = Block::default()
         .borders(Borders::BOTTOM)
         .border_style(Style::default().fg(Color::DarkGray));
