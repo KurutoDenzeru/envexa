@@ -66,6 +66,23 @@ Then confirm:
 - Changed report format → show sample
 - New dependency → call out in summary
 
+## Pre-Push Checklist
+
+Always run this before pushing:
+
+```bash
+cargo build && cargo clippy -- -D warnings && cargo fmt --check
+```
+
+CLI output verification — manually run and visually inspect:
+1. `cargo run -- --help` — help text renders correctly
+2. `cargo run -- scan brew` — scan output is readable
+3. `cargo run -- status` — status table is aligned
+4. `cargo run -- outdated` — outdated table is correct
+5. `cargo run -- info` — info displays
+
+Do not push if any of these produce warnings or malformed output. Fix first, then push.
+
 ---
 
 ## Recurring errors log

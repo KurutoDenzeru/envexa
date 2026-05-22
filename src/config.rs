@@ -32,6 +32,7 @@ fn cache_path() -> PathBuf {
     dir().join("cache.json")
 }
 
+#[allow(dead_code)]
 fn config_path() -> PathBuf {
     dir().join("config.json")
 }
@@ -40,6 +41,7 @@ fn ensure() -> std::io::Result<()> {
     std::fs::create_dir_all(dir())
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct UserConfig {
     pub cache_ttl_days: u64,
@@ -58,6 +60,7 @@ pub struct CacheEntry {
     pub ttl_days: u64,
 }
 
+#[allow(dead_code)]
 pub fn load_config() -> UserConfig {
     let path = config_path();
     std::fs::read_to_string(path)
@@ -66,6 +69,7 @@ pub fn load_config() -> UserConfig {
         .unwrap_or_default()
 }
 
+#[allow(dead_code)]
 pub fn save_config(cfg: &UserConfig) -> std::io::Result<()> {
     ensure()?;
     std::fs::write(config_path(), serde_json::to_string_pretty(cfg)?)
