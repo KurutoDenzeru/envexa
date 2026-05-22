@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="v1.0.0"
+VERSION="${ENVEXA_VERSION:-v1.0.0}"
 REPO="KurutoDenzeru/envexa"
 
 die() {
@@ -37,7 +37,7 @@ main() {
     install_dir="${ENVEXA_INSTALL_DIR:-${HOME}/.local/bin}"
     bin_path="${install_dir}/envexa"
 
-    if command -v envexa &>/dev/null && [[ -f "$bin_path" ]]; then
+    if [[ -f "$bin_path" ]]; then
         echo "envexa is already installed at ${bin_path}"
         echo "Re-run to upgrade, or remove it first."
         exit 0
