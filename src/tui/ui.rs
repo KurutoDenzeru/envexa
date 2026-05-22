@@ -384,16 +384,46 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
         .height(1);
 
     let q = app.search_query.to_lowercase();
-    let rows: Vec<Row> = scanner::tool_order()
-        .iter()
-        .filter_map(|tool| {
-            let res = report.results.get(*tool)?;
-            if !q.is_empty() && app.search_mode {
-                let name = scanner::display_name(tool).to_lowercase();
-                if !name.contains(&q) && !tool.contains(&q) {
-                    return None;
+    let mut rows: Vec<Row> = Vec::new();
+    let mut tool_index = 0;
+
+    for cat in scanner::tool_categories() {
+        let visible_tools: Vec<&&str> = cat
+            .tools
+            .iter()
+            .filter(|t| {
+                if !report.results.contains_key(**t) {
+                    return false;
                 }
-            }
+                if !q.is_empty() && app.search_mode {
+                    let name = scanner::display_name(t).to_lowercase();
+                    if !name.contains(&q) && !t.contains(&q) {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect();
+
+        if visible_tools.is_empty() {
+            continue;
+        }
+
+        rows.push(
+            Row::new(vec![
+                Cell::from(""),
+                Cell::from(format!("── {} ──", cat.name)),
+                Cell::from(""),
+                Cell::from(""),
+                Cell::from(""),
+                Cell::from(""),
+            ])
+            .style(Style::default().fg(Color::DarkGray))
+            .height(1),
+        );
+
+        for tool in visible_tools {
+            let res = report.results.get(*tool).unwrap();
             let display = scanner::display_name(tool);
             let label = scanner::status_label(&res.status);
             let style = status_style(&res.status);
@@ -445,34 +475,28 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
                     (outdated_str, issues_str)
                 }
             };
-            Some((tool, display, label, style, ver, outdated_str, issues_str))
-        })
-        .enumerate()
-        .map(
-            |(i, (_tool, display, label, style, ver, outdated_str, issues_str))| {
-                let sel = i == app.dashboard_selection;
-                let indicator = if sel { "\u{25b8} " } else { "  " };
-                let row = Row::new(vec![
-                    Cell::from(indicator),
-                    Cell::from(display),
-                    Cell::from(label).style(style),
-                    Cell::from(ver),
-                    truncated_cell(&outdated_str, 8),
-                    truncated_cell(issues_str, 20),
-                ])
-                .height(1);
-                if sel {
-                    row.style(
-                        Style::default()
-                            .bg(Color::DarkGray)
-                            .add_modifier(Modifier::BOLD),
-                    )
-                } else {
-                    row
-                }
-            },
-        )
-        .collect();
+            let sel = tool_index == app.dashboard_selection;
+            let indicator = if sel { "\u{25b8} " } else { "  " };
+            let mut row = Row::new(vec![
+                Cell::from(indicator),
+                Cell::from(display),
+                Cell::from(label).style(style),
+                Cell::from(ver),
+                truncated_cell(&outdated_str, 8),
+                truncated_cell(issues_str, 20),
+            ])
+            .height(1);
+            if sel {
+                row = row.style(
+                    Style::default()
+                        .bg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD),
+                );
+            }
+            rows.push(row);
+            tool_index += 1;
+        }
+    }
 
     let total_outdated = scanner::count_outdated(report);
     let filtered = app.search_mode && !q.is_empty();

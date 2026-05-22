@@ -110,6 +110,28 @@ pub struct OutdatedItem {
     pub latest: String,
 }
 
+pub struct ToolCategory {
+    pub name: &'static str,
+    pub tools: &'static [&'static str],
+}
+
+pub fn tool_categories() -> [ToolCategory; 3] {
+    [
+        ToolCategory {
+            name: "System & Runtime",
+            tools: &["brew", "cargo", "docker", "pip", "gem"],
+        },
+        ToolCategory {
+            name: "Web Development",
+            tools: &["npm", "pnpm", "yarn", "bun", "deno"],
+        },
+        ToolCategory {
+            name: "Project Tooling",
+            tools: &["project", "security", "audit", "cleanup"],
+        },
+    ]
+}
+
 pub fn tool_order() -> [&'static str; 14] {
     [
         "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
