@@ -10,10 +10,9 @@ die() {
 }
 
 detect_asset_name() {
-    local os arch ext
+    local os arch
     os="$(uname -s | tr '[:upper:]' '[:lower:]')"
     arch="$(uname -m)"
-    ext=""
 
     case "$arch" in
         x86_64) arch="x86_64" ;;
@@ -24,28 +23,19 @@ detect_asset_name() {
     case "$os" in
         darwin) os="macos" ;;
         linux) os="linux" ;;
-        mingw* | msys* | cygwin*) os="windows"; ext=".exe" ;;
         *) die "unsupported OS: $os" ;;
     esac
 
-    echo "envexa-${arch}-${os}${ext}"
-}
-
-detect_bin_name() {
-    case "$(uname -s | tr '[:upper:]' '[:lower:]')" in
-        mingw* | msys* | cygwin*) echo "envexa.exe" ;;
-        *) echo "envexa" ;;
-    esac
+    echo "envexa-${arch}-${os}"
 }
 
 main() {
-    local asset_name bin_name url install_dir bin_path
+    local asset_name url install_dir bin_path
 
     asset_name="$(detect_asset_name)" || die "cannot detect platform"
-    bin_name="$(detect_bin_name)"
     url="https://github.com/${REPO}/releases/download/${VERSION}/${asset_name}"
     install_dir="${ENVEXA_INSTALL_DIR:-${HOME}/.local/bin}"
-    bin_path="${install_dir}/${bin_name}"
+    bin_path="${install_dir}/envexa"
 
     if [[ -f "$bin_path" ]]; then
         echo "envexa is already installed at ${bin_path}"
@@ -58,13 +48,13 @@ main() {
     echo "Downloading envexa ${VERSION} for ${asset_name}..."
     curl -fsSL "$url" -o "$bin_path" || die "download failed (url: $url)"
 
-    chmod +x "$bin_path" 2>/dev/null || true
+    chmod +x "$bin_path"
 
     echo ""
     echo "envexa ${VERSION} installed to ${bin_path}"
     echo ""
     echo "Make sure ${install_dir} is in your PATH."
-    echo "Run '${bin_name}' to start."
+    echo "Run 'envexa' to start."
 }
 
 main
