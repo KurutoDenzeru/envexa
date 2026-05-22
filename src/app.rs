@@ -19,6 +19,8 @@ pub struct App {
     pub dashboard_selection: usize,
     pub outdated_selection: usize,
     pub tab_index: usize,
+    pub search_mode: bool,
+    pub search_query: String,
 }
 
 impl App {
@@ -30,6 +32,8 @@ impl App {
             dashboard_selection: 0,
             outdated_selection: 0,
             tab_index: 0,
+            search_mode: false,
+            search_query: String::new(),
         }
     }
 
@@ -44,16 +48,52 @@ impl App {
                 if key.kind != KeyEventKind::Press {
                     continue;
                 }
+
                 match key.code {
-                    KeyCode::Char('q') => break,
+                    KeyCode::Char('q') | KeyCode::Char('Q') => break,
+                    _ => {}
+                }
+
+                if self.search_mode {
+                    match key.code {
+                        KeyCode::Esc => {
+                            self.search_mode = false;
+                            self.search_query.clear();
+                        }
+                        KeyCode::Enter => {
+                            self.search_mode = false;
+                        }
+                        KeyCode::Backspace => {
+                            self.search_query.pop();
+                            self.clamp_selection();
+                        }
+                        KeyCode::Char(c) if !c.is_control() => {
+                            self.search_query.push(c);
+                            self.clamp_selection();
+                        }
+                        _ => {}
+                    }
+                    continue;
+                }
+
+                match key.code {
                     KeyCode::Esc | KeyCode::Char('h') => {
                         self.view = View::Dashboard;
                         self.tab_index = 0;
                     }
-                    KeyCode::Char('s') => self.do_scan(&mut terminal)?,
-                    KeyCode::Char('o') => {
+                    KeyCode::Char('s') | KeyCode::Char('S') => {
+                        self.search_mode = false;
+                        self.search_query.clear();
+                        self.do_scan(&mut terminal)?
+                    }
+                    KeyCode::Char('o') | KeyCode::Char('O') => {
                         self.view = View::Outdated;
                         self.tab_index = 1;
+                    }
+                    KeyCode::Char('/') => {
+                        self.search_mode = true;
+                        self.dashboard_selection = 0;
+                        self.outdated_selection = 0;
                     }
                     KeyCode::Right | KeyCode::Char('l') => {
                         self.tab_index = (self.tab_index + 1).min(1);
@@ -71,8 +111,8 @@ impl App {
                             View::Outdated
                         };
                     }
-                    KeyCode::Down => self.next_item(),
-                    KeyCode::Up => self.prev_item(),
+                    KeyCode::Down | KeyCode::Char('n') => self.next_item(),
+                    KeyCode::Up | KeyCode::Char('p') => self.prev_item(),
                     _ => {}
                 }
             }
@@ -80,6 +120,67 @@ impl App {
 
         ratatui::restore();
         Ok(())
+    }
+
+    fn filtered_tools(&self) -> Vec<&'static str> {
+        let report = match &self.report {
+            Some(r) => r,
+            None => return vec![],
+        };
+        let q = self.search_query.to_lowercase();
+        scanner::tool_order()
+            .iter()
+            .copied()
+            .filter(|tool| {
+                if q.is_empty() || !self.search_mode {
+                    return true;
+                }
+                let name = scanner::display_name(tool).to_lowercase();
+                name.contains(&q) || tool.contains(&q)
+            })
+            .filter(|tool| report.results.contains_key(*tool))
+            .collect()
+    }
+
+    fn clamp_selection(&mut self) {
+        match self.view {
+            View::Dashboard => {
+                let n = self.filtered_tools().len().saturating_sub(1);
+                self.dashboard_selection = self.dashboard_selection.min(n);
+            }
+            View::Outdated => {
+                let n: usize = self
+                    .report
+                    .as_ref()
+                    .map(|r| {
+                        let q = self.search_query.to_lowercase();
+                        let mut count = 0usize;
+                        for tool in &scanner::tool_order() {
+                            if let Some(res) = r.results.get(*tool) {
+                                for item in &scanner::extract_outdated(res) {
+                                    if q.is_empty() || !self.search_mode {
+                                        count += 1;
+                                    } else {
+                                        let tool_name =
+                                            scanner::display_name(tool).to_lowercase();
+                                        if tool_name.contains(&q)
+                                            || item.name.to_lowercase().contains(&q)
+                                            || item.source.contains(&q)
+                                        {
+                                            count += 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        count
+                    })
+                    .unwrap_or(0)
+                    .saturating_sub(1);
+                self.outdated_selection = self.outdated_selection.min(n);
+            }
+            View::Scanning => {}
+        }
     }
 
     fn do_scan(

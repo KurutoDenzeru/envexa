@@ -23,6 +23,16 @@ fn status_style(status: &str) -> Style {
     }
 }
 
+fn source_style(source: &str) -> Style {
+    match source {
+        "formula" => Style::default().fg(Color::Blue),
+        "cask" => Style::default().fg(Color::Magenta),
+        "global" => Style::default().fg(Color::Cyan),
+        "package" => Style::default().fg(Color::DarkGray),
+        _ => Style::default(),
+    }
+}
+
 fn title_bar(frame: &mut Frame, area: Rect, app: &App) {
     let title = Span::styled(
         " Envexa ",
@@ -74,24 +84,43 @@ fn tab_bar(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(tabs, area);
 }
 
-fn key_hints(frame: &mut Frame, area: Rect) {
-    let hints = vec![
-        Span::styled(" S", Style::default().fg(Color::Green)),
-        Span::raw("can "),
-        Span::styled("O", Style::default().fg(Color::Yellow)),
-        Span::raw("utdated "),
-        Span::styled("\u{2190}\u{2192}", Style::default().fg(Color::DarkGray)),
-        Span::raw(" tabs "),
-        Span::styled("\u{2191}\u{2193}", Style::default().fg(Color::DarkGray)),
-        Span::raw(" nav "),
-        Span::styled("Q", Style::default().fg(Color::Red)),
-        Span::raw("uit"),
-    ];
-    let bar = Line::from(hints);
+fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
+    let bar = if app.search_mode {
+        let query = format!(" / {}█", app.search_query);
+        Line::from(vec![
+            Span::styled("Search:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::raw(query),
+        ])
+    } else {
+        let hints = vec![
+            Span::styled(" S", Style::default().fg(Color::Green)),
+            Span::raw("can "),
+            Span::styled("O", Style::default().fg(Color::Yellow)),
+            Span::raw("utdated "),
+            Span::styled("/", Style::default().fg(Color::Cyan)),
+            Span::raw("earch "),
+            Span::styled("\u{2190}\u{2192}", Style::default().fg(Color::DarkGray)),
+            Span::raw(" tabs "),
+            Span::styled("\u{2191}\u{2193}", Style::default().fg(Color::DarkGray)),
+            Span::raw(" nav "),
+            Span::styled("Q", Style::default().fg(Color::Red)),
+            Span::raw("uit"),
+        ];
+        Line::from(hints)
+    };
     let block = Block::default()
         .borders(Borders::TOP)
         .border_style(Style::default().fg(Color::DarkGray));
     frame.render_widget(Paragraph::new(bar).block(block), area);
+}
+
+fn truncated_cell(text: &str, max: usize) -> Cell<'static> {
+    let display = if text.len() > max {
+        format!("{}…", &text[..max.saturating_sub(1)])
+    } else {
+        text.to_string()
+    };
+    Cell::from(display)
 }
 
 fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
@@ -131,33 +160,55 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
         }
     };
 
-    let header_cells = [" Toolchain ", " Status ", " Version "]
+    let header_cells = ["", " Toolchain ", " Status ", " Version ", " Outdated ", " Issues "]
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
         .style(Style::default().bg(Color::Blue).fg(Color::White))
         .height(1);
 
+    let q = app.search_query.to_lowercase();
     let rows: Vec<Row> = scanner::tool_order()
         .iter()
         .filter_map(|tool| {
             let res = report.results.get(*tool)?;
+            if !q.is_empty() && app.search_mode {
+                let name = scanner::display_name(tool).to_lowercase();
+                if !name.contains(&q) && !tool.contains(&q) {
+                    return None;
+                }
+            }
             let display = scanner::display_name(tool);
             let label = scanner::status_label(&res.status);
             let style = status_style(&res.status);
             let ver = scanner::first_version(res);
-            Some(
-                Row::new(vec![
-                    Cell::from(display),
-                    Cell::from(label).style(style),
-                    Cell::from(ver),
-                ])
-                .height(1),
-            )
+            let outdated_count = scanner::extract_outdated(res).len();
+            let outdated_str = if outdated_count > 0 {
+                outdated_count.to_string()
+            } else {
+                String::new()
+            };
+            let issues_str = res
+                .issues
+                .first()
+                .map(|s| s.as_str())
+                .unwrap_or("");
+            Some((tool, display, label, style, ver, outdated_str, issues_str))
         })
         .enumerate()
-        .map(|(i, row)| {
-            if i == app.dashboard_selection {
+        .map(|(i, (_tool, display, label, style, ver, outdated_str, issues_str))| {
+            let sel = i == app.dashboard_selection;
+            let indicator = if sel { "\u{25b8} " } else { "  " };
+            let row = Row::new(vec![
+                Cell::from(indicator),
+                Cell::from(display),
+                Cell::from(label).style(style),
+                Cell::from(ver),
+                truncated_cell(&outdated_str, 8),
+                truncated_cell(issues_str, 20),
+            ])
+            .height(1);
+            if sel {
                 row.style(
                     Style::default()
                         .bg(Color::DarkGray)
@@ -170,21 +221,35 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
         .collect();
 
     let total_outdated = scanner::count_outdated(report);
-    let subtitle = if total_outdated > 0 {
+    let filtered = app.search_mode && !q.is_empty();
+    let count = rows.len();
+    let subtitle = if filtered {
+        format!(" Dashboard  ({count} matched) ")
+    } else if total_outdated > 0 {
         format!(" Dashboard  |  {total_outdated} outdated ")
     } else {
         " Dashboard  |  all up to date ".into()
     };
 
-    let table = Table::new(rows, Constraint::from_lengths([15, 10, 30]))
-        .header(header)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(subtitle)
-                .border_style(Style::default().fg(Color::Cyan)),
-        )
-        .column_spacing(2);
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(2),
+            Constraint::Length(14),
+            Constraint::Length(8),
+            Constraint::Length(18),
+            Constraint::Length(8),
+            Constraint::Min(15),
+        ],
+    )
+    .header(header)
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(subtitle)
+            .border_style(Style::default().fg(Color::Cyan)),
+    )
+    .column_spacing(1);
 
     frame.render_widget(table, area);
 }
@@ -202,36 +267,46 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         }
     };
 
-    let header_cells = [" Toolchain ", " Package ", " Current ", " Latest "]
+    let header_cells = ["", " Toolchain ", " Source ", " Package ", " Current ", " Latest "]
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
         .style(Style::default().bg(Color::Blue).fg(Color::White))
         .height(1);
 
-    let mut items: Vec<(String, String, String, String)> = Vec::new();
+    let q = app.search_query.to_lowercase();
+    let mut items: Vec<(String, scanner::OutdatedItem)> = Vec::new();
     for tool in &scanner::tool_order() {
         if let Some(res) = report.results.get(*tool) {
             let pkgs = scanner::extract_outdated(res);
             if !pkgs.is_empty() {
-                let display = scanner::display_name(tool);
-                for pkg in &pkgs {
-                    items.push((
-                        display.to_string(),
-                        pkg.name.clone(),
-                        pkg.current.clone(),
-                        pkg.latest.clone(),
-                    ));
+                let display = scanner::display_name(tool).to_string();
+                for pkg in pkgs {
+                    if !q.is_empty() && app.search_mode {
+                        let tool_lower = display.to_lowercase();
+                        if !tool_lower.contains(&q)
+                            && !pkg.name.to_lowercase().contains(&q)
+                            && !pkg.source.contains(&q)
+                        {
+                            continue;
+                        }
+                    }
+                    items.push((display.clone(), pkg));
                 }
             }
         }
     }
 
     if items.is_empty() {
+        let msg = if app.search_mode && !q.is_empty() {
+            format!("  No packages match \"{q}\" ")
+        } else {
+            "  All packages are up to date! ".into()
+        };
         let text = Paragraph::new(Text::from(vec![
             Line::from(""),
             Line::from(vec![Span::styled(
-                "  All packages are up to date! ",
+                msg,
                 Style::default().fg(Color::Green),
             )]),
         ]))
@@ -248,14 +323,18 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
     let rows: Vec<Row> = items
         .iter()
         .enumerate()
-        .map(|(i, (tool, name, cur, lat))| {
+        .map(|(i, (tool, pkg))| {
+            let sel = i == app.outdated_selection;
+            let indicator = if sel { "\u{25b8} " } else { "  " };
             let row = Row::new(vec![
+                Cell::from(indicator),
                 Cell::from(tool.as_str()),
-                Cell::from(name.as_str()),
-                Cell::from(cur.as_str()),
-                Cell::from(lat.as_str()),
+                Cell::from(pkg.source.as_str()).style(source_style(&pkg.source)),
+                Cell::from(pkg.name.as_str()),
+                Cell::from(pkg.current.as_str()),
+                Cell::from(pkg.latest.as_str()),
             ]);
-            if i == app.outdated_selection {
+            if sel {
                 row.style(
                     Style::default()
                         .bg(Color::DarkGray)
@@ -268,15 +347,30 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         .collect();
 
     let total = items.len();
-    let table = Table::new(rows, Constraint::from_lengths([12, 26, 22, 22]))
-        .header(header)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!(" Outdated Packages ({total}) "))
-                .border_style(Style::default().fg(Color::Yellow)),
-        )
-        .column_spacing(1);
+    let title = if app.search_mode && !q.is_empty() {
+        format!(" Outdated Packages ({total} matched) ")
+    } else {
+        format!(" Outdated Packages ({total}) ")
+    };
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(2),
+            Constraint::Length(10),
+            Constraint::Length(8),
+            Constraint::Min(18),
+            Constraint::Length(18),
+            Constraint::Length(18),
+        ],
+    )
+    .header(header)
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(title)
+            .border_style(Style::default().fg(Color::Yellow)),
+    )
+    .column_spacing(1);
 
     frame.render_widget(table, area);
 }
@@ -343,5 +437,5 @@ pub fn render(frame: &mut Frame, app: &App) {
         View::Scanning => render_scanning(frame, chunks[2], app),
     }
 
-    key_hints(frame, chunks[3]);
+    status_bar(frame, chunks[3], app);
 }

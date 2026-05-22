@@ -1,6 +1,14 @@
 use std::collections::HashMap;
 
-use crate::toolchains::{PackageInfo, ScanResult};
+use crate::toolchains::ScanResult;
+
+#[derive(Debug, Clone)]
+pub struct OutdatedItem {
+    pub source: String,
+    pub name: String,
+    pub current: String,
+    pub latest: String,
+}
 
 struct Table {
     headers: Vec<String>,
@@ -120,21 +128,39 @@ pub fn status_label(s: &str) -> &str {
         .unwrap_or("?")
 }
 
-pub fn extract_outdated(res: &ScanResult) -> Vec<&PackageInfo> {
+pub fn extract_outdated(res: &ScanResult) -> Vec<OutdatedItem> {
     let mut items = vec![];
-    for key in [
-        "outdated_formulae",
-        "outdated_casks",
-        "outdated_global",
-        "outdated",
-    ] {
-        match key {
-            "outdated_formulae" => items.extend(res.outdated_formulae.iter()),
-            "outdated_casks" => items.extend(res.outdated_casks.iter()),
-            "outdated_global" => items.extend(res.outdated_global.iter()),
-            "outdated" => items.extend(res.outdated.iter()),
-            _ => {}
-        }
+    for f in &res.outdated_formulae {
+        items.push(OutdatedItem {
+            source: "formula".into(),
+            name: f.name.clone(),
+            current: f.current.clone(),
+            latest: f.latest.clone(),
+        });
+    }
+    for c in &res.outdated_casks {
+        items.push(OutdatedItem {
+            source: "cask".into(),
+            name: c.name.clone(),
+            current: c.current.clone(),
+            latest: c.latest.clone(),
+        });
+    }
+    for p in &res.outdated {
+        items.push(OutdatedItem {
+            source: "package".into(),
+            name: p.name.clone(),
+            current: p.current.clone(),
+            latest: p.latest.clone(),
+        });
+    }
+    for g in &res.outdated_global {
+        items.push(OutdatedItem {
+            source: "global".into(),
+            name: g.name.clone(),
+            current: g.current.clone(),
+            latest: g.latest.clone(),
+        });
     }
     items
 }
@@ -178,7 +204,7 @@ pub fn format_report(report: &Report) -> String {
     lines.push(format!("**Generated:** {}", report.timestamp));
     lines.push(String::new());
 
-    let mut outdated_all: HashMap<&str, Vec<&PackageInfo>> = HashMap::new();
+    let mut outdated_all: HashMap<&str, Vec<OutdatedItem>> = HashMap::new();
 
     for tool in &tool_order() {
         if let Some(res) = results.get(*tool) {

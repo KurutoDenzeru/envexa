@@ -37,10 +37,25 @@ envexa update     Self-update to latest release
 |-----|--------|
 | `S` | Scan all toolchains |
 | `O` | Show outdated packages |
-| `←` `→` | Switch between tabs |
-| `↑` `↓` | Navigate rows |
-| `Q` | Quit |
+| `/` | Enter search/filter mode |
+| `←` `→` / `J` `L` | Switch between tabs |
+| `↑` `↓` / `N` `P` | Navigate rows |
+| `Q` | Quit (works even during search) |
 | `Esc` / `H` | Back to Dashboard |
+
+### TUI Search
+
+Press `/` to enter search mode — the bottom bar becomes a search prompt. Type to filter the current view:
+
+- **Dashboard** — matches toolchain names
+- **Outdated** — matches package name, toolchain name, or source type (formula/cask/global/pkg)
+
+Press `Esc` to clear filter & exit, `Enter` to keep the filter active.
+
+### TUI Columns
+
+**Dashboard:** Indicator (▸), Toolchain, Status, Version, Outdated (#), Issues  
+**Outdated:** Indicator (▸), Toolchain, Source, Package, Current, Latest
 
 ---
 
