@@ -28,6 +28,7 @@ pub struct App {
     pub search_mode: bool,
     pub search_query: String,
     pub throbber_state: ThrobberState,
+    pub progress_counter: usize,
 
     pub detail_tool: Option<String>,
     pub detail_key: Option<String>,
@@ -54,6 +55,7 @@ impl App {
             search_mode: false,
             search_query: String::new(),
             throbber_state: ThrobberState::default(),
+            progress_counter: 0,
             detail_tool: None,
             detail_key: None,
             detail_selection: 0,
@@ -242,9 +244,6 @@ impl App {
         match *tool {
             "security" => {
                 let vulns = scanner::extract_vulnerabilities(res);
-                if vulns.is_empty() {
-                    return;
-                }
                 self.detail_vulns = vulns.to_vec();
                 self.detail_items.clear();
                 self.detail_audits.clear();
@@ -252,9 +251,6 @@ impl App {
             }
             "audit" => {
                 let audits = scanner::extract_audit_items(res);
-                if audits.is_empty() {
-                    return;
-                }
                 self.detail_audits = audits.to_vec();
                 self.detail_items.clear();
                 self.detail_vulns.clear();
@@ -262,9 +258,6 @@ impl App {
             }
             "cleanup" => {
                 let cleanup = scanner::extract_cleanup_items(res);
-                if cleanup.is_empty() {
-                    return;
-                }
                 self.detail_cleanup = cleanup.to_vec();
                 self.detail_items.clear();
                 self.detail_vulns.clear();
@@ -272,9 +265,6 @@ impl App {
             }
             _ => {
                 let items = scanner::extract_outdated(res);
-                if items.is_empty() {
-                    return;
-                }
                 self.detail_items = items;
                 self.detail_vulns.clear();
                 self.detail_audits.clear();
@@ -306,6 +296,7 @@ impl App {
         }
 
         self.view = View::Updating;
+        self.progress_counter = 0;
         let _count = work.len();
 
         let handle = std::thread::spawn(move || {
@@ -332,6 +323,7 @@ impl App {
         loop {
             terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
             self.throbber_state.calc_next();
+            self.progress_counter += 1;
             if handle.is_finished() {
                 break;
             }
@@ -375,6 +367,7 @@ impl App {
         }
 
         self.view = View::Updating;
+        self.progress_counter = 0;
         let _count = work.len();
 
         let handle = std::thread::spawn(move || {
@@ -401,6 +394,7 @@ impl App {
         loop {
             terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
             self.throbber_state.calc_next();
+            self.progress_counter += 1;
             if handle.is_finished() {
                 break;
             }
@@ -483,6 +477,7 @@ impl App {
         terminal: &mut DefaultTerminal,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.view = View::Scanning;
+        self.progress_counter = 0;
 
         let rt_handle = tokio::runtime::Handle::current();
         let handle = std::thread::spawn(move || rt_handle.block_on(toolchains::scan_all()));
@@ -490,6 +485,7 @@ impl App {
         loop {
             terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
             self.throbber_state.calc_next();
+            self.progress_counter += 1;
             if handle.is_finished() {
                 break;
             }

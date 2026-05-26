@@ -1197,7 +1197,32 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
     if inner.width > 0 && inner.height > 0 {
-        frame.render_stateful_widget(throbber, inner, &mut app.throbber_state);
+        if inner.height >= 4 {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Length(2),
+                    Constraint::Min(0),
+                ])
+                .split(inner);
+            frame.render_stateful_widget(throbber, chunks[0], &mut app.throbber_state);
+
+            let ratio = 1.0 - (0.96_f64).powi(app.progress_counter as i32);
+            let pct = (ratio * 100.0).round() as u64;
+            let gauge = Gauge::default()
+                .block(Block::default().borders(Borders::NONE))
+                .gauge_style(Style::default().fg(Color::Cyan))
+                .label(Span::styled(
+                    format!(" scanning... {}% ", pct),
+                    Style::default().fg(Color::White).bold(),
+                ))
+                .ratio(ratio);
+            frame.render_widget(gauge, chunks[2]);
+        } else {
+            frame.render_stateful_widget(throbber, inner, &mut app.throbber_state);
+        }
     }
 }
 
@@ -1262,6 +1287,26 @@ fn render_package_detail(frame: &mut Frame, area: Rect, app: &App) {
 fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
     let items = &app.detail_items;
 
+    if items.is_empty() {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" {tool} — Outdated Packages (0) "))
+            .border_style(Style::default().fg(Color::Green));
+        let text = Paragraph::new(Text::from(vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  \u{2714} ", Style::default().fg(Color::Green).bold()),
+                Span::styled(
+                    "All packages are completely up to date!",
+                    Style::default().fg(Color::White),
+                ),
+            ]),
+        ]))
+        .block(block);
+        frame.render_widget(text, area);
+        return;
+    }
+
     let header_cells = ["", "Package ", "Source ", "Current ", "Latest "]
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
@@ -1321,6 +1366,27 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
 
 fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
     let items = &app.detail_vulns;
+
+    if items.is_empty() {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" {tool} — Vulnerabilities (0) "))
+            .border_style(Style::default().fg(Color::Green));
+        let text = Paragraph::new(Text::from(vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  \u{2714} ", Style::default().fg(Color::Green).bold()),
+                Span::styled(
+                    "No security vulnerabilities detected!",
+                    Style::default().fg(Color::White),
+                ),
+            ]),
+        ]))
+        .block(block);
+        frame.render_widget(text, area);
+        return;
+    }
+
     let header_cells = ["Package ", "Severity ", "CVE ", "Title ", "Patched In "]
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
@@ -1527,6 +1593,27 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
 
 fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
     let items = &app.detail_audits;
+
+    if items.is_empty() {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" {tool} — Audit Items (0) "))
+            .border_style(Style::default().fg(Color::Green));
+        let text = Paragraph::new(Text::from(vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  \u{2714} ", Style::default().fg(Color::Green).bold()),
+                Span::styled(
+                    "System and toolchains are aligned! No issues flagged.",
+                    Style::default().fg(Color::White),
+                ),
+            ]),
+        ]))
+        .block(block);
+        frame.render_widget(text, area);
+        return;
+    }
+
     let header_cells = ["Name ", "Current ", "Note "]
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
@@ -1727,6 +1814,27 @@ fn get_label_color(label: &str) -> Color {
 
 fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
     let items = &app.detail_cleanup;
+
+    if items.is_empty() {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" {tool} — Cleanup (0) "))
+            .border_style(Style::default().fg(Color::Green));
+        let text = Paragraph::new(Text::from(vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  \u{2714} ", Style::default().fg(Color::Green).bold()),
+                Span::styled(
+                    "Your environment is fully clean! No cache cleanup needed.",
+                    Style::default().fg(Color::White),
+                ),
+            ]),
+        ]))
+        .block(block);
+        frame.render_widget(text, area);
+        return;
+    }
+
     let header_cells = ["Category ", "Description ", "Size ", "Command "]
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
@@ -1858,6 +1966,31 @@ fn render_updating(frame: &mut Frame, area: Rect, app: &mut App) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
     if inner.width > 0 && inner.height > 0 {
-        frame.render_stateful_widget(throbber, inner, &mut app.throbber_state);
+        if inner.height >= 4 {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Length(2),
+                    Constraint::Min(0),
+                ])
+                .split(inner);
+            frame.render_stateful_widget(throbber, chunks[0], &mut app.throbber_state);
+
+            let ratio = 1.0 - (0.96_f64).powi(app.progress_counter as i32);
+            let pct = (ratio * 100.0).round() as u64;
+            let gauge = Gauge::default()
+                .block(Block::default().borders(Borders::NONE))
+                .gauge_style(Style::default().fg(Color::Green))
+                .label(Span::styled(
+                    format!(" updating... {}% ", pct),
+                    Style::default().fg(Color::White).bold(),
+                ))
+                .ratio(ratio);
+            frame.render_widget(gauge, chunks[2]);
+        } else {
+            frame.render_stateful_widget(throbber, inner, &mut app.throbber_state);
+        }
     }
 }
