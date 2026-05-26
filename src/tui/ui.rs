@@ -1220,6 +1220,124 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
                 ))
                 .ratio(ratio);
             frame.render_widget(gauge, chunks[2]);
+
+            // Real-time scan logs and tips
+            let step = app.progress_counter;
+            let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+            let spin_char = spinner_frames[step % spinner_frames.len()];
+            let mut log_lines = vec![Line::from("")];
+
+            // Step 1: Project Environment (started at step 0)
+            if step > 0 {
+                let sym = if step < 10 { spin_char } else { "✔" };
+                let color = if step < 10 { Color::Cyan } else { Color::Green };
+                log_lines.push(Line::from(vec![
+                    Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
+                    Span::styled(
+                        "Checking project environment & lockfiles...",
+                        Style::default().fg(Color::White),
+                    ),
+                ]));
+            }
+
+            // Step 2: Homebrew (started at step 10)
+            if step >= 10 {
+                let sym = if step < 22 { spin_char } else { "✔" };
+                let color = if step < 22 { Color::Cyan } else { Color::Green };
+                log_lines.push(Line::from(vec![
+                    Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
+                    Span::styled(
+                        "Auditing system runtimes & Homebrew formulas...",
+                        Style::default().fg(Color::White),
+                    ),
+                ]));
+            }
+
+            // Step 3: Web Runtimes (started at step 22)
+            if step >= 22 {
+                let sym = if step < 35 { spin_char } else { "✔" };
+                let color = if step < 35 { Color::Cyan } else { Color::Green };
+                log_lines.push(Line::from(vec![
+                    Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
+                    Span::styled(
+                        "Scanning Web Development runtimes (npm, pnpm, Bun, Deno)...",
+                        Style::default().fg(Color::White),
+                    ),
+                ]));
+            }
+
+            // Step 4: Cargo / pip / gem (started at step 35)
+            if step >= 35 {
+                let sym = if step < 48 { spin_char } else { "✔" };
+                let color = if step < 48 { Color::Cyan } else { Color::Green };
+                log_lines.push(Line::from(vec![
+                    Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
+                    Span::styled(
+                        "Checking compiler dependencies (cargo-outdated, pip, gem)...",
+                        Style::default().fg(Color::White),
+                    ),
+                ]));
+            }
+
+            // Step 5: Security Advisory (started at step 48)
+            if step >= 48 {
+                let sym = if step < 62 { spin_char } else { "✔" };
+                let color = if step < 62 { Color::Cyan } else { Color::Green };
+                log_lines.push(Line::from(vec![
+                    Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
+                    Span::styled(
+                        "Running security advisory audits (RustSec, npm audit, pip-audit)...",
+                        Style::default().fg(Color::White),
+                    ),
+                ]));
+            }
+
+            // Step 6: Docker / Cleanup (started at step 62)
+            if step >= 62 {
+                let sym = if step < 75 { spin_char } else { "✔" };
+                let color = if step < 75 { Color::Cyan } else { Color::Green };
+                log_lines.push(Line::from(vec![
+                    Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
+                    Span::styled(
+                        "Checking Docker daemons & local cache reclaimables...",
+                        Style::default().fg(Color::White),
+                    ),
+                ]));
+            }
+
+            // Step 7: Compiling results (started at step 75)
+            if step >= 75 {
+                log_lines.push(Line::from(vec![
+                    Span::styled(
+                        format!("  {} ", spin_char),
+                        Style::default().fg(Color::Cyan).bold(),
+                    ),
+                    Span::styled(
+                        "Compiling final health reports and consolidating cache...",
+                        Style::default().fg(Color::White),
+                    ),
+                ]));
+            }
+
+            // Rotating tool tips
+            let tips = [
+                "💡 Tip: Press '/' to filter outdated packages by name or manager in real-time.",
+                "💡 Tip: Use the 'Space' key to select packages and 'U' to update them concurrently.",
+                "💡 Tip: Run 'envexa scan' in your terminal to get a clean Markdown report for your CI.",
+                "💡 Tip: Change your default target project directory in '~/.envexa/config.json'.",
+                "💡 Tip: Cleanup scanner checks docker, npm, and cargo local cache spaces.",
+                "💡 Tip: Outdated tab shows global as well as local project dependencies.",
+            ];
+            let tip_index = (step / 80) % tips.len();
+            let current_tip = tips[tip_index];
+
+            log_lines.push(Line::from(""));
+            log_lines.push(Line::from(vec![Span::styled(
+                format!("  {}", current_tip),
+                Style::default().fg(Color::DarkGray),
+            )]));
+
+            frame.render_widget(Paragraph::new(log_lines), chunks[3]);
         } else {
             frame.render_stateful_widget(throbber, inner, &mut app.throbber_state);
         }
