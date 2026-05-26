@@ -141,6 +141,14 @@ pub async fn run_cmd_in(
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
+pub fn get_project_path() -> std::path::PathBuf {
+    crate::config::load_config()
+        .project_path
+        .filter(|p| !p.is_empty())
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
+}
+
 pub mod audit;
 pub mod brew;
 pub mod bun;

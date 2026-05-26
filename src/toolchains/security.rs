@@ -34,41 +34,46 @@ fn parse_vuln(name: &str, info: &serde_json::Value, out: &mut Vec<VulnerabilityI
     });
 }
 
-async fn npm_audit(result: &mut ScanResult) {
+async fn npm_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
+    let mut vulns = Vec::new();
     if !which("npm") {
-        return;
+        return vulns;
     }
-    if let Ok(out) = run_cmd("npm", &["audit", "--json"]).await {
+    if let Ok(out) = run_cmd_in(project_path, "npm", &["audit", "--json"]).await {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
-            if let Some(vulns) = data["vulnerabilities"].as_object() {
-                for (name, info) in vulns {
-                    parse_vuln(name, info, &mut result.vulnerabilities);
+            if let Some(vulnerabilities) = data["vulnerabilities"].as_object() {
+                for (name, info) in vulnerabilities {
+                    parse_vuln(name, info, &mut vulns);
                 }
             }
         }
     }
+    vulns
 }
 
-async fn pnpm_audit(result: &mut ScanResult) {
+async fn pnpm_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
+    let mut vulns = Vec::new();
     if !which("pnpm") {
-        return;
+        return vulns;
     }
-    if let Ok(out) = run_cmd("pnpm", &["audit", "--json"]).await {
+    if let Ok(out) = run_cmd_in(project_path, "pnpm", &["audit", "--json"]).await {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
-            if let Some(vulns) = data["vulnerabilities"].as_object() {
-                for (name, info) in vulns {
-                    parse_vuln(name, info, &mut result.vulnerabilities);
+            if let Some(vulnerabilities) = data["vulnerabilities"].as_object() {
+                for (name, info) in vulnerabilities {
+                    parse_vuln(name, info, &mut vulns);
                 }
             }
         }
     }
+    vulns
 }
 
-async fn bun_audit(result: &mut ScanResult) {
+async fn bun_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
+    let mut vulns = Vec::new();
     if !which("bun") {
-        return;
+        return vulns;
     }
-    if let Ok(out) = run_cmd("bun", &["audit"]).await {
+    if let Ok(out) = run_cmd_in(project_path, "bun", &["audit"]).await {
         for line in out.lines() {
             let parts: Vec<&str> = line.splitn(4, ' ').collect();
             if parts.len() >= 3 {
@@ -76,7 +81,7 @@ async fn bun_audit(result: &mut ScanResult) {
                 let severity = parts.get(1).unwrap_or(&"unknown").trim().to_uppercase();
                 let remainder = parts[2..].join(" ");
                 if !name.is_empty() && !severity.is_empty() {
-                    result.vulnerabilities.push(VulnerabilityInfo {
+                    vulns.push(VulnerabilityInfo {
                         package: name.to_string(),
                         severity,
                         title: remainder,
@@ -87,19 +92,21 @@ async fn bun_audit(result: &mut ScanResult) {
             }
         }
     }
+    vulns
 }
 
-async fn cargo_audit(result: &mut ScanResult) {
+async fn cargo_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
+    let mut vulns = Vec::new();
     if !which("cargo-audit") {
-        return;
+        return vulns;
     }
-    if let Ok(out) = run_cmd("cargo-audit", &["audit", "--json"]).await {
+    if let Ok(out) = run_cmd_in(project_path, "cargo-audit", &["audit", "--json"]).await {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
             if let Some(list) = data["vulnerabilities"]["list"].as_array() {
                 for item in list {
                     let pkg = &item["package"];
                     let advisory = &item["advisory"];
-                    result.vulnerabilities.push(VulnerabilityInfo {
+                    vulns.push(VulnerabilityInfo {
                         package: pkg["name"].as_str().unwrap_or("?").to_string(),
                         severity: advisory["severity"]
                             .as_str()
@@ -120,19 +127,27 @@ async fn cargo_audit(result: &mut ScanResult) {
             }
         }
     }
+    vulns
 }
 
-async fn pip_audit(result: &mut ScanResult) {
+async fn pip_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
+    let mut vulns = Vec::new();
     if !which("pip-audit") {
-        return;
+        return vulns;
     }
-    if let Ok(out) = run_cmd("pip-audit", &["--format", "json", "--desc", "--no-deps"]).await {
+    if let Ok(out) = run_cmd_in(
+        project_path,
+        "pip-audit",
+        &["--format", "json", "--desc", "--no-deps"],
+    )
+    .await
+    {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
             if let Some(deps) = data["dependencies"].as_array() {
                 for dep in deps {
-                    if let Some(vulns) = dep["vulns"].as_array() {
-                        for v in vulns {
-                            result.vulnerabilities.push(VulnerabilityInfo {
+                    if let Some(v_arr) = dep["vulns"].as_array() {
+                        for v in v_arr {
+                            vulns.push(VulnerabilityInfo {
                                 package: dep["name"].as_str().unwrap_or("?").to_string(),
                                 severity: v["severity"]
                                     .as_str()
@@ -158,16 +173,26 @@ async fn pip_audit(result: &mut ScanResult) {
             }
         }
     }
+    vulns
 }
 
 pub async fn scan() -> ScanResult {
     let mut result = ScanResult::new("security");
+    let project_path = get_project_path();
 
-    npm_audit(&mut result).await;
-    pnpm_audit(&mut result).await;
-    bun_audit(&mut result).await;
-    cargo_audit(&mut result).await;
-    pip_audit(&mut result).await;
+    let (npm_res, pnpm_res, bun_res, cargo_res, pip_res) = tokio::join!(
+        npm_audit(&project_path),
+        pnpm_audit(&project_path),
+        bun_audit(&project_path),
+        cargo_audit(&project_path),
+        pip_audit(&project_path)
+    );
+
+    result.vulnerabilities.extend(npm_res);
+    result.vulnerabilities.extend(pnpm_res);
+    result.vulnerabilities.extend(bun_res);
+    result.vulnerabilities.extend(cargo_res);
+    result.vulnerabilities.extend(pip_res);
 
     let n = result.vulnerabilities.len();
     result.status = if n == 0 {
