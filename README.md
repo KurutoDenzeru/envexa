@@ -1,8 +1,20 @@
-# 🚧 Envexa
+<p align="center">
+  <img src="assets/bulldozer.png" alt="Envexa Logo" width="120" />
+</p>
 
-**Envexa** is a blazing-fast Rust TUI and CLI for monitoring local developer tooling health. It consolidates scans of system runtimes, package managers, project dependencies, security advisories, version alignment, and disk cleanup opportunities into a single terminal dashboard.
+<h1 align="center">🚧 Envexa</h1>
 
-Built with performance in mind, Envexa helps you spot drift, security risks, and dependency lag before you commit. Run it interactively as a TUI, or run `envexa scan` to generate structured Markdown reports for scripts or CI.
+<p align="center">
+  <strong>Blazing-fast Rust TUI and CLI for monitoring local developer tooling health</strong>
+</p>
+
+<p align="center">
+  <img src="assets/envexa-tui.png" alt="Envexa TUI Screenshot" width="800" />
+</p>
+
+---
+
+**Envexa** is a blazing-fast Rust TUI and CLI for monitoring local developer tooling health, consolidating system runtimes, package managers, security advisories, and disk cleanup opportunities into a single terminal dashboard. Built with performance in mind, it helps you spot environment drift and security risks before you commit.
 
 ## 📚 Table of Contents
 
