@@ -14,7 +14,7 @@
 
 ---
 
-**Envexa** is a blazing-fast Rust TUI and CLI for monitoring local developer tooling health, consolidating system runtimes, package managers, security advisories, and disk cleanup opportunities into a single terminal dashboard. Built with performance in mind, it helps you spot environment drift and security risks before you commit.
+**Envexa** is a fast Rust TUI and CLI to monitor local developer tooling health.
 
 ## 📚 Table of Contents
 
