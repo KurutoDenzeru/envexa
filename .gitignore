@@ -8,3 +8,5 @@ report.json
 # Added by cargo
 
 /target
+.antigravitycli/
+
