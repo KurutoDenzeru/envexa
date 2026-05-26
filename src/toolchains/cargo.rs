@@ -24,7 +24,8 @@ pub async fn scan() -> ScanResult {
         return result;
     }
 
-    if let Ok(out) = run_cmd("cargo-outdated", &["--format=json"]).await {
+    let project_path = get_project_path();
+    if let Ok(out) = run_cmd_in(&project_path, "cargo-outdated", &["--format=json"]).await {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
             if let Some(crates) = data["dependencies"].as_array() {
                 for c in crates {

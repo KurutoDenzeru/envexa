@@ -481,11 +481,8 @@ impl App {
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.view = View::Scanning;
 
-        let handle = std::thread::spawn(|| {
-            tokio::runtime::Runtime::new()
-                .expect("Failed to create scan runtime")
-                .block_on(toolchains::scan_all())
-        });
+        let rt_handle = tokio::runtime::Handle::current();
+        let handle = std::thread::spawn(move || rt_handle.block_on(toolchains::scan_all()));
 
         loop {
             terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
@@ -570,19 +567,129 @@ impl App {
 }
 
 fn run_update(tool: &str, item: &OutdatedItem) -> Result<String, String> {
-    let (cmd, args) = match tool {
+    let project_path = toolchains::get_project_path();
+    let is_package = item.source == "package";
+
+    let (cmd, args, run_in_project) = match tool {
         "Brew" | "Brew (dev)" => {
-            let mut args = vec!["upgrade"];
+            let mut args = vec!["upgrade".to_string()];
             if item.source == "cask" {
-                args.push("--cask");
+                args.push("--cask".to_string());
             }
-            args.push(&item.name);
-            ("brew", args)
+            args.push(item.name.clone());
+            ("brew".to_string(), args, false)
         }
-        _ => return Err("auto-update not supported for this toolchain".into()),
+        "npm" => {
+            if is_package {
+                (
+                    "npm".to_string(),
+                    vec!["install".to_string(), format!("{}@latest", item.name)],
+                    true,
+                )
+            } else {
+                (
+                    "npm".to_string(),
+                    vec![
+                        "install".to_string(),
+                        "-g".to_string(),
+                        format!("{}@latest", item.name),
+                    ],
+                    false,
+                )
+            }
+        }
+        "pnpm" => {
+            if is_package {
+                (
+                    "pnpm".to_string(),
+                    vec!["add".to_string(), format!("{}@latest", item.name)],
+                    true,
+                )
+            } else {
+                (
+                    "pnpm".to_string(),
+                    vec![
+                        "add".to_string(),
+                        "-g".to_string(),
+                        format!("{}@latest", item.name),
+                    ],
+                    false,
+                )
+            }
+        }
+        "Yarn" => {
+            if is_package {
+                (
+                    "yarn".to_string(),
+                    vec!["upgrade".to_string(), format!("{}@latest", item.name)],
+                    true,
+                )
+            } else {
+                return Err("global auto-update not supported for Yarn".into());
+            }
+        }
+        "Bun" => {
+            if is_package {
+                (
+                    "bun".to_string(),
+                    vec!["add".to_string(), format!("{}@latest", item.name)],
+                    true,
+                )
+            } else {
+                (
+                    "bun".to_string(),
+                    vec![
+                        "add".to_string(),
+                        "-g".to_string(),
+                        format!("{}@latest", item.name),
+                    ],
+                    false,
+                )
+            }
+        }
+        "pip" => {
+            if is_package {
+                (
+                    "pip3".to_string(),
+                    vec![
+                        "install".to_string(),
+                        "--upgrade".to_string(),
+                        item.name.clone(),
+                    ],
+                    true,
+                )
+            } else {
+                (
+                    "pip3".to_string(),
+                    vec![
+                        "install".to_string(),
+                        "--upgrade".to_string(),
+                        item.name.clone(),
+                    ],
+                    false,
+                )
+            }
+        }
+        "Gem" => (
+            "gem".to_string(),
+            vec!["update".to_string(), item.name.clone()],
+            false,
+        ),
+        "Cargo" => (
+            "cargo".to_string(),
+            vec!["install".to_string(), item.name.clone()],
+            false,
+        ),
+        _ => return Err(format!("auto-update not supported for {}", tool)),
     };
-    let output = std::process::Command::new(cmd)
-        .args(&args)
+
+    let mut command = std::process::Command::new(&cmd);
+    command.args(&args);
+    if run_in_project {
+        command.current_dir(&project_path);
+    }
+
+    let output = command
         .output()
         .map_err(|e| format!("command failed: {e}"))?;
     if output.status.success() {
