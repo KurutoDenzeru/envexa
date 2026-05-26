@@ -141,7 +141,7 @@ async fn self_update() {
         format!("https://github.com/KurutoDenzeru/envexa/releases/download/{tag}/{asset_name}");
 
     let current = std::env::current_exe().unwrap_or_default();
-    let tmp = current.with_extension("tmp");
+    let tmp = std::env::temp_dir().join(format!("{asset_name}.tmp"));
 
     let cmd_url = download_url.clone();
     let cmd_tmp = tmp.clone();
@@ -209,11 +209,12 @@ async fn self_update() {
         }
     }
 
-    if std::fs::rename(&tmp, &current).is_err() {
-        eprintln!("Failed to replace binary (try with elevated permissions)");
+    if std::fs::rename(&tmp, &current).is_err() && std::fs::copy(&tmp, &current).is_err() {
+        eprintln!("Failed to replace binary (try with elevated permissions or sudo)");
         let _ = std::fs::remove_file(&tmp);
         return;
     }
+    let _ = std::fs::remove_file(&tmp);
 
     println!("Updated to {tag}. Restart envexa to use the new version.");
 }
