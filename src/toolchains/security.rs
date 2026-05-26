@@ -36,6 +36,11 @@ fn parse_vuln(name: &str, info: &serde_json::Value, out: &mut Vec<VulnerabilityI
 
 async fn npm_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
     let mut vulns = Vec::new();
+    if !project_path.join("package-lock.json").exists()
+        && !project_path.join("package.json").exists()
+    {
+        return vulns;
+    }
     if !which("npm") {
         return vulns;
     }
@@ -53,6 +58,10 @@ async fn npm_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
 
 async fn pnpm_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
     let mut vulns = Vec::new();
+    if !project_path.join("pnpm-lock.yaml").exists() && !project_path.join("pnpm-lock.yml").exists()
+    {
+        return vulns;
+    }
     if !which("pnpm") {
         return vulns;
     }
@@ -70,6 +79,9 @@ async fn pnpm_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
 
 async fn bun_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
     let mut vulns = Vec::new();
+    if !project_path.join("bun.lockb").exists() && !project_path.join("bun.lock").exists() {
+        return vulns;
+    }
     if !which("bun") {
         return vulns;
     }
@@ -97,6 +109,9 @@ async fn bun_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
 
 async fn cargo_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
     let mut vulns = Vec::new();
+    if !project_path.join("Cargo.toml").exists() && !project_path.join("Cargo.lock").exists() {
+        return vulns;
+    }
     if !which("cargo-audit") {
         return vulns;
     }
@@ -132,6 +147,13 @@ async fn cargo_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
 
 async fn pip_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
     let mut vulns = Vec::new();
+    if !project_path.join("requirements.txt").exists()
+        && !project_path.join("Pipfile").exists()
+        && !project_path.join("Pipfile.lock").exists()
+        && !project_path.join("poetry.lock").exists()
+    {
+        return vulns;
+    }
     if !which("pip-audit") {
         return vulns;
     }

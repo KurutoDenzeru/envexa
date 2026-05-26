@@ -11,6 +11,14 @@ fn detect_project_type(dir: &Path) -> Option<&'static str> {
         Some("bun")
     } else if dir.join("deno.json").exists() || dir.join("deno.jsonc").exists() {
         Some("deno")
+    } else if dir.join("Cargo.toml").exists() {
+        Some("cargo")
+    } else if dir.join("poetry.lock").exists() {
+        Some("poetry")
+    } else if dir.join("Pipfile").exists() || dir.join("Pipfile.lock").exists() {
+        Some("pipenv")
+    } else if dir.join("requirements.txt").exists() {
+        Some("requirements")
     } else if dir.join("package.json").exists() {
         Some("npm")
     } else {
@@ -125,6 +133,152 @@ async fn deno_outdated(dir: &Path, result: &mut ScanResult) {
     }
 }
 
+async fn cargo_outdated(dir: &Path, result: &mut ScanResult) {
+    if !which("cargo-outdated") {
+        return;
+    }
+    if let Ok(out) = run_cmd_in(dir, "cargo", &["outdated", "--format", "json"]).await {
+        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
+            if let Some(arr) = data.as_array() {
+                for item in arr {
+                    let name = item["name"].as_str().unwrap_or("?").to_string();
+                    let current = item["project"].as_str().unwrap_or("?").to_string();
+                    let latest = item["latest"].as_str().unwrap_or("?").to_string();
+                    result.outdated.push(PackageInfo {
+                        name,
+                        current,
+                        latest,
+                    });
+                }
+            } else if let Some(obj) = data.as_object() {
+                if let Some(arr) = obj.get("dependencies").and_then(|v| v.as_array()) {
+                    for item in arr {
+                        let name = item["name"].as_str().unwrap_or("?").to_string();
+                        let current = item["project"].as_str().unwrap_or("?").to_string();
+                        let latest = item["latest"].as_str().unwrap_or("?").to_string();
+                        result.outdated.push(PackageInfo {
+                            name,
+                            current,
+                            latest,
+                        });
+                    }
+                }
+            }
+        }
+    }
+}
+
+async fn poetry_outdated(dir: &Path, result: &mut ScanResult) {
+    if !which("poetry") {
+        return;
+    }
+    if let Ok(out) = run_cmd_in(dir, "poetry", &["show", "--outdated", "--format=json"]).await {
+        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
+            if let Some(arr) = data.as_array() {
+                for item in arr {
+                    let name = item["name"].as_str().unwrap_or("?").to_string();
+                    let current = item["version"].as_str().unwrap_or("?").to_string();
+                    let latest = item["latest"].as_str().unwrap_or("?").to_string();
+                    result.outdated.push(PackageInfo {
+                        name,
+                        current,
+                        latest,
+                    });
+                }
+                return;
+            }
+        }
+    }
+    if let Ok(out) = run_cmd_in(dir, "poetry", &["show", "--outdated"]).await {
+        for line in out.lines() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 3 {
+                let name = parts[0];
+                let current = parts[1];
+                let latest = parts[2];
+                if (current.chars().next().is_some_and(|c| c.is_ascii_digit())
+                    || current.contains('.'))
+                    && (latest.chars().next().is_some_and(|c| c.is_ascii_digit())
+                        || latest.contains('.'))
+                {
+                    result.outdated.push(PackageInfo {
+                        name: name.to_string(),
+                        current: current.to_string(),
+                        latest: latest.to_string(),
+                    });
+                }
+            }
+        }
+    }
+}
+
+fn parse_pip_outdated(out: &str, result: &mut ScanResult) {
+    if let Ok(data) = serde_json::from_str::<serde_json::Value>(out) {
+        if let Some(arr) = data.as_array() {
+            for item in arr {
+                let name = item["name"].as_str().unwrap_or("?").to_string();
+                let current = item["version"].as_str().unwrap_or("?").to_string();
+                let latest = item["latest_version"].as_str().unwrap_or("?").to_string();
+                result.outdated.push(PackageInfo {
+                    name,
+                    current,
+                    latest,
+                });
+            }
+        }
+    }
+}
+
+async fn pipenv_outdated(dir: &Path, result: &mut ScanResult) {
+    if !which("pipenv") {
+        return;
+    }
+    if let Ok(out) = run_cmd_in(
+        dir,
+        "pipenv",
+        &["run", "pip", "list", "--outdated", "--format=json"],
+    )
+    .await
+    {
+        parse_pip_outdated(&out, result);
+    }
+}
+
+async fn pip_venv_outdated(dir: &Path, result: &mut ScanResult) {
+    let dot_venv = dir.join(".venv").join("bin").join("pip");
+    let venv = dir.join("venv").join("bin").join("pip");
+    let pip_cmd = if dot_venv.exists() {
+        Some(dot_venv)
+    } else if venv.exists() {
+        Some(venv)
+    } else {
+        None
+    };
+
+    if let Some(pip) = pip_cmd {
+        if let Ok(out) = run_cmd_in(
+            dir,
+            pip.to_str().unwrap_or("pip"),
+            &["list", "--outdated", "--format=json"],
+        )
+        .await
+        {
+            parse_pip_outdated(&out, result);
+        }
+    } else {
+        let cmd = if which("pip3") {
+            "pip3"
+        } else if which("pip") {
+            "pip"
+        } else {
+            return;
+        };
+        if let Ok(out) = run_cmd_in(dir, cmd, &["list", "--outdated", "--format=json"]).await {
+            parse_pip_outdated(&out, result);
+        }
+    }
+}
+
 pub async fn scan() -> ScanResult {
     let project_path = crate::config::load_config()
         .project_path
@@ -146,6 +300,10 @@ pub async fn scan() -> ScanResult {
         "yarn" => yarn_outdated(&project_path, &mut result).await,
         "bun" => bun_outdated(&project_path, &mut result).await,
         "deno" => deno_outdated(&project_path, &mut result).await,
+        "cargo" => cargo_outdated(&project_path, &mut result).await,
+        "poetry" => poetry_outdated(&project_path, &mut result).await,
+        "pipenv" => pipenv_outdated(&project_path, &mut result).await,
+        "requirements" => pip_venv_outdated(&project_path, &mut result).await,
         _ => {}
     }
 

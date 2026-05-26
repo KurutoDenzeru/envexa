@@ -549,12 +549,14 @@ fn detail_table_constraints(width: u16, kind: &str) -> Vec<Constraint> {
             Constraint::Min(30),
         ],
         "cleanup" if width < 80 => vec![
+            Constraint::Length(6),
             Constraint::Length(10),
             Constraint::Min(16),
             Constraint::Length(8),
             Constraint::Min(12),
         ],
         _ => vec![
+            Constraint::Length(6),
             Constraint::Length(12),
             Constraint::Min(24),
             Constraint::Length(10),
@@ -1953,7 +1955,7 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         return;
     }
 
-    let header_cells = ["Category ", "Description ", "Size ", "Command "]
+    let header_cells = ["", "Category ", "Description ", "Size ", "Command "]
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
@@ -1965,9 +1967,17 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         .enumerate()
         .map(|(i, c)| {
             let sel = i == app.detail_selection;
+            let checked = app.detail_checked.contains(&i);
+            let cb = if checked { "[x]" } else { "[ ]" };
+            let indicator = if sel {
+                format!("{cb}\u{25b8}")
+            } else {
+                format!("{cb} ")
+            };
             let size = c.size.as_deref().unwrap_or("-");
             let cmd = c.command.as_deref().unwrap_or("-");
             let mut row = Row::new(vec![
+                Cell::from(indicator),
                 Cell::from(c.category.as_str()),
                 Cell::from(c.description.as_str()),
                 Cell::from(size),

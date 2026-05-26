@@ -114,7 +114,7 @@ impl App {
                         KeyCode::Char(' ')
                             if !matches!(
                                 self.detail_key.as_deref(),
-                                Some("security") | Some("audit") | Some("cleanup")
+                                Some("security") | Some("audit")
                             ) =>
                         {
                             if self.detail_checked.contains(&self.detail_selection) {
@@ -124,13 +124,16 @@ impl App {
                             }
                         }
                         KeyCode::Char(' ') => {}
-                        KeyCode::Char('y') | KeyCode::Char('Y')
-                            if !matches!(
-                                self.detail_key.as_deref(),
-                                Some("security") | Some("audit") | Some("cleanup")
-                            ) =>
-                        {
-                            self.do_detail_updates(&mut terminal)?;
+                        KeyCode::Char('y') | KeyCode::Char('Y') => {
+                            match self.detail_key.as_deref() {
+                                Some("cleanup") => {
+                                    self.do_detail_cleanups(&mut terminal)?;
+                                }
+                                Some("security") | Some("audit") => {}
+                                _ => {
+                                    self.do_detail_updates(&mut terminal)?;
+                                }
+                            }
                         }
                         KeyCode::Char('e') | KeyCode::Char('E') => {
                             self.export_detail_report();
@@ -333,6 +336,90 @@ impl App {
         let result = handle.join().unwrap();
         self.detail_message = result;
         self.view = View::PackageDetail;
+        Ok(())
+    }
+
+    fn do_detail_cleanups(
+        &mut self,
+        terminal: &mut DefaultTerminal,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let work: Vec<CleanupItem> = self
+            .detail_cleanup
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| self.detail_checked.contains(i))
+            .map(|(_, item)| item.clone())
+            .collect();
+        self.detail_checked.clear();
+        if work.is_empty() {
+            return Ok(());
+        }
+
+        self.view = View::Updating;
+        self.progress_counter = 0;
+
+        let handle = std::thread::spawn(move || {
+            let mut cleaned = 0usize;
+            let mut failed = 0usize;
+            let mut errors = vec![];
+            for item in &work {
+                if let Some(ref cmd_str) = item.command {
+                    let mut command = std::process::Command::new("sh");
+                    command.arg("-c").arg(cmd_str);
+                    match command.output() {
+                        Ok(output) if output.status.success() => cleaned += 1,
+                        Ok(output) => {
+                            failed += 1;
+                            let err_msg =
+                                String::from_utf8_lossy(&output.stderr).trim().to_string();
+                            errors.push(format!("{}: {}", item.description, err_msg));
+                        }
+                        Err(e) => {
+                            failed += 1;
+                            errors.push(format!("{}: {}", item.description, e));
+                        }
+                    }
+                } else {
+                    failed += 1;
+                    errors.push(format!("{}: no command configured", item.description));
+                }
+            }
+            if errors.is_empty() {
+                format!("\u{2714} Successfully cleaned up {cleaned} item(s)")
+            } else {
+                let e = errors.join("; ");
+                format!("\u{2714} Cleaned up {cleaned} | \u{2716} Failed {failed}: {e}")
+            }
+        });
+
+        loop {
+            terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
+            self.throbber_state.calc_next();
+            self.progress_counter += 1;
+            if handle.is_finished() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+
+        let result = handle.join().unwrap();
+        self.detail_message = result;
+        self.view = View::PackageDetail;
+
+        if let Some(ref mut report) = self.report {
+            let rt_handle = tokio::runtime::Handle::current();
+            if let Some(res) = rt_handle.block_on(async { toolchains::scan_one("cleanup").await }) {
+                report.results.insert("cleanup".to_string(), res);
+            }
+        }
+
+        if let Some(ref mut report) = self.report {
+            if let Some(res) = report.results.get("cleanup") {
+                self.detail_cleanup = scanner::extract_cleanup_items(res).to_vec();
+            }
+        }
+
+        self.clamp_selection();
         Ok(())
     }
 
