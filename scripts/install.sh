@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${ENVEXA_VERSION:-v1.0.1}"
+VERSION="${ENVEXA_VERSION:-v1.1.0}"
 REPO="KurutoDenzeru/envexa"
 
 die() {

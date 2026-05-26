@@ -87,12 +87,12 @@ async fn self_update() {
 
     let os = std::env::consts::OS;
     let arch = std::env::consts::ARCH;
-    let target = match (os, arch) {
-        ("macos", "aarch64") => "aarch64-apple-darwin",
-        ("macos", "x86_64") => "x86_64-apple-darwin",
-        ("linux", "aarch64") => "aarch64-unknown-linux-gnu",
-        ("linux", "x86_64") => "x86_64-unknown-linux-gnu",
-        ("windows", "x86_64") => "x86_64-pc-windows-msvc",
+    match (os, arch) {
+        ("macos", "aarch64")
+        | ("macos", "x86_64")
+        | ("linux", "aarch64")
+        | ("linux", "x86_64")
+        | ("windows", "x86_64") => {}
         _ => {
             eprintln!("Unsupported platform: {os}-{arch}");
             return;
@@ -100,7 +100,7 @@ async fn self_update() {
     };
 
     let ext = if os == "windows" { ".exe" } else { "" };
-    let asset_name = format!("envexa-{target}{ext}");
+    let asset_name = format!("envexa-{arch}-{os}{ext}");
     let download_url =
         format!("https://github.com/KurutoDenzeru/envexa/releases/download/{tag}/{asset_name}");
 
@@ -116,7 +116,7 @@ async fn self_update() {
             ]
         } else {
             vec![
-                "-sLo".into(),
+                "-fsLo".into(),
                 tmp.to_string_lossy().to_string(),
                 download_url.clone(),
             ]
@@ -126,7 +126,7 @@ async fn self_update() {
     match status {
         Ok(s) if s.success() => {}
         _ => {
-            eprintln!("Failed to download binary for {target}");
+            eprintln!("Failed to download binary {asset_name}");
             eprintln!("Download manually: {download_url}");
             return;
         }
