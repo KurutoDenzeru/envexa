@@ -2,6 +2,23 @@ use std::collections::HashMap;
 
 use crate::toolchains::{AuditItem, CleanupItem, ScanResult, VulnerabilityInfo};
 
+fn visible_len(s: &str) -> usize {
+    let mut len = 0;
+    let mut in_ansi = false;
+    for c in s.chars() {
+        if c == '\x1b' {
+            in_ansi = true;
+        } else if in_ansi {
+            if c == 'm' {
+                in_ansi = false;
+            }
+        } else {
+            len += 1;
+        }
+    }
+    len
+}
+
 struct Table {
     headers: Vec<String>,
     rows: Vec<Vec<String>>,
@@ -31,43 +48,51 @@ impl Table {
 
         let mut widths = vec![0usize; ncols];
         for (i, h) in self.headers.iter().enumerate() {
-            widths[i] = widths[i].max(h.len());
+            widths[i] = widths[i].max(visible_len(h));
         }
         for row in &self.rows {
             for (i, cell) in row.iter().enumerate() {
                 if i < ncols {
-                    widths[i] = widths[i].max(cell.len());
+                    widths[i] = widths[i].max(visible_len(cell));
                 }
             }
         }
 
-        let sep_body: Vec<String> = widths.iter().map(|w| "-".repeat(w + 2)).collect();
-        let sep = format!("+{}+", sep_body.join("+"));
+        let top_sep_parts: Vec<String> = widths.iter().map(|w| "─".repeat(w + 2)).collect();
+        let top_border = format!("╭{}╮", top_sep_parts.join("┬"));
+
+        let mid_sep_parts: Vec<String> = widths.iter().map(|w| "─".repeat(w + 2)).collect();
+        let mid_border = format!("├{}┤", mid_sep_parts.join("┼"));
+
+        let bot_sep_parts: Vec<String> = widths.iter().map(|w| "─".repeat(w + 2)).collect();
+        let bot_border = format!("╰{}╯", bot_sep_parts.join("┴"));
 
         let fmt = |cells: &[String]| -> String {
-            let mut s = String::from("|");
+            let mut s = String::from("│");
             for (i, cell) in cells.iter().enumerate() {
                 if let Some(&w) = widths.get(i) {
-                    s.push_str(&format!(" {:<w$} |", cell, w = w));
+                    let vlen = visible_len(cell);
+                    let padding = w.saturating_sub(vlen);
+                    s.push_str(&format!(" {}{} │", cell, " ".repeat(padding)));
                 } else {
-                    s.push_str(&format!(" {} |", cell));
+                    s.push_str(&format!(" {} │", cell));
                 }
             }
             s
         };
 
         let mut out = String::new();
-        out.push_str(&sep);
+        out.push_str(&top_border);
         out.push('\n');
         out.push_str(&fmt(&self.headers));
         out.push('\n');
-        out.push_str(&sep);
+        out.push_str(&mid_border);
         out.push('\n');
         for row in &self.rows {
             out.push_str(&fmt(row));
             out.push('\n');
         }
-        out.push_str(&sep);
+        out.push_str(&bot_border);
         out
     }
 }
@@ -239,6 +264,40 @@ pub fn first_version(res: &ScanResult) -> String {
     String::new()
 }
 
+pub fn cli_status_label(s: &str) -> String {
+    let raw = status_label(s);
+    match s {
+        "ok" => format!("\x1b[32m{}\x1b[0m", raw),
+        "warning" => format!("\x1b[33m{}\x1b[0m", raw),
+        "error" => format!("\x1b[31m{}\x1b[0m", raw),
+        "skipped" => format!("\x1b[90m{}\x1b[0m", raw),
+        _ => raw.to_string(),
+    }
+}
+
+pub fn cli_severity(sev: &str) -> String {
+    let upper = sev.to_uppercase();
+    if upper.contains("CRITICAL") {
+        format!("\x1b[1;31m{}\x1b[0m", sev)
+    } else if upper.contains("HIGH") {
+        format!("\x1b[31m{}\x1b[0m", sev)
+    } else if upper.contains("MEDIUM") || upper.contains("MODERATE") {
+        format!("\x1b[33m{}\x1b[0m", sev)
+    } else if upper.contains("LOW") {
+        format!("\x1b[34m{}\x1b[0m", sev)
+    } else {
+        sev.to_string()
+    }
+}
+
+pub fn cli_green(s: &str) -> String {
+    format!("\x1b[32m{}\x1b[0m", s)
+}
+
+pub fn cli_yellow(s: &str) -> String {
+    format!("\x1b[33m{}\x1b[0m", s)
+}
+
 pub fn format_report(report: &Report) -> String {
     let results = &report.results;
     let mut lines = vec![];
@@ -275,9 +334,9 @@ pub fn format_report(report: &Report) -> String {
     for tool in &tool_order() {
         if let Some(res) = results.get(*tool) {
             let display = display_name(tool);
-            let label = status_label(&res.status);
+            let label = cli_status_label(&res.status);
             let ver = first_version(res);
-            dt.add_row(&[display, label, &ver]);
+            dt.add_row(&[display, &label, &ver]);
         }
     }
     lines.push(dt.render());
@@ -291,7 +350,9 @@ pub fn format_report(report: &Report) -> String {
             if let Some(items) = outdated_all.get(tool) {
                 let display = display_name(tool);
                 for item in items {
-                    ot.add_row(&[display, &item.name, &item.current, &item.latest]);
+                    let cur = cli_yellow(&item.current);
+                    let lat = cli_green(&item.latest);
+                    ot.add_row(&[display, &item.name, &cur, &lat]);
                 }
             }
         }
@@ -307,7 +368,9 @@ pub fn format_report(report: &Report) -> String {
             if let Some(items) = vuln_all.get(tool) {
                 let display = display_name(tool);
                 for v in items {
-                    vt.add_row(&[display, &v.package, &v.severity, &v.patched_version]);
+                    let sev = cli_severity(&v.severity);
+                    let patched = cli_green(&v.patched_version);
+                    vt.add_row(&[display, &v.package, &sev, &patched]);
                 }
             }
         }
@@ -323,7 +386,8 @@ pub fn format_report(report: &Report) -> String {
             if let Some(items) = audit_all.get(tool) {
                 let display = display_name(tool);
                 for a in items {
-                    at.add_row(&[display, &a.name, &a.current, &a.note]);
+                    let cur = cli_yellow(&a.current);
+                    at.add_row(&[display, &a.name, &cur, &a.note]);
                 }
             }
         }
@@ -356,7 +420,7 @@ pub fn format_report(report: &Report) -> String {
 
     for tool in &tool_order() {
         if let Some(res) = results.get(*tool) {
-            let label = status_label(&res.status);
+            let label = cli_status_label(&res.status);
             let display = display_name(tool);
             lines.push(format!("### [{label}] {display}"));
 
@@ -424,7 +488,9 @@ pub fn format_report(report: &Report) -> String {
                 let mut pt = Table::new();
                 pt.header(&["Package", "Current", "Latest"]);
                 for item in &outdated_items {
-                    pt.add_row(&[&item.name, &item.current, &item.latest]);
+                    let cur = cli_yellow(&item.current);
+                    let lat = cli_green(&item.latest);
+                    pt.add_row(&[&item.name, &cur, &lat]);
                 }
                 lines.push(pt.render());
             }
@@ -434,7 +500,9 @@ pub fn format_report(report: &Report) -> String {
                 let mut vt = Table::new();
                 vt.header(&["Package", "Severity", "Patched"]);
                 for v in &res.vulnerabilities {
-                    vt.add_row(&[&v.package, &v.severity, &v.patched_version]);
+                    let sev = cli_severity(&v.severity);
+                    let patched = cli_green(&v.patched_version);
+                    vt.add_row(&[&v.package, &sev, &patched]);
                 }
                 lines.push(vt.render());
             }
@@ -480,11 +548,15 @@ pub fn format_status(report: &Report) -> String {
     t.header(&["Toolchain", "Status", "Count"]);
     for tool in &tool_order() {
         if let Some(res) = results.get(*tool) {
-            let label = status_label(&res.status);
+            let label = cli_status_label(&res.status);
             let n = extract_outdated(res).len();
-            let count = if n > 0 { n.to_string() } else { "-".into() };
+            let count = if n > 0 {
+                cli_yellow(&n.to_string())
+            } else {
+                "-".into()
+            };
             let display = display_name(tool);
-            t.add_row(&[display, label, &count]);
+            t.add_row(&[display, &label, &count]);
         }
     }
     lines.push(t.render());
@@ -516,7 +588,9 @@ pub fn format_outdated(report: &Report) -> String {
                 has_anything = true;
                 let display = display_name(tool);
                 for item in &items {
-                    t.add_row(&[display, &item.name, &item.current, &item.latest]);
+                    let cur = cli_yellow(&item.current);
+                    let lat = cli_green(&item.latest);
+                    t.add_row(&[display, &item.name, &cur, &lat]);
                 }
             }
         }

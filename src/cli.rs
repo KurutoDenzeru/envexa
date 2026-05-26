@@ -1,4 +1,6 @@
 use clap::Parser;
+use std::io::Write;
+use std::time::Instant;
 
 use crate::config;
 use crate::scanner::{self, Report};
@@ -29,6 +31,40 @@ enum Commands {
     Update,
 }
 
+pub async fn with_spinner<F, T>(label: &str, future: F) -> T
+where
+    F: std::future::Future<Output = T>,
+{
+    let label = label.to_string();
+    let (tx, mut rx) = tokio::sync::oneshot::channel::<()>();
+
+    let spinner_task = tokio::spawn(async move {
+        let chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+        let mut idx = 0;
+        let start = Instant::now();
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(80));
+
+        loop {
+            tokio::select! {
+                _ = &mut rx => break,
+                _ = interval.tick() => {
+                    let elapsed = start.elapsed().as_secs_f64();
+                    eprint!("\r\x1b[2K\x1b[36m{}\x1b[0m {} ({:.1}s)", chars[idx], label, elapsed);
+                    let _ = std::io::stderr().flush();
+                    idx = (idx + 1) % chars.len();
+                }
+            }
+        }
+        eprint!("\r\x1b[2K");
+        let _ = std::io::stderr().flush();
+    });
+
+    let res = future.await;
+    let _ = tx.send(());
+    let _ = spinner_task.await;
+    res
+}
+
 pub async fn run() -> Result<(), anyhow::Error> {
     let cli = Cli::parse();
     match cli.command {
@@ -44,7 +80,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn run_cmd(cmd: Commands) -> Result<(), anyhow::Error> {
     match cmd {
         Commands::Scan { ttl } => {
-            let results = toolchains::scan_all().await;
+            let results = with_spinner("Scanning toolchains...", toolchains::scan_all()).await;
             let report = Report {
                 timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
                 results,
@@ -69,7 +105,7 @@ async fn run_cmd(cmd: Commands) -> Result<(), anyhow::Error> {
 }
 
 async fn self_update() {
-    let tag = match fetch_latest_tag().await {
+    let tag = match with_spinner("Checking for updates...", fetch_latest_tag()).await {
         Some(t) => t,
         None => {
             eprintln!("Failed to check for updates. Try manually: https://github.com/KurutoDenzeru/envexa/releases");
@@ -107,29 +143,35 @@ async fn self_update() {
     let current = std::env::current_exe().unwrap_or_default();
     let tmp = current.with_extension("tmp");
 
-    let status = std::process::Command::new(if cfg!(windows) { "powershell" } else { "curl" })
-        .args(if cfg!(windows) {
-            vec![
-                "-OutFile".into(),
-                tmp.to_string_lossy().to_string(),
-                download_url.clone(),
-            ]
-        } else {
-            vec![
-                "-fsLo".into(),
-                tmp.to_string_lossy().to_string(),
-                download_url.clone(),
-            ]
-        })
-        .status();
+    let cmd_url = download_url.clone();
+    let cmd_tmp = tmp.clone();
+    let status = with_spinner(
+        "Downloading latest release...",
+        tokio::task::spawn_blocking(move || {
+            std::process::Command::new(if cfg!(windows) { "powershell" } else { "curl" })
+                .args(if cfg!(windows) {
+                    vec![
+                        "-OutFile".into(),
+                        cmd_tmp.to_string_lossy().to_string(),
+                        cmd_url,
+                    ]
+                } else {
+                    vec![
+                        "-fsLo".into(),
+                        cmd_tmp.to_string_lossy().to_string(),
+                        cmd_url,
+                    ]
+                })
+                .status()
+        }),
+    )
+    .await;
 
-    match status {
-        Ok(s) if s.success() => {}
-        _ => {
-            eprintln!("Failed to download binary {asset_name}");
-            eprintln!("Download manually: {download_url}");
-            return;
-        }
+    let download_success = matches!(status, Ok(Ok(s)) if s.success());
+    if !download_success {
+        eprintln!("Failed to download binary {asset_name}");
+        eprintln!("Download manually: {download_url}");
+        return;
     }
 
     if !tmp.exists() {

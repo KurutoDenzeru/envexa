@@ -1,8 +1,8 @@
 # 🚧 Envexa
 
-**Envexa is a Rust TUI for checking local developer tooling health.** It scans system runtimes, package managers, project dependencies, security advisories, version alignment, and cleanup opportunities from one terminal dashboard.
+**Envexa** is a blazing-fast Rust TUI and CLI for monitoring local developer tooling health. It consolidates scans of system runtimes, package managers, project dependencies, security advisories, version alignment, and disk cleanup opportunities into a single terminal dashboard.
 
-Envexa is built for fast local checks before work, before commits, or when a machine starts to drift. Run it with no args for the interactive TUI, or use `envexa scan` for scriptable Markdown output.
+Built with performance in mind, Envexa helps you spot drift, security risks, and dependency lag before you commit. Run it interactively as a TUI, or run `envexa scan` to generate structured Markdown reports for scripts or CI.
 
 ## 📚 Table of Contents
 
@@ -25,12 +25,12 @@ Envexa is built for fast local checks before work, before commits, or when a mac
 
 ## ✨ Highlights
 
-- Concurrent scanner for 14 toolchains using `tokio::join!`.
-- Interactive `ratatui` dashboard with status pie chart, readiness gauges, barcharts, tables, tabs, and animated scan/update states.
-- Dedicated Project Tooling sector for Project, Security, Audit, and Cleanup signals.
-- CLI report mode for automation, logs, or issue comments.
-- Self-update command for macOS release binaries.
-- File-backed cache at `~/.envexa/cache.json` so the TUI can open with recent data instantly.
+- **Concurrent Engine**: Scans 14+ toolchains in parallel using `tokio::join!`.
+- **Interactive TUI**: Implements a highly responsive `ratatui` dashboard featuring custom pie charts, health gauges, real-time activity spinners, and keyboard shortcuts.
+- **Project Tooling Sector**: Dedicated checks for project dependencies, security vulnerabilities, environmental alignment, and cache-clearing opportunities.
+- **Scriptable CLI**: Generates production-ready Markdown reports with a single `scan` command.
+- **Instant Launch**: Utilizes a JSON-backed local cache (`~/.envexa/cache.json`) to render previous scan states instantly.
+- **Zero-Friction Updates**: Integrates a self-update pipeline for native macOS binaries directly from GitHub Releases.
 
 ---
 
@@ -42,15 +42,17 @@ Envexa is built for fast local checks before work, before commits, or when a mac
 curl -fsSL https://raw.githubusercontent.com/KurutoDenzeru/envexa/main/scripts/install.sh | bash
 ```
 
-The installer places `envexa` in `~/.local/bin`.
+The script automatically detects your architecture, downloads the latest release binary, and installs it to `~/.local/bin`.
 
 ### Build from source
+
+Requires Rust and Cargo:
 
 ```bash
 git clone https://github.com/KurutoDenzeru/envexa.git
 cd envexa
 cargo build --release
-./target/release/envexa
+cp target/release/envexa ~/.local/bin/
 ```
 
 ---
@@ -58,72 +60,70 @@ cargo build --release
 ## 🚀 Usage
 
 ```bash
-envexa             # launch interactive TUI
-envexa scan        # print full health report to stdout
-envexa update      # self-update from latest GitHub release
-envexa --help      # print CLI help
+envexa             # Launch the interactive TUI dashboard
+envexa scan        # Generate and print a comprehensive markdown report
+envexa update      # Check and install the latest GitHub release
+envexa --help      # Print command-line options
 ```
 
-Run Envexa from the project directory you want to inspect. To scan another path, set `project_path` in `~/.envexa/config.json`.
+Run `envexa` inside any local project directory to inspect its tooling status. You can customize the default search path in `~/.envexa/config.json`.
 
 ---
 
 ## 🖥️ TUI
 
-The dashboard follows a dev-monitoring layout: summary visuals on the left, actionable tables on the right, and keyboard shortcuts in the footer.
+The dashboard features a classic developer-monitoring interface: key metric visualizations on the left, interactive data tables on the right, and shortcut guides at the footer.
 
-| Area | Purpose |
-|------|---------|
-| Overview | Pass/warn/fail/skip distribution pie chart |
-| Project Tooling | Project readiness gauge, risk score, vulnerability/audit/package barchart |
-| Health line | Overall health ratio, outdated count, cache age |
-| Category tables | System, Web Development, and Project Tooling scanner rows |
-| Outdated tab | Package update queue with checkbox selection |
-| Detail views | Per-toolchain outdated, vulnerability, audit, and cleanup records |
+| Component | Function |
+| :--- | :--- |
+| **Overview** | Status distribution (pass/warning/error/skipped) as an interactive pie chart. |
+| **Project Tooling** | Live readiness gauge, aggregate risk score, and vulnerability/audit/package distribution. |
+| **Health Stats** | Core metrics line displaying system health ratios, outdated package count, and cache age. |
+| **Category Tables** | Organized rows for System, Web Development, and Project Tooling packages. |
+| **Outdated Tab** | Centralized package update queues supporting individual selection. |
+| **Details Pane** | Complete outputs for individual toolchains, security advisories, audits, and cleanup paths. |
 
 ### Keybindings
 
 | Key | Action |
-|-----|--------|
-| `S` | Scan all toolchains |
-| `O` | Open Outdated tab |
-| `Enter` | Open selected dashboard row detail |
-| `/` | Search/filter current view |
-| `Left` / `Right` | Switch tabs |
-| `Up` / `Down` | Navigate rows |
-| `Space` | Toggle package selection where updates are supported |
-| `Y` | Update selected packages in a package detail view |
-| `U` | Update checked packages from Outdated tab |
-| `Esc` / `H` | Return to dashboard |
-| `Q` / `Ctrl+C` | Quit |
+| :--- | :--- |
+| `S` | Trigger immediate concurrent scan |
+| `O` | Switch to the Outdated packages tab |
+| `Enter` | Expand detail pane for the selected dashboard row |
+| `/` | Initiate active search/filtering on the current view |
+| `Left` / `Right` | Navigate between primary tabs |
+| `Up` / `Down` | Browse rows in tables |
+| `Space` | Toggle selection for packages supporting updates |
+| `Y` | Apply updates for selected package in the detail view |
+| `U` | Run batch updates for all selected packages on the Outdated tab |
+| `Esc` / `H` | Return to the dashboard home view |
+| `Q` / `Ctrl+C` | Quit Envexa |
 
 ### Search
 
-Press `/` to filter:
+Press `/` to instantly filter views:
+- **Dashboard**: Filter by toolchain or category name.
+- **Outdated**: Filter by package name, toolchain source, or type.
 
-- Dashboard: toolchain names.
-- Outdated: toolchain, package name, or source type.
-
-Press `Esc` to clear the filter. Press `Enter` to keep the filter active.
+Press `Esc` to clear search or `Enter` to lock the filter in place.
 
 ---
 
 ## 🧰 Project Tooling Sector
 
-Project Tooling is the local project lens inside Envexa.
+The Project Tooling sector provides a specialized local lens into your active project.
 
-| Scanner | What it checks |
-|---------|----------------|
-| ✨ Project | Detects lockfiles and runs the matching package manager outdated check |
-| 🔐 Security | Runs available security audit tools across JavaScript, Rust, and Python ecosystems |
-| 🧪 Audit | Checks runtime/tool version alignment such as Node/npm, Python/pip, and rustc/Cargo |
-| 🧹 Cleanup | Finds reclaimable package-manager and Docker cache space |
+| Scanner | Target Scope |
+| :--- | :--- |
+| ✨ **Project** | Scans lockfiles (package.json, Cargo.toml, poetry.lock, etc.) and performs dependency drift analysis. |
+| 🔐 **Security** | Audits dependencies using language-specific advisory databases (Rust Sec, npm audit, pip-audit). |
+| 🧪 **Audit** | Validates runtime parity across toolsets (e.g., verifying Node, npm, Python, pip, and Rust compiler alignment). |
+| 🧹 **Cleanup** | Identifies local package caches, build artifacts, and Docker caches that can be safely reclaimed. |
 
-The TUI summarizes this sector with:
-
-- Readiness gauge based on dependency drift, vulnerability severity, and audit findings.
-- Signal barchart for outdated project packages, critical/high/moderate/other vulnerabilities, and audit items.
-- Focus labels that show the strongest next action instead of generic issue text.
+Envexa compiles these signals into:
+- A dynamic **Readiness Gauge** mapping dependency risk, warning levels, and unpatched security issues.
+- A **Signal Bar Chart** categorizing outdated packages and security vulnerabilities by severity.
+- Clear, actionable focus logs pointing you to the most critical next remediation step.
 
 ---
 
@@ -131,68 +131,67 @@ The TUI summarizes this sector with:
 
 ### 🖥️ System & Runtime
 
-| Toolchain | Checks |
-|-----------|--------|
-| Homebrew | Version, installed formula count, outdated formulae/casks |
-| pip | Python/pip version and outdated packages |
-| Gem | Ruby version and outdated gems |
-| Cargo | rustc/Cargo versions and optional `cargo-outdated` results |
-| Docker | CLI/daemon availability, disk usage, image/container cleanup signals |
+| Toolchain | Monitored Metrics |
+| :--- | :--- |
+| **Homebrew** | Version status, formula counts, and outdated global formulae/casks. |
+| **pip** | Python & pip compiler versions along with globally outdated packages. |
+| **Gem** | Ruby & gem environment version states and outdated global gems. |
+| **Cargo** | rustc/Cargo compiler drift and target-specific outdated binaries. |
+| **Docker** | Engine/Daemon availability, storage footprint, and system cleanup opportunities. |
 
 ### 🌐 Web Development
 
-| Toolchain | Checks |
-|-----------|--------|
-| npm | Node/npm version and global package drift |
-| pnpm | Node/pnpm version and global package drift |
-| Yarn | Availability and version signal |
-| Bun | Bun version and global package drift |
-| Deno | Deno version and outdated package signal |
+| Toolchain | Monitored Metrics |
+| :--- | :--- |
+| **npm** | Node & npm local execution checks, plus global package drift tracking. |
+| **pnpm** | Node & pnpm integration checks, plus global package drift tracking. |
+| **Yarn** | Node & Yarn package manager availability and version diagnostics. |
+| **Bun** | Bun runtime availability and global npm package alignment. |
+| **Deno** | Deno engine versions and outdated package diagnostics. |
 
 ---
 
 ## 📄 CLI Report
 
+Run a complete, non-interactive scan directly in standard output:
+
 ```bash
 envexa scan
 ```
 
-`scan` prints a Markdown report with:
+The CLI prints a structured Markdown document including:
+- High-level system health dashboard
+- Complete outdated package queue
+- Categorized security vulnerabilities
+- Core runtime version audit findings
+- Actionable disk cleanup suggestions
 
-- Dashboard status table.
-- Outdated package table.
-- Vulnerability table.
-- Audit findings.
-- Cleanup recommendations.
-- Per-toolchain details.
-
-Use it for logs, CI notes, or PR comments when you need a plain text artifact.
+Perfect for generating PR comments, build logs, and environment documentation in automated environments.
 
 ---
 
 ## 🗄️ Cache
 
-Envexa caches scan data at:
+Envexa stores scan history to accelerate launch times:
 
 ```text
 ~/.envexa/cache.json
 ```
 
-Default cache TTL is 7 days. The TUI reads cached results on launch and refreshes when you press `S`.
+Cached results have a default TTL of 7 days. On startup, Envexa instantly visualizes cached data and schedules non-blocking background checks or manual scans via the `S` key.
 
 ---
 
 ## 🧑‍💻 Development
 
 ```bash
-cargo build
-cargo run
-cargo run -- scan
-cargo run -- --help
+cargo build         # Compile debug build
+cargo run           # Launch interactive TUI in terminal
+cargo run -- scan   # Run CLI report mode
+cargo run -- --help # Print help instructions
 ```
 
-Optional fast loop:
-
+For live reloading check:
 ```bash
 cargo install cargo-watch
 cargo watch -x check
@@ -206,7 +205,7 @@ cargo clippy -- -D warnings
 cargo fmt --check
 ```
 
-For TUI work, also launch `cargo run` in a real terminal and verify scan, navigation, search, detail views, and quit behavior.
+*Note: For TUI changes, run `cargo run` in a full-sized terminal to manually verify layouts, detail scrolls, navigation, and exit states.*
 
 ---
 
@@ -216,17 +215,17 @@ For TUI work, also launch `cargo run` in a real terminal and verify scan, naviga
 envexa/
 ├── Cargo.toml
 ├── src/
-│   ├── main.rs             # no args = TUI, args = CLI
-│   ├── cli.rs              # scan/update/help dispatch
-│   ├── config.rs           # cache/config persistence
+│   ├── main.rs             # Application entrypoint (TUI or CLI router)
+│   ├── cli.rs              # CLI command parser and runner
+│   ├── config.rs           # Persistent configurations and cached state
 │   ├── scanner/
-│   │   └── mod.rs          # report formatting and extraction helpers
+│   │   └── mod.rs          # Formatting utilities and diagnostic extraction
 │   ├── tui/
-│   │   ├── app.rs          # app state, events, scan/update actions
+│   │   ├── app.rs          # App state management, keyboard events, and scheduler
 │   │   ├── mod.rs
-│   │   └── ui.rs           # ratatui render functions and widgets
+│   │   └── ui.rs           # Ratatui rendering pipeline and interface structures
 │   └── toolchains/
-│       ├── mod.rs          # ScanResult, protocol types, scan_all()
+│       ├── mod.rs          # ScanResult schema, protocols, and multi-thread runners
 │       ├── brew.rs
 │       ├── npm.rs / pnpm.rs / yarn.rs / bun.rs / deno.rs
 │       ├── pip.rs / gem.rs / cargo.rs / docker.rs
@@ -238,25 +237,27 @@ envexa/
     └── workflows/
 ```
 
-Scanner modules are intentionally small: one toolchain, one `pub async fn scan() -> ScanResult`, graceful skip on missing tools, and structured output for CLI/TUI reuse.
+Individual scanner modules are kept highly isolated. Each scanner implements a single `pub async fn scan() -> ScanResult` function, executes in parallel, and handles missing CLI tools gracefully to prevent crashes.
 
 ---
 
 ## 🎛️ Design Notes
 
-Envexa uses built-in `ratatui` widgets where they fit cleanly: `Table`, `Tabs`, `Gauge`, `LineGauge`, and `BarChart`. It also uses focused third-party widgets where they add clear value: `tui-piechart` for the overview chart and `throbber-widgets-tui` for scan/update activity.
+Envexa maximizes the use of built-in `ratatui` UI widgets (like `Table`, `Tabs`, `Gauge`, `LineGauge`, and `BarChart`) for a cohesive look. High-signal third-party integrations include:
+- `tui-piechart`: Renders the high-level category distribution on the dashboard.
+- `throbber-widgets-tui`: Powering animated spinners during live scanner activity.
 
-New TUI widgets should improve scan readability or action priority. Avoid decorative widgets that do not help users decide what to update, audit, or clean.
+All UI components should prioritize actionability. Only introduce widgets that directly assist a developer in resolving drift, securing packages, or reclaiming disk space.
 
 ---
 
 ## 🚢 Release
 
-Maintainers publish macOS binaries through GitHub Releases. For details on release notes formatting, templates, and logs, see [.github/ISSUE_TEMPLATE/RELEASES.md](.github/ISSUE_TEMPLATE/RELEASES.md).
+Binaries for macOS are built and published through GitHub Releases. For details on versioning guidelines and the release logs template, consult [.github/ISSUE_TEMPLATE/RELEASES.md](.github/ISSUE_TEMPLATE/RELEASES.md).
 
 ```bash
 cargo clean
-# bump Cargo.toml version, commit
+# Bump Cargo.toml version and commit changes
 git tag vX.Y.Z && git push origin vX.Y.Z
 gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."
 scripts/build-and-upload.sh vX.Y.Z
