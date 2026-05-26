@@ -122,7 +122,7 @@ Do not submit warnings, malformed CLI output, or broken TUI navigation.
 
 ## Release (maintainers)
 
-Envexa is macOS-only and built locally.
+Envexa is macOS-only and built locally. Refer to [.github/ISSUE_TEMPLATE/RELEASES.md](.github/ISSUE_TEMPLATE/RELEASES.md) for the release checklist, standard templates, and log format.
 
 ```bash
 cargo clean

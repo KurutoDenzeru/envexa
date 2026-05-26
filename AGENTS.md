@@ -102,6 +102,8 @@ Do not push if any of these produce warnings or malformed output. Fix first, the
 
 ## Release (macOS-only, built locally)
 
+Refer to [.github/ISSUE_TEMPLATE/RELEASES.md](.github/ISSUE_TEMPLATE/RELEASES.md) for the release checklist, standard templates, and log format.
+
 ```bash
 # 1. Clean build artifacts (safe — binaries live on GitHub Releases)
 cargo clean

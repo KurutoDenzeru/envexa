@@ -252,7 +252,7 @@ New TUI widgets should improve scan readability or action priority. Avoid decora
 
 ## 🚢 Release
 
-Maintainers publish macOS binaries through GitHub Releases:
+Maintainers publish macOS binaries through GitHub Releases. For details on release notes formatting, templates, and logs, see [.github/ISSUE_TEMPLATE/RELEASES.md](.github/ISSUE_TEMPLATE/RELEASES.md).
 
 ```bash
 cargo clean
