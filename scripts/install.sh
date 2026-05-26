@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${ENVEXA_VERSION:-v1.1.0}"
 REPO="KurutoDenzeru/envexa"
 
 die() {
     echo "Error: $*" >&2
     exit 1
+}
+
+fetch_latest_tag() {
+    curl -fsSL -H "User-Agent: envexa" \
+        "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null \
+        | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
+        | cut -d'"' -f4
 }
 
 detect_asset_name() {
@@ -30,10 +36,12 @@ detect_asset_name() {
 }
 
 main() {
-    local asset_name url install_dir bin_path
+    local version asset_name url install_dir bin_path
+
+    version="${ENVEXA_VERSION:-$(fetch_latest_tag)}"
 
     asset_name="$(detect_asset_name)" || die "cannot detect platform"
-    url="https://github.com/${REPO}/releases/download/${VERSION}/${asset_name}"
+    url="https://github.com/${REPO}/releases/download/${version}/${asset_name}"
     install_dir="${ENVEXA_INSTALL_DIR:-${HOME}/.local/bin}"
     bin_path="${install_dir}/envexa"
 
@@ -49,13 +57,18 @@ main() {
 
     mkdir -p "$install_dir"
 
-    echo "Downloading envexa ${VERSION} for ${asset_name}..."
+    echo "Downloading envexa ${version} for ${asset_name}..."
     curl -fsSL "$url" -o "$bin_path" || die "download failed (url: $url)"
+
+    if ! file "$bin_path" | grep -qE 'Mach-O|ELF'; then
+        rm "$bin_path"
+        die "downloaded file is not a valid binary (got HTML/redirect instead of release asset)"
+    fi
 
     chmod +x "$bin_path"
 
     echo ""
-    echo "envexa ${VERSION} installed to ${bin_path}"
+    echo "envexa ${version} installed to ${bin_path}"
     echo ""
     echo "Make sure ${install_dir} is in your PATH."
     echo "Run 'envexa' to start."

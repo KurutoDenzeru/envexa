@@ -143,6 +143,30 @@ async fn self_update() {
         let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755));
     }
 
+    #[cfg(unix)]
+    {
+        let file_out = std::process::Command::new("file")
+            .arg(&tmp)
+            .output()
+            .ok()
+            .and_then(|o| {
+                if o.status.success() {
+                    String::from_utf8(o.stdout).ok()
+                } else {
+                    None
+                }
+            });
+        match file_out {
+            Some(s) if s.contains("Mach-O") || s.contains("ELF") => {}
+            _ => {
+                let _ = std::fs::remove_file(&tmp);
+                eprintln!("Downloaded file is not a valid binary (corrupted or wrong URL)");
+                eprintln!("Download manually: {download_url}");
+                return;
+            }
+        }
+    }
+
     if std::fs::rename(&tmp, &current).is_err() {
         eprintln!("Failed to replace binary (try with elevated permissions)");
         let _ = std::fs::remove_file(&tmp);
