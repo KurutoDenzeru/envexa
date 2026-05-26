@@ -20,7 +20,7 @@
 | `cargo build` | Debug build |
 | `cargo build --release` | Optimized build |
 | `cargo run` | Launches interactive TUI (no args, TTY) |
-| `cargo run -- status` | CLI mode (args present) |
+| `cargo run -- scan` | CLI scan mode (args present) |
 | `cargo fmt` | Format all code |
 | `cargo clippy` | Lint check |
 | `cargo test` | Run tests |
@@ -55,7 +55,10 @@ cargo run -- --help       # CLI help
 - Input: `crossterm::event::read()` loop with `KeyCode` matching; `s`=scan, `o`=outdated, `h`/`Esc`=home, `q`=quit, `arrows`=navigate/switch tabs
 - Color convention: `ok`=green, `warning`=yellow, `error`=red, `skipped`=darkgray
 - Table navigation: `dashboard_selection` / `outdated_selection` tracked per view
-- ratatui widgets used: `Table` (dashboard/outdated), `Tabs` (tab bar), `Gauge` (scan progress), `Paragraph` (text), `Block` (borders/titles), `Row`/`Cell` (table data)
+- ratatui widgets used: `Table` (dashboard/outdated), `Tabs` (tab bar), `Gauge`/`LineGauge` (readiness/health), `BarChart` (tooling signal distribution), `Paragraph` (text), `Block` (borders/titles), `Row`/`Cell` (table data)
+- third-party widgets are allowed when they add clear scan readability; existing examples: `tui-piechart` for overview status distribution and `throbber-widgets-tui` for scan/update activity
+- Project Tooling dashboard should keep Project, Security, and Audit visible as first-class signals, not just generic issue rows
+- Layouts must degrade across terminal sizes: compact title under narrow widths, vertical dashboard under medium widths, minimal fallback for tiny terminals, and guarded rendering for third-party widgets when inner areas are too small
 - No obvious comments — explain *why*, not *what*
 - Conventional commits: `type(scope): description`
 - One logical change per commit, no `--no-verify`, no force push
@@ -91,6 +94,7 @@ CLI output verification — manually run and visually inspect:
 2. `cargo run -- scan` — full report printed to stdout
 3. `cargo run -- update` — update check message (no-op if latest)
 4. `cargo run` (no args, in terminal) — TUI launches, `S` triggers scan, `O` shows outdated, arrows navigate, `Q` quits
+5. Resize smoke test — run the TUI at narrow, medium, wide, and tiny terminal sizes; no panic, malformed layout, or broken terminal restore
 
 Do not push if any of these produce warnings or malformed output. Fix first, then push.
 
