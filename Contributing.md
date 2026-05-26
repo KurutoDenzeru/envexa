@@ -60,6 +60,7 @@ When changing the TUI, verify:
 - `Enter` opens detail rows with data.
 - Read-only details do not show update-only shortcuts.
 - `Q` exits cleanly.
+- Narrow, medium, wide, and tiny terminal sizes do not panic or leave the terminal in alternate screen mode.
 
 For visual widgets, prefer dense monitoring patterns: gauges for readiness, barcharts for signal distribution, tables for actionable rows, and focused color for status/severity.
 
