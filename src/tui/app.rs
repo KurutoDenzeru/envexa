@@ -500,18 +500,21 @@ impl App {
             None => return vec![],
         };
         let q = self.search_query.to_lowercase();
-        scanner::tool_order()
-            .iter()
-            .copied()
-            .filter(|tool| {
-                if q.is_empty() || !self.search_mode {
-                    return true;
+        let mut tools = vec![];
+        for cat in scanner::tool_categories() {
+            for tool in cat.tools {
+                let matches_search = if q.is_empty() || !self.search_mode {
+                    true
+                } else {
+                    let name = scanner::display_name(tool).to_lowercase();
+                    name.contains(&q) || tool.contains(&q)
+                };
+                if matches_search && report.results.contains_key(*tool) {
+                    tools.push(*tool);
                 }
-                let name = scanner::display_name(tool).to_lowercase();
-                name.contains(&q) || tool.contains(&q)
-            })
-            .filter(|tool| report.results.contains_key(*tool))
-            .collect()
+            }
+        }
+        tools
     }
 
     fn clamp_selection(&mut self) {
