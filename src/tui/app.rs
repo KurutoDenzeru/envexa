@@ -130,6 +130,9 @@ impl App {
                         {
                             self.do_detail_updates(&mut terminal)?;
                         }
+                        KeyCode::Char('e') | KeyCode::Char('E') => {
+                            self.export_detail_report();
+                        }
                         KeyCode::Down | KeyCode::Char('n') => {
                             let n = self.detail_len().saturating_sub(1);
                             self.detail_selection = self.detail_selection.saturating_add(1).min(n);
@@ -563,6 +566,65 @@ impl App {
         self.detail_cleanup.clear();
         self.detail_checked.clear();
         self.detail_message.clear();
+    }
+
+    pub fn export_detail_report(&mut self) {
+        let key = match self.detail_key.as_deref() {
+            Some(k) => k,
+            None => return,
+        };
+        let timestamp = self
+            .report
+            .as_ref()
+            .map(|r| r.timestamp.as_str())
+            .unwrap_or("Unknown");
+
+        let (filename, content) = match key {
+            "security" => {
+                let filename = "envexa_security_report.md";
+                let mut out = "# Envexa Security Vulnerability Report\n\n".to_string();
+                out.push_str(&format!("* **Generated**: {}\n", timestamp));
+                out.push_str(&format!(
+                    "* **Total Vulnerabilities**: {}\n\n",
+                    self.detail_vulns.len()
+                ));
+                out.push_str("| Package | Severity | CVE | Title | Patched In |\n");
+                out.push_str("| --- | --- | --- | --- | --- |\n");
+                for v in &self.detail_vulns {
+                    let cve = v.cve.as_deref().unwrap_or("-");
+                    out.push_str(&format!(
+                        "| {} | {} | {} | {} | {} |\n",
+                        v.package, v.severity, cve, v.title, v.patched_version
+                    ));
+                }
+                (filename, out)
+            }
+            "audit" => {
+                let filename = "envexa_audit_report.md";
+                let mut out = "# Envexa System & Toolchain Audit Report\n\n".to_string();
+                out.push_str(&format!("* **Generated**: {}\n", timestamp));
+                out.push_str(&format!(
+                    "* **Total Audit Issues**: {}\n\n",
+                    self.detail_audits.len()
+                ));
+                out.push_str("| Name | Current State | Note / Recommendation |\n");
+                out.push_str("| --- | --- | --- |\n");
+                for a in &self.detail_audits {
+                    out.push_str(&format!("| {} | {} | {} |\n", a.name, a.current, a.note));
+                }
+                (filename, out)
+            }
+            _ => return,
+        };
+
+        match std::fs::write(filename, content) {
+            Ok(_) => {
+                self.detail_message = format!("\u{2714} Exported to {}", filename);
+            }
+            Err(e) => {
+                self.detail_message = format!("\u{2716} Export failed: {}", e);
+            }
+        }
     }
 }
 

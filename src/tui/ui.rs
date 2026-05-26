@@ -1352,17 +1352,177 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         })
         .collect();
 
-    let table = Table::new(rows, detail_table_constraints(area.width, "security"))
-        .header(header)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!(" {tool} — Vulnerabilities ({}) ", items.len()))
-                .border_style(Style::default().fg(Color::Red)),
+    let bottom_msg = if !app.detail_message.is_empty() {
+        format!(
+            "  {}  |  [E] Export Report  [Esc] Back ",
+            app.detail_message
         )
-        .column_spacing(1);
+    } else {
+        "  [E] Export Report  |  [Esc] Back ".to_string()
+    };
 
-    frame.render_widget(table, area);
+    let table_block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(" {tool} — Vulnerabilities ({}) ", items.len()))
+        .title_bottom(bottom_msg)
+        .border_style(Style::default().fg(Color::Red));
+
+    // Responsive 2-column layout
+    if area.width >= 100 && area.height >= 8 {
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .split(area);
+
+        let left_area = chunks[0];
+        let right_area = chunks[1];
+
+        // Draw Left Table
+        let table = Table::new(rows, detail_table_constraints(left_area.width, "security"))
+            .header(header)
+            .block(table_block)
+            .column_spacing(1);
+        frame.render_widget(table, left_area);
+
+        // Draw Right Stats and Detail Panel
+        let right_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(7), Constraint::Min(1)])
+            .split(right_area);
+
+        // Right Top: Scorecard with line gauge
+        let (crit, high, mod_cnt, other) = severity_counts(items);
+        let score = 100_usize
+            .saturating_sub(crit * 25 + high * 10 + mod_cnt * 5)
+            .clamp(0, 100) as u16;
+        let score_color = if score >= 90 {
+            Color::Green
+        } else if score >= 70 {
+            Color::Yellow
+        } else {
+            Color::Red
+        };
+
+        let gauge = LineGauge::default()
+            .block(Block::default().title(" Security Health Score "))
+            .filled_style(Style::default().fg(score_color))
+            .unfilled_style(Style::default().fg(Color::DarkGray))
+            .ratio(score as f64 / 100.0);
+
+        let overview_text = vec![Line::from(vec![
+            Span::styled("Critical: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{} ", crit),
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" High: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{} ", high),
+                Style::default()
+                    .fg(Color::LightRed)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" Mod: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{} ", mod_cnt),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" Low: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{} ", other),
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ])];
+
+        let overview_block = Block::default()
+            .borders(Borders::ALL)
+            .title(" Security Scorecard ")
+            .border_style(Style::default().fg(Color::Magenta));
+
+        let overview_inner = overview_block.inner(right_chunks[0]);
+        frame.render_widget(overview_block, right_chunks[0]);
+
+        if overview_inner.width > 0 && overview_inner.height > 0 {
+            let metric_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(2), Constraint::Length(2)])
+                .split(overview_inner);
+
+            frame.render_widget(gauge, metric_chunks[0]);
+            frame.render_widget(Paragraph::new(overview_text), metric_chunks[1]);
+        }
+
+        // Right Bottom: Dynamic Selection Card
+        if let Some(vuln) = items.get(app.detail_selection) {
+            let cve = vuln.cve.as_deref().unwrap_or("None");
+            let card_border_color = match vuln.severity.to_ascii_lowercase().as_str() {
+                "critical" => Color::Red,
+                "high" => Color::LightRed,
+                "moderate" | "medium" => Color::Yellow,
+                "low" => Color::Blue,
+                _ => Color::DarkGray,
+            };
+
+            let lines = vec![
+                Line::from(vec![
+                    Span::styled("Package: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        &vuln.package,
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                ]),
+                Line::from(vec![
+                    Span::styled("Severity: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(&vuln.severity, severity_style(&vuln.severity)),
+                ]),
+                Line::from(vec![
+                    Span::styled("CVE ID: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(cve, Style::default().fg(Color::Cyan)),
+                ]),
+                Line::from(vec![
+                    Span::styled("Patched: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(&vuln.patched_version, Style::default().fg(Color::Green)),
+                ]),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "Title / Description:",
+                    Style::default().fg(Color::DarkGray),
+                )),
+                Line::from(Span::styled(&vuln.title, Style::default().fg(Color::White))),
+            ];
+
+            let detail_card = Paragraph::new(lines)
+                .wrap(ratatui::widgets::Wrap { trim: true })
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(" Selected Vulnerability ")
+                        .border_style(Style::default().fg(card_border_color)),
+                );
+
+            frame.render_widget(detail_card, right_chunks[1]);
+        } else {
+            let empty_card = Paragraph::new("No item selected.").block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Selected Vulnerability "),
+            );
+            frame.render_widget(empty_card, right_chunks[1]);
+        }
+    } else {
+        // Fallback layout (narrow terminal)
+        let table = Table::new(rows, detail_table_constraints(area.width, "security"))
+            .header(header)
+            .block(table_block)
+            .column_spacing(1);
+        frame.render_widget(table, area);
+    }
 }
 
 fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
@@ -1395,17 +1555,112 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         })
         .collect();
 
-    let table = Table::new(rows, detail_table_constraints(area.width, "audit"))
-        .header(header)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!(" {tool} — Audit Items ({}) ", items.len()))
-                .border_style(Style::default().fg(Color::Yellow)),
+    let bottom_msg = if !app.detail_message.is_empty() {
+        format!(
+            "  {}  |  [E] Export Report  [Esc] Back ",
+            app.detail_message
         )
-        .column_spacing(1);
+    } else {
+        "  [E] Export Report  |  [Esc] Back ".to_string()
+    };
 
-    frame.render_widget(table, area);
+    let table_block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(" {tool} — Audit Items ({}) ", items.len()))
+        .title_bottom(bottom_msg)
+        .border_style(Style::default().fg(Color::Yellow));
+
+    // Responsive 2-column layout
+    if area.width >= 100 && area.height >= 8 {
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .split(area);
+
+        let left_area = chunks[0];
+        let right_area = chunks[1];
+
+        // Draw Left Table
+        let table = Table::new(rows, detail_table_constraints(left_area.width, "audit"))
+            .header(header)
+            .block(table_block)
+            .column_spacing(1);
+        frame.render_widget(table, left_area);
+
+        // Draw Right Stats and Detail Panel
+        let right_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(5), Constraint::Min(1)])
+            .split(right_area);
+
+        // Right Top: Alignment meter with LineGauge
+        let alignment_score = 100_usize.saturating_sub(items.len() * 20).clamp(0, 100) as u16;
+        let gauge_color = if alignment_score >= 80 {
+            Color::Green
+        } else if alignment_score >= 50 {
+            Color::Yellow
+        } else {
+            Color::Red
+        };
+
+        let gauge = LineGauge::default()
+            .block(Block::default().title(" System Alignment Score "))
+            .filled_style(Style::default().fg(gauge_color))
+            .unfilled_style(Style::default().fg(Color::DarkGray))
+            .ratio(alignment_score as f64 / 100.0);
+
+        frame.render_widget(gauge, right_chunks[0]);
+
+        // Right Bottom: Dynamic Recommendation Card
+        if let Some(audit) = items.get(app.detail_selection) {
+            let lines = vec![
+                Line::from(vec![
+                    Span::styled("Audit Rule: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        &audit.name,
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                ]),
+                Line::from(vec![
+                    Span::styled("Current State: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(&audit.current, Style::default().fg(Color::Yellow)),
+                ]),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "Recommendation / Note:",
+                    Style::default().fg(Color::DarkGray),
+                )),
+                Line::from(Span::styled(&audit.note, Style::default().fg(Color::White))),
+            ];
+
+            let detail_card = Paragraph::new(lines)
+                .wrap(ratatui::widgets::Wrap { trim: true })
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(" Recommendation Detail ")
+                        .border_style(Style::default().fg(Color::Yellow)),
+                );
+
+            frame.render_widget(detail_card, right_chunks[1]);
+        } else {
+            let empty_card = Paragraph::new("No item selected.").block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Recommendation Detail "),
+            );
+            frame.render_widget(empty_card, right_chunks[1]);
+        }
+    } else {
+        // Fallback layout (narrow terminal)
+        let table = Table::new(rows, detail_table_constraints(area.width, "audit"))
+            .header(header)
+            .block(table_block)
+            .column_spacing(1);
+        frame.render_widget(table, area);
+    }
 }
 
 fn parse_size_to_mb(size_str: &str) -> f64 {
