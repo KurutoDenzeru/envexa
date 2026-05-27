@@ -171,20 +171,22 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
             } else {
                 String::new()
             };
-            let readonly_detail = matches!(
-                app.detail_key.as_deref(),
-                Some("security") | Some("audit") | Some("cleanup")
-            );
+            let readonly_detail = matches!(app.detail_key.as_deref(), Some("audit"));
             let mut spans = vec![
                 Span::styled(" [\u{2191}\u{2193}]", Style::default().fg(Color::DarkGray)),
                 Span::raw(" nav "),
             ];
-            if !readonly_detail {
+            if app.detail_key.as_deref() == Some("security") {
+                spans.extend([
+                    Span::styled("[F]", Style::default().fg(Color::Green)),
+                    Span::raw(" fix "),
+                ]);
+            } else if !readonly_detail {
                 spans.extend([
                     Span::styled("[Space]", Style::default().fg(Color::Yellow)),
                     Span::raw(" toggle "),
                     Span::styled("[Y]", Style::default().fg(Color::Green)),
-                    Span::raw(" update "),
+                    Span::raw(" update/clean "),
                 ]);
             }
             spans.extend([

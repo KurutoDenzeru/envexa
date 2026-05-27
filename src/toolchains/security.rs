@@ -198,16 +198,83 @@ async fn pip_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
     vulns
 }
 
+async fn go_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
+    let mut vulns = Vec::new();
+    if !project_path.join("go.mod").exists() {
+        return vulns;
+    }
+    if !which("govulncheck") {
+        return vulns;
+    }
+    if let Ok(out) = run_cmd_in(project_path, "govulncheck", &["-json", "./..."]).await {
+        for line in out.lines() {
+            if let Ok(data) = serde_json::from_str::<serde_json::Value>(line) {
+                if let Some(vuln) = data.get("osv") {
+                    let id = vuln["id"].as_str().unwrap_or("?");
+                    let details = vuln["details"].as_str().unwrap_or("?");
+                    let aliases = vuln["aliases"].as_array();
+                    let cve = aliases
+                        .and_then(|a| {
+                            a.iter()
+                                .find_map(|v| v.as_str().filter(|s| s.starts_with("CVE-")))
+                        })
+                        .map(|s| s.to_string());
+                    vulns.push(VulnerabilityInfo {
+                        package: id.to_string(),
+                        severity: "HIGH".to_string(),
+                        title: details.to_string(),
+                        cve,
+                        patched_version: "?".to_string(),
+                    });
+                }
+            }
+        }
+    }
+    vulns
+}
+
+async fn composer_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
+    let mut vulns = Vec::new();
+    if !project_path.join("composer.json").exists() {
+        return vulns;
+    }
+    if !which("composer") {
+        return vulns;
+    }
+    if let Ok(out) = run_cmd_in(project_path, "composer", &["audit", "--format=json"]).await {
+        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
+            if let Some(advisories) = data.get("advisories").and_then(|a| a.as_object()) {
+                for (pkg, list) in advisories {
+                    if let Some(arr) = list.as_array() {
+                        for adv in arr {
+                            vulns.push(VulnerabilityInfo {
+                                package: pkg.to_string(),
+                                severity: "HIGH".to_string(),
+                                title: adv["title"].as_str().unwrap_or("?").to_string(),
+                                cve: adv["cve"].as_str().map(|s| s.to_string()),
+                                patched_version: "?".to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    vulns
+}
+
 pub async fn scan() -> ScanResult {
     let mut result = ScanResult::new("security");
     let project_path = get_project_path();
 
-    let (npm_res, pnpm_res, bun_res, cargo_res, pip_res) = tokio::join!(
+    let (npm_res, pnpm_res, bun_res, cargo_res, pip_res, go_res, php_res) = tokio::join!(
         npm_audit(&project_path),
         pnpm_audit(&project_path),
         bun_audit(&project_path),
         cargo_audit(&project_path),
-        pip_audit(&project_path)
+        pip_audit(&project_path),
+        go_audit(&project_path),
+        composer_audit(&project_path)
     );
 
     result.vulnerabilities.extend(npm_res);
@@ -215,6 +282,8 @@ pub async fn scan() -> ScanResult {
     result.vulnerabilities.extend(bun_res);
     result.vulnerabilities.extend(cargo_res);
     result.vulnerabilities.extend(pip_res);
+    result.vulnerabilities.extend(go_res);
+    result.vulnerabilities.extend(php_res);
 
     let n = result.vulnerabilities.len();
     result.status = if n == 0 {

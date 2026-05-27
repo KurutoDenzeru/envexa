@@ -118,7 +118,7 @@ impl ScanResult {
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 
-fn which(cmd: &str) -> bool {
+pub fn which(cmd: &str) -> bool {
     std::env::var("PATH")
         .unwrap_or_default()
         .split(':')
@@ -157,6 +157,7 @@ pub mod cleanup;
 pub mod deno;
 pub mod docker;
 pub mod gem;
+pub mod git;
 pub mod npm;
 pub mod pip;
 pub mod pnpm;
@@ -165,7 +166,10 @@ pub mod security;
 pub mod yarn;
 
 pub async fn scan_all() -> HashMap<String, ScanResult> {
-    let (b, n, p, y, bu, de, pi, g, ca, dk, pr, se, au, cl) = tokio::join!(
+    let project_dir = get_project_path();
+    let ignore = crate::config::EnvexaIgnore::load(&project_dir);
+
+    let (b, n, p, y, bu, de, pi, g, ca, dk, pr, se, au, cl, git_res) = tokio::join!(
         brew::scan(),
         npm::scan(),
         pnpm::scan(),
@@ -180,22 +184,56 @@ pub async fn scan_all() -> HashMap<String, ScanResult> {
         security::scan(),
         audit::scan(),
         cleanup::scan(),
+        git::scan(),
     );
     let mut results = HashMap::new();
-    results.insert("brew".to_string(), b);
-    results.insert("npm".to_string(), n);
-    results.insert("pnpm".to_string(), p);
-    results.insert("yarn".to_string(), y);
-    results.insert("bun".to_string(), bu);
-    results.insert("deno".to_string(), de);
-    results.insert("pip".to_string(), pi);
-    results.insert("gem".to_string(), g);
-    results.insert("cargo".to_string(), ca);
-    results.insert("docker".to_string(), dk);
-    results.insert("project".to_string(), pr);
-    results.insert("security".to_string(), se);
-    results.insert("audit".to_string(), au);
-    results.insert("cleanup".to_string(), cl);
+    let candidates = vec![
+        ("brew", b),
+        ("npm", n),
+        ("pnpm", p),
+        ("yarn", y),
+        ("bun", bu),
+        ("deno", de),
+        ("pip", pi),
+        ("gem", g),
+        ("cargo", ca),
+        ("docker", dk),
+        ("project", pr),
+        ("security", se),
+        ("audit", au),
+        ("cleanup", cl),
+        ("git", git_res),
+    ];
+
+    for (name, mut res) in candidates.into_iter() {
+        if ignore.should_ignore_tool(name) {
+            results.insert(
+                name.to_string(),
+                ScanResult::skipped("Ignored by .envexaignore"),
+            );
+            continue;
+        }
+
+        res.outdated
+            .retain(|p| !ignore.should_ignore_package(&p.name));
+        res.outdated_global
+            .retain(|p| !ignore.should_ignore_package(&p.name));
+        res.outdated_formulae
+            .retain(|p| !ignore.should_ignore_package(&p.name));
+        res.outdated_casks
+            .retain(|p| !ignore.should_ignore_package(&p.name));
+
+        res.vulnerabilities.retain(|v| {
+            !ignore.should_ignore_package(&v.package)
+                && !ignore.should_ignore_vuln(&v.package)
+                && v.cve
+                    .as_ref()
+                    .map(|cve| !ignore.should_ignore_vuln(cve))
+                    .unwrap_or(true)
+        });
+
+        results.insert(name.to_string(), res);
+    }
     results
 }
 
@@ -216,6 +254,7 @@ pub async fn scan_one(name: &str) -> Option<ScanResult> {
         "security" => Some(security::scan().await),
         "audit" => Some(audit::scan().await),
         "cleanup" => Some(cleanup::scan().await),
+        "git" => Some(git::scan().await),
         _ => None,
     }
 }
