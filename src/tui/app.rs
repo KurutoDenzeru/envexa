@@ -44,6 +44,12 @@ pub struct App {
     pub checked_outdated: HashSet<usize>,
 }
 
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl App {
     pub fn new() -> Self {
         let report = config::read_cache().map(|e| e.report);

@@ -20,17 +20,7 @@ pub async fn scan() -> ScanResult {
     }
 
     if let Ok(out) = run_cmd("npm", &["outdated", "-g", "--json"]).await {
-        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
-            if let Some(obj) = data.as_object() {
-                for (name, info) in obj {
-                    result.outdated_global.push(PackageInfo {
-                        name: name.clone(),
-                        current: info["current"].as_str().unwrap_or("?").to_string(),
-                        latest: info["latest"].as_str().unwrap_or("?").to_string(),
-                    });
-                }
-            }
-        }
+        result.outdated_global = parse_outdated(&out);
     }
 
     result.status = if result.outdated_global.is_empty() {
@@ -40,4 +30,20 @@ pub async fn scan() -> ScanResult {
     };
 
     result
+}
+
+pub fn parse_outdated(out: &str) -> Vec<PackageInfo> {
+    let mut packages = Vec::new();
+    if let Ok(data) = serde_json::from_str::<serde_json::Value>(out) {
+        if let Some(obj) = data.as_object() {
+            for (name, info) in obj {
+                packages.push(PackageInfo {
+                    name: name.clone(),
+                    current: info["current"].as_str().unwrap_or("?").to_string(),
+                    latest: info["latest"].as_str().unwrap_or("?").to_string(),
+                });
+            }
+        }
+    }
+    packages
 }

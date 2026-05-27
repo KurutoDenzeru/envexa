@@ -169,43 +169,35 @@ pub async fn scan_all() -> HashMap<String, ScanResult> {
     let project_dir = get_project_path();
     let ignore = crate::core::config::EnvexaIgnore::load(&project_dir);
 
-    let (b, n, p, y, bu, de, pi, g, ca, dk, pr, se, au, cl, git_res) = tokio::join!(
-        brew::scan(),
-        npm::scan(),
-        pnpm::scan(),
-        yarn::scan(),
-        bun::scan(),
-        deno::scan(),
-        pip::scan(),
-        gem::scan(),
-        cargo::scan(),
-        docker::scan(),
-        project::scan(),
-        security::scan(),
-        audit::scan(),
-        cleanup::scan(),
-        git::scan(),
-    );
-    let mut results = HashMap::new();
-    let candidates = vec![
-        ("brew", b),
-        ("npm", n),
-        ("pnpm", p),
-        ("yarn", y),
-        ("bun", bu),
-        ("deno", de),
-        ("pip", pi),
-        ("gem", g),
-        ("cargo", ca),
-        ("docker", dk),
-        ("project", pr),
-        ("security", se),
-        ("audit", au),
-        ("cleanup", cl),
-        ("git", git_res),
+    use futures::stream::{self, StreamExt};
+
+    let tasks = vec![
+        ("brew", Box::pin(brew::scan()) as std::pin::Pin<Box<dyn std::future::Future<Output = ScanResult> + Send>>),
+        ("npm", Box::pin(npm::scan())),
+        ("pnpm", Box::pin(pnpm::scan())),
+        ("yarn", Box::pin(yarn::scan())),
+        ("bun", Box::pin(bun::scan())),
+        ("deno", Box::pin(deno::scan())),
+        ("pip", Box::pin(pip::scan())),
+        ("gem", Box::pin(gem::scan())),
+        ("cargo", Box::pin(cargo::scan())),
+        ("docker", Box::pin(docker::scan())),
+        ("project", Box::pin(project::scan())),
+        ("security", Box::pin(security::scan())),
+        ("audit", Box::pin(audit::scan())),
+        ("cleanup", Box::pin(cleanup::scan())),
+        ("git", Box::pin(git::scan())),
     ];
 
-    for (name, mut res) in candidates.into_iter() {
+    let mut results = HashMap::new();
+
+    let stream = stream::iter(tasks).map(|(name, fut)| async move {
+        (name, fut.await)
+    });
+
+    let mut buffered = stream.buffer_unordered(4);
+
+    while let Some((name, mut res)) = buffered.next().await {
         if ignore.should_ignore_tool(name) {
             results.insert(
                 name.to_string(),
@@ -234,6 +226,7 @@ pub async fn scan_all() -> HashMap<String, ScanResult> {
 
         results.insert(name.to_string(), res);
     }
+
     results
 }
 
