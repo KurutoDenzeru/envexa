@@ -43,14 +43,14 @@ fn ensure() -> std::io::Result<()> {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct UserConfig {
-    pub cache_ttl_days: u64,
+    pub cache_ttl_minutes: u64,
     pub project_path: Option<String>,
 }
 
 impl Default for UserConfig {
     fn default() -> Self {
         Self {
-            cache_ttl_days: 7,
+            cache_ttl_minutes: 15,
             project_path: None,
         }
     }
@@ -60,7 +60,7 @@ impl Default for UserConfig {
 pub struct CacheEntry {
     pub report: Report,
     pub cached_at: String,
-    pub ttl_days: u64,
+    pub ttl_minutes: u64,
 }
 
 #[allow(dead_code)]
@@ -85,12 +85,12 @@ pub fn read_cache() -> Option<CacheEntry> {
         .and_then(|s| serde_json::from_str(&s).ok())
 }
 
-pub fn write_cache(report: &Report, ttl_days: u64) -> std::io::Result<()> {
+pub fn write_cache(report: &Report, ttl_minutes: u64) -> std::io::Result<()> {
     ensure()?;
     let entry = CacheEntry {
         report: report.clone(),
         cached_at: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
-        ttl_days,
+        ttl_minutes,
     };
     std::fs::write(cache_path(), serde_json::to_string_pretty(&entry)?)
 }
@@ -99,7 +99,7 @@ pub fn write_cache(report: &Report, ttl_days: u64) -> std::io::Result<()> {
 pub fn cache_expired(entry: &CacheEntry) -> bool {
     chrono::NaiveDateTime::parse_from_str(&entry.cached_at, "%Y-%m-%dT%H:%M:%S")
         .map(|dt| {
-            let expiry = dt + chrono::Duration::days(entry.ttl_days as i64);
+            let expiry = dt + chrono::Duration::minutes(entry.ttl_minutes as i64);
             chrono::Local::now().naive_local() > expiry
         })
         .unwrap_or(true)

@@ -42,18 +42,21 @@ async fn npm_outdated(dir: &Path, result: &mut ScanResult) {
         if out.is_empty() || !out.starts_with('{') {
             return;
         }
-        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
-            if let Some(obj) = data.as_object() {
-                for (name, info) in obj {
-                    if name == "error" {
-                        continue;
-                    }
-                    result.outdated.push(PackageInfo {
-                        name: name.clone(),
-                        current: info["current"].as_str().unwrap_or("?").to_string(),
-                        latest: info["latest"].as_str().unwrap_or("?").to_string(),
-                    });
+        #[derive(serde::Deserialize)]
+        struct NpmOutdated {
+            current: Option<String>,
+            latest: Option<String>,
+        }
+        if let Ok(data) = serde_json::from_str::<std::collections::HashMap<String, NpmOutdated>>(&out) {
+            for (name, info) in data {
+                if name == "error" {
+                    continue;
                 }
+                result.outdated.push(PackageInfo {
+                    name,
+                    current: info.current.unwrap_or_else(|| "?".to_string()),
+                    latest: info.latest.unwrap_or_else(|| "?".to_string()),
+                });
             }
         }
     }
@@ -67,15 +70,18 @@ async fn pnpm_outdated(dir: &Path, result: &mut ScanResult) {
         if out.is_empty() || !out.starts_with('{') {
             return;
         }
-        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
-            if let Some(obj) = data.as_object() {
-                for (name, info) in obj {
-                    result.outdated.push(PackageInfo {
-                        name: name.clone(),
-                        current: info["current"].as_str().unwrap_or("?").to_string(),
-                        latest: info["latest"].as_str().unwrap_or("?").to_string(),
-                    });
-                }
+        #[derive(serde::Deserialize)]
+        struct PnpmOutdated {
+            current: Option<String>,
+            latest: Option<String>,
+        }
+        if let Ok(data) = serde_json::from_str::<std::collections::HashMap<String, PnpmOutdated>>(&out) {
+            for (name, info) in data {
+                result.outdated.push(PackageInfo {
+                    name,
+                    current: info.current.unwrap_or_else(|| "?".to_string()),
+                    latest: info.latest.unwrap_or_else(|| "?".to_string()),
+                });
             }
         }
     }

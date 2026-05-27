@@ -40,17 +40,21 @@ pub async fn scan() -> ScanResult {
     result
 }
 
+#[derive(serde::Deserialize)]
+struct NpmOutdated {
+    current: Option<String>,
+    latest: Option<String>,
+}
+
 pub fn parse_outdated(out: &str) -> Vec<PackageInfo> {
     let mut packages = Vec::new();
-    if let Ok(data) = serde_json::from_str::<serde_json::Value>(out) {
-        if let Some(obj) = data.as_object() {
-            for (name, info) in obj {
-                packages.push(PackageInfo {
-                    name: name.clone(),
-                    current: info["current"].as_str().unwrap_or("?").to_string(),
-                    latest: info["latest"].as_str().unwrap_or("?").to_string(),
-                });
-            }
+    if let Ok(data) = serde_json::from_str::<std::collections::HashMap<String, NpmOutdated>>(out) {
+        for (name, info) in data {
+            packages.push(PackageInfo {
+                name,
+                current: info.current.unwrap_or_else(|| "?".to_string()),
+                latest: info.latest.unwrap_or_else(|| "?".to_string()),
+            });
         }
     }
     packages

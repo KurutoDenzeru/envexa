@@ -38,17 +38,27 @@ pub async fn scan() -> ScanResult {
     result
 }
 
+#[derive(serde::Deserialize)]
+struct CargoOutdatedDependency {
+    name: String,
+    project_version: Option<String>,
+    latest_version: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct CargoOutdated {
+    dependencies: Vec<CargoOutdatedDependency>,
+}
+
 pub fn parse_outdated(out: &str) -> Vec<PackageInfo> {
     let mut packages = Vec::new();
-    if let Ok(data) = serde_json::from_str::<serde_json::Value>(out) {
-        if let Some(crates) = data["dependencies"].as_array() {
-            for c in crates {
-                packages.push(PackageInfo {
-                    name: c["name"].as_str().unwrap_or("?").to_string(),
-                    current: c["project_version"].as_str().unwrap_or("?").to_string(),
-                    latest: c["latest_version"].as_str().unwrap_or("?").to_string(),
-                });
-            }
+    if let Ok(data) = serde_json::from_str::<CargoOutdated>(out) {
+        for c in data.dependencies {
+            packages.push(PackageInfo {
+                name: c.name,
+                current: c.project_version.unwrap_or_else(|| "?".to_string()),
+                latest: c.latest_version.unwrap_or_else(|| "?".to_string()),
+            });
         }
     }
     packages

@@ -151,7 +151,7 @@ async fn check_env_managers() -> Vec<AuditItem> {
     let node_version_file = project_dir.join(".node-version");
     let tool_versions = project_dir.join(".tool-versions");
     let mise_toml = project_dir.join("mise.toml");
-    let sdkmanrc = project_dir.join(".sdkmanrc");
+    let _sdkmanrc = project_dir.join(".sdkmanrc");
 
     let mut expected_node = None;
     let mut expected_python = None;

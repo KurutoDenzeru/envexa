@@ -84,7 +84,13 @@ impl Default for App {
 
 impl App {
     pub fn new() -> Self {
-        let report = config::read_cache().map(|e| e.report);
+        let report = config::read_cache().and_then(|e| {
+            if !config::cache_expired(&e) {
+                Some(e.report)
+            } else {
+                None
+            }
+        });
         Self {
             report,
             ui: UiState {
@@ -312,7 +318,7 @@ impl App {
                             timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
                             results,
                         };
-                        let _ = config::write_cache(&report, 7);
+                        let _ = config::write_cache(&report, 15);
 
                         self.report = Some(report);
                         self.ui.view = View::Dashboard;

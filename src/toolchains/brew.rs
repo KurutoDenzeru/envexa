@@ -1,5 +1,18 @@
 use super::*;
 
+#[derive(serde::Deserialize)]
+struct BrewItem {
+    name: String,
+    installed_versions: Vec<String>,
+    current_version: String,
+}
+
+#[derive(serde::Deserialize)]
+struct BrewOutdated {
+    formulae: Vec<BrewItem>,
+    casks: Vec<BrewItem>,
+}
+
 pub async fn scan() -> ScanResult {
     if !which("brew") {
         return ScanResult::skipped("Homebrew not installed");
@@ -19,30 +32,20 @@ pub async fn scan() -> ScanResult {
 
     if let Ok(out) = outdated_res {
         if !out.is_empty() {
-            if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
-                if let Some(formulae) = data["formulae"].as_array() {
-                    for f in formulae {
-                        result.outdated_formulae.push(PackageInfo {
-                            name: f["name"].as_str().unwrap_or("?").to_string(),
-                            current: f["installed_versions"][0]
-                                .as_str()
-                                .unwrap_or("?")
-                                .to_string(),
-                            latest: f["current_version"].as_str().unwrap_or("?").to_string(),
-                        });
-                    }
+            if let Ok(data) = serde_json::from_str::<BrewOutdated>(&out) {
+                for f in data.formulae {
+                    result.outdated_formulae.push(PackageInfo {
+                        name: f.name,
+                        current: f.installed_versions.into_iter().next().unwrap_or_else(|| "?".to_string()),
+                        latest: f.current_version,
+                    });
                 }
-                if let Some(casks) = data["casks"].as_array() {
-                    for c in casks {
-                        result.outdated_casks.push(PackageInfo {
-                            name: c["name"].as_str().unwrap_or("?").to_string(),
-                            current: c["installed_versions"][0]
-                                .as_str()
-                                .unwrap_or("?")
-                                .to_string(),
-                            latest: c["current_version"].as_str().unwrap_or("?").to_string(),
-                        });
-                    }
+                for c in data.casks {
+                    result.outdated_casks.push(PackageInfo {
+                        name: c.name,
+                        current: c.installed_versions.into_iter().next().unwrap_or_else(|| "?".to_string()),
+                        latest: c.current_version,
+                    });
                 }
             }
         }

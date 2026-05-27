@@ -23,12 +23,18 @@ pub async fn scan() -> ScanResult {
             result.version = Some(ver);
         }
         if let Ok(out) = outdated {
-            if let Ok(packages) = serde_json::from_str::<Vec<serde_json::Value>>(&out) {
+            #[derive(serde::Deserialize)]
+            struct PipOutdated {
+                name: String,
+                version: String,
+                latest_version: String,
+            }
+            if let Ok(packages) = serde_json::from_str::<Vec<PipOutdated>>(&out) {
                 for pkg in packages {
                     result.outdated.push(PackageInfo {
-                        name: pkg["name"].as_str().unwrap_or("?").to_string(),
-                        current: pkg["version"].as_str().unwrap_or("?").to_string(),
-                        latest: pkg["latest_version"].as_str().unwrap_or("?").to_string(),
+                        name: pkg.name,
+                        current: pkg.version,
+                        latest: pkg.latest_version,
                     });
                 }
             }
