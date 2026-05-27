@@ -217,12 +217,12 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
             )
         }
         _ => {
-            let update_msg = if matches!(app.ui.view, View::Outdated) && !app.detail.message.is_empty()
-            {
-                format!("  {}", app.detail.message)
-            } else {
-                String::new()
-            };
+            let update_msg =
+                if matches!(app.ui.view, View::Outdated) && !app.detail.message.is_empty() {
+                    format!("  {}", app.detail.message)
+                } else {
+                    String::new()
+                };
             (
                 Line::from(vec![
                     Span::styled(" [S]", Style::default().fg(Color::Green)),
@@ -297,9 +297,9 @@ fn dashboard_max_widths(width: u16) -> (usize, usize) {
 
 fn outdated_max_width(width: u16) -> usize {
     if width < 72 {
-        (width.saturating_sub(45)) as usize
+        (width.saturating_sub(48)) as usize
     } else {
-        (width.saturating_sub(66)) as usize
+        (width.saturating_sub(70)) as usize
     }
 }
 
@@ -525,15 +525,16 @@ fn dashboard_table_constraints(width: u16) -> [Constraint; 6] {
     }
 }
 
-fn outdated_table_constraints(width: u16) -> [Constraint; 6] {
+fn outdated_table_constraints(width: u16) -> [Constraint; 7] {
     if width < 72 {
         [
             Constraint::Length(3),
             Constraint::Length(8),
             Constraint::Length(7),
             Constraint::Min(12),
-            Constraint::Length(10),
-            Constraint::Length(10),
+            Constraint::Length(8),
+            Constraint::Length(8),
+            Constraint::Length(8),
         ]
     } else {
         [
@@ -541,8 +542,9 @@ fn outdated_table_constraints(width: u16) -> [Constraint; 6] {
             Constraint::Length(10),
             Constraint::Length(8),
             Constraint::Min(18),
-            Constraint::Length(18),
-            Constraint::Length(18),
+            Constraint::Length(14),
+            Constraint::Length(14),
+            Constraint::Length(10),
         ]
     }
 }
@@ -553,15 +555,17 @@ fn detail_table_constraints(width: u16, kind: &str) -> Vec<Constraint> {
             Constraint::Length(3),
             Constraint::Min(12),
             Constraint::Length(7),
-            Constraint::Length(10),
-            Constraint::Length(10),
+            Constraint::Length(8),
+            Constraint::Length(8),
+            Constraint::Length(8),
         ],
         "outdated" => vec![
             Constraint::Length(5),
             Constraint::Min(18),
             Constraint::Length(8),
-            Constraint::Length(18),
-            Constraint::Length(18),
+            Constraint::Length(14),
+            Constraint::Length(14),
+            Constraint::Length(10),
         ],
         "security" if width < 84 => vec![
             Constraint::Min(12),
@@ -1176,6 +1180,7 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         "Package ",
         "Current ",
         "Latest ",
+        "Size ",
     ]
     .iter()
     .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
@@ -1248,6 +1253,7 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
                 Cell::from(pkg_name),
                 Cell::from(pkg.current.as_str()),
                 Cell::from(pkg.latest.as_str()),
+                Cell::from(pkg.size.as_str()),
             ]);
             if sel {
                 row = row.style(
@@ -1530,7 +1536,7 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         return;
     }
 
-    let header_cells = ["", "Package ", "Source ", "Current ", "Latest "]
+    let header_cells = ["", "Package ", "Source ", "Current ", "Latest ", "Size "]
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
@@ -1555,6 +1561,7 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
                 Cell::from(item.source.as_str()).style(source_style(&item.source)),
                 Cell::from(item.current.as_str()),
                 Cell::from(item.latest.as_str()),
+                Cell::from(item.size.as_str()),
             ]);
             if sel {
                 row = row.style(
@@ -2178,8 +2185,19 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
 }
 
 fn render_updating(frame: &mut Frame, area: Rect, app: &mut App) {
+    let label = if app.ui.update_package_name.is_empty() {
+        "Updating packages...".to_string()
+    } else if app.ui.update_downloaded_mb > 0.0 {
+        format!(
+            "Updating {} ({:.2} MB downloaded)...",
+            app.ui.update_package_name, app.ui.update_downloaded_mb
+        )
+    } else {
+        format!("Updating {}...", app.ui.update_package_name)
+    };
+
     let throbber = throbber_widgets_tui::Throbber::default()
-        .label("Updating packages...")
+        .label(label)
         .style(Style::default().fg(Color::Green))
         .throbber_style(
             Style::default()
@@ -2220,6 +2238,45 @@ fn render_updating(frame: &mut Frame, area: Rect, app: &mut App) {
                 ))
                 .ratio(ratio);
             frame.render_widget(gauge, chunks[2]);
+
+            if chunks[3].height >= 3 {
+                let tip_block = Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::DarkGray))
+                    .title(" Loading Tip ")
+                    .title_style(Style::default().fg(Color::Yellow).bold());
+
+                let mut tip_lines = vec![Line::from(vec![
+                    Span::styled("💡 Tip: ", Style::default().fg(Color::Yellow).bold()),
+                    Span::raw("Downloading updates can take a moment depending on your network connection."),
+                ])];
+
+                if app.ui.update_downloaded_mb > 0.0 {
+                    tip_lines.push(Line::from(vec![
+                        Span::styled("⤓ Progress: ", Style::default().fg(Color::Cyan).bold()),
+                        Span::styled(
+                            format!(
+                                "{:.2} MB downloaded so far for {}",
+                                app.ui.update_downloaded_mb, app.ui.update_package_name
+                            ),
+                            Style::default().fg(Color::White).bold(),
+                        ),
+                    ]));
+                } else if !app.ui.update_package_name.is_empty() {
+                    tip_lines.push(Line::from(vec![
+                        Span::styled("⚡ Active: ", Style::default().fg(Color::Cyan).bold()),
+                        Span::styled(
+                            format!("Installing/updating {}...", app.ui.update_package_name),
+                            Style::default().fg(Color::White),
+                        ),
+                    ]));
+                }
+
+                let tip_paragraph = Paragraph::new(tip_lines)
+                    .block(tip_block)
+                    .alignment(Alignment::Left);
+                frame.render_widget(tip_paragraph, chunks[3]);
+            }
         } else {
             frame.render_stateful_widget(throbber, inner, &mut app.ui.throbber_state);
         }

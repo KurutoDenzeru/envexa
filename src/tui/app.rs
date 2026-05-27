@@ -25,6 +25,10 @@ pub enum AppEvent {
     Tick,
     Input(crossterm::event::KeyEvent),
     ScanFinished(HashMap<String, crate::toolchains::ScanResult>),
+    UpdateProgress {
+        package_name: String,
+        downloaded_mb: f64,
+    },
     UpdateFinished(String),
     CleanupFinished {
         result_msg: String,
@@ -47,6 +51,8 @@ pub struct UiState {
     pub progress_counter: usize,
     pub tick_count: usize,
     pub checked_outdated: HashSet<usize>,
+    pub update_package_name: String,
+    pub update_downloaded_mb: f64,
 }
 
 pub struct DetailState {
@@ -89,6 +95,8 @@ impl App {
                 progress_counter: 0,
                 tick_count: 0,
                 checked_outdated: HashSet::new(),
+                update_package_name: String::new(),
+                update_downloaded_mb: 0.0,
             },
             detail: DetailState {
                 tool: None,
@@ -248,8 +256,14 @@ impl App {
                             }
                             KeyCode::Char(' ') => {
                                 if matches!(self.ui.view, View::Outdated) {
-                                    if self.ui.checked_outdated.contains(&self.ui.outdated_selection) {
-                                        self.ui.checked_outdated.remove(&self.ui.outdated_selection);
+                                    if self
+                                        .ui
+                                        .checked_outdated
+                                        .contains(&self.ui.outdated_selection)
+                                    {
+                                        self.ui
+                                            .checked_outdated
+                                            .remove(&self.ui.outdated_selection);
                                     } else {
                                         self.ui.checked_outdated.insert(self.ui.outdated_selection);
                                     }
@@ -297,6 +311,13 @@ impl App {
                         self.ui.view = View::Dashboard;
                         self.ui.tab_index = 0;
                         self.ui.dashboard_selection = 0;
+                    }
+                    AppEvent::UpdateProgress {
+                        package_name,
+                        downloaded_mb,
+                    } => {
+                        self.ui.update_package_name = package_name;
+                        self.ui.update_downloaded_mb = downloaded_mb;
                     }
                     AppEvent::UpdateFinished(msg) => {
                         self.detail.message = msg;
@@ -424,6 +445,8 @@ impl App {
 
         self.ui.view = View::Updating;
         self.ui.progress_counter = 0;
+        self.ui.update_package_name = String::new();
+        self.ui.update_downloaded_mb = 0.0;
         let _count = work.len();
 
         tokio::spawn(async move {
@@ -431,7 +454,7 @@ impl App {
             let mut failed = 0usize;
             let mut errors = vec![];
             for (tool, item) in &work {
-                match run_update(tool, item).await {
+                match run_update(tool, item, tx.clone()).await {
                     Ok(_) => updated += 1,
                     Err(e) => {
                         failed += 1;
@@ -606,6 +629,8 @@ impl App {
 
         self.ui.view = View::Updating;
         self.ui.progress_counter = 0;
+        self.ui.update_package_name = String::new();
+        self.ui.update_downloaded_mb = 0.0;
         let _count = work.len();
 
         tokio::spawn(async move {
@@ -613,7 +638,7 @@ impl App {
             let mut failed = 0usize;
             let mut errors = vec![];
             for (tool, item) in &work {
-                match run_update(tool, item).await {
+                match run_update(tool, item, tx.clone()).await {
                     Ok(_) => updated += 1,
                     Err(e) => {
                         failed += 1;
@@ -743,7 +768,9 @@ impl App {
             View::Dashboard => {
                 self.ui.dashboard_selection = self.ui.dashboard_selection.saturating_sub(1)
             }
-            View::Outdated => self.ui.outdated_selection = self.ui.outdated_selection.saturating_sub(1),
+            View::Outdated => {
+                self.ui.outdated_selection = self.ui.outdated_selection.saturating_sub(1)
+            }
             View::Scanning => {}
             View::PackageDetail => self.detail.selection = self.detail.selection.saturating_sub(1),
             View::Updating => {}
@@ -828,7 +855,11 @@ impl App {
     }
 }
 
-async fn run_update(tool: &str, item: &OutdatedItem) -> Result<String, String> {
+async fn run_update(
+    tool: &str,
+    item: &OutdatedItem,
+    tx: mpsc::UnboundedSender<AppEvent>,
+) -> Result<String, String> {
     let project_path = toolchains::get_project_path();
     let is_package = item.source == "package";
 
@@ -945,29 +976,145 @@ async fn run_update(tool: &str, item: &OutdatedItem) -> Result<String, String> {
         _ => return Err(format!("auto-update not supported for {}", tool)),
     };
 
+    let _ = tx.send(AppEvent::UpdateProgress {
+        package_name: item.name.clone(),
+        downloaded_mb: 0.0,
+    });
+
     let mut command = tokio::process::Command::new(&cmd);
     command.args(&args);
     if run_in_project {
         command.current_dir(&project_path);
     }
+    command.stdout(std::process::Stdio::piped());
+    command.stderr(std::process::Stdio::piped());
 
-    let output = command
-        .output()
-        .await
-        .map_err(|e| format!("command failed: {e}"))?;
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if stdout.is_empty() {
-            Ok("done".into())
-        } else {
-            Ok(stdout)
+    let mut child = command
+        .spawn()
+        .map_err(|e| format!("command failed to spawn: {e}"))?;
+
+    use tokio::io::{AsyncBufReadExt, BufReader};
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "Failed to open stdout".to_string())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "Failed to open stderr".to_string())?;
+
+    let mut stdout_reader = BufReader::new(stdout).lines();
+    let mut stderr_reader = BufReader::new(stderr).lines();
+
+    let mut total_downloaded_mb = 0.0;
+    let mut stderr_accum = String::new();
+    let mut stdout_accum = String::new();
+
+    let name_clone = item.name.clone();
+
+    loop {
+        tokio::select! {
+            res = stdout_reader.next_line() => {
+                match res {
+                    Ok(Some(line)) => {
+                        if let Some(mb) = parse_downloaded_mb(&line) {
+                            if mb > total_downloaded_mb {
+                                total_downloaded_mb = mb;
+                                let _ = tx.send(AppEvent::UpdateProgress {
+                                    package_name: name_clone.clone(),
+                                    downloaded_mb: total_downloaded_mb,
+                                });
+                            }
+                        }
+                        if contains_password_prompt(&line) {
+                            let _ = child.kill().await;
+                            return Err("Requires interactive password/sudo input, which is not supported in background updates. Run manually in terminal.".into());
+                        }
+                        if stdout_accum.len() < 1000 {
+                            if !stdout_accum.is_empty() {
+                                stdout_accum.push('\n');
+                            }
+                            stdout_accum.push_str(&line);
+                        }
+                    }
+                    Ok(None) => {},
+                    Err(_) => {}
+                }
+            }
+            res = stderr_reader.next_line() => {
+                match res {
+                    Ok(Some(line)) => {
+                        if let Some(mb) = parse_downloaded_mb(&line) {
+                            if mb > total_downloaded_mb {
+                                total_downloaded_mb = mb;
+                                let _ = tx.send(AppEvent::UpdateProgress {
+                                    package_name: name_clone.clone(),
+                                    downloaded_mb: total_downloaded_mb,
+                                });
+                            }
+                        }
+                        if contains_password_prompt(&line) {
+                            let _ = child.kill().await;
+                            return Err("Requires interactive password/sudo input, which is not supported in background updates. Run manually in terminal.".into());
+                        }
+                        if stderr_accum.len() < 1000 {
+                            if !stderr_accum.is_empty() {
+                                stderr_accum.push('\n');
+                            }
+                            stderr_accum.push_str(&line);
+                        }
+                    }
+                    Ok(None) => {},
+                    Err(_) => {}
+                }
+            }
+            status = child.wait() => {
+                let exit_status = status.map_err(|e| format!("failed to wait for child: {e}"))?;
+                if exit_status.success() {
+                    let combined = if !stdout_accum.is_empty() { stdout_accum } else { "done".to_string() };
+                    return Ok(combined);
+                } else {
+                    let err_msg = if !stderr_accum.is_empty() {
+                        stderr_accum
+                    } else if !stdout_accum.is_empty() {
+                        stdout_accum
+                    } else {
+                        format!("exit code: {:?}", exit_status.code())
+                    };
+                    return Err(err_msg);
+                }
+            }
         }
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        Err(if stderr.is_empty() {
-            "unknown error".into()
-        } else {
-            stderr
-        })
     }
+}
+
+fn parse_downloaded_mb(line: &str) -> Option<f64> {
+    use regex::Regex;
+    thread_local! {
+        static RE: Regex = Regex::new(r"(?i)(\d+(?:\.\d+)?)\s*(MB|MiB|KB|KiB|GB|GiB|M|K|G)\b").unwrap();
+    }
+    RE.with(|re| {
+        if let Some(caps) = re.captures(line) {
+            if let (Some(num_str), Some(unit)) = (caps.get(1), caps.get(2)) {
+                if let Ok(num) = num_str.as_str().parse::<f64>() {
+                    let unit_lower = unit.as_str().to_lowercase();
+                    if unit_lower.starts_with('g') {
+                        return Some(num * 1024.0);
+                    } else if unit_lower.starts_with('m') {
+                        return Some(num);
+                    } else if unit_lower.starts_with('k') {
+                        return Some(num / 1024.0);
+                    }
+                }
+            }
+        }
+        None
+    })
+}
+
+fn contains_password_prompt(line: &str) -> bool {
+    let lower = line.to_lowercase();
+    lower.contains("password:")
+        || lower.contains("[sudo] password")
+        || lower.contains("enter password")
 }

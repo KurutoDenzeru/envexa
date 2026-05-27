@@ -178,6 +178,7 @@ pub async fn scan_all() -> HashMap<String, ScanResult> {
 
     use futures::stream::{self, StreamExt};
 
+    #[allow(clippy::type_complexity)]
     let tasks: Vec<
         std::pin::Pin<Box<dyn std::future::Future<Output = (&'static str, ScanResult)> + Send>>,
     > = vec![
