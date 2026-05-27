@@ -125,7 +125,11 @@ pub fn which(cmd: &str) -> bool {
         .any(|d| std::path::Path::new(d).join(cmd).exists())
 }
 
-pub async fn run_cmd(program: &str, args: &[&str], timeout: Option<Duration>) -> Result<String, anyhow::Error> {
+pub async fn run_cmd(
+    program: &str,
+    args: &[&str],
+    timeout: Option<Duration>,
+) -> Result<String, anyhow::Error> {
     let cmd = Command::new(program).args(args).output();
     let to_wait = timeout.unwrap_or(TIMEOUT);
     let output = tokio::time::timeout(to_wait, cmd).await??;
@@ -174,31 +178,29 @@ pub async fn scan_all() -> HashMap<String, ScanResult> {
 
     use futures::stream::{self, StreamExt};
 
-    let tasks = vec![
-        ("brew", Box::pin(brew::scan()) as std::pin::Pin<Box<dyn std::future::Future<Output = ScanResult> + Send>>),
-        ("npm", Box::pin(npm::scan())),
-        ("pnpm", Box::pin(pnpm::scan())),
-        ("yarn", Box::pin(yarn::scan())),
-        ("bun", Box::pin(bun::scan())),
-        ("deno", Box::pin(deno::scan())),
-        ("pip", Box::pin(pip::scan())),
-        ("gem", Box::pin(gem::scan())),
-        ("cargo", Box::pin(cargo::scan())),
-        ("docker", Box::pin(docker::scan())),
-        ("project", Box::pin(project::scan())),
-        ("security", Box::pin(security::scan())),
-        ("audit", Box::pin(audit::scan())),
-        ("cleanup", Box::pin(cleanup::scan())),
-        ("git", Box::pin(git::scan())),
+    let tasks: Vec<
+        std::pin::Pin<Box<dyn std::future::Future<Output = (&'static str, ScanResult)> + Send>>,
+    > = vec![
+        Box::pin(async { ("brew", brew::scan().await) }),
+        Box::pin(async { ("npm", npm::scan().await) }),
+        Box::pin(async { ("pnpm", pnpm::scan().await) }),
+        Box::pin(async { ("yarn", yarn::scan().await) }),
+        Box::pin(async { ("bun", bun::scan().await) }),
+        Box::pin(async { ("deno", deno::scan().await) }),
+        Box::pin(async { ("pip", pip::scan().await) }),
+        Box::pin(async { ("gem", gem::scan().await) }),
+        Box::pin(async { ("cargo", cargo::scan().await) }),
+        Box::pin(async { ("docker", docker::scan().await) }),
+        Box::pin(async { ("project", project::scan().await) }),
+        Box::pin(async { ("security", security::scan().await) }),
+        Box::pin(async { ("audit", audit::scan().await) }),
+        Box::pin(async { ("cleanup", cleanup::scan().await) }),
+        Box::pin(async { ("git", git::scan().await) }),
     ];
 
     let mut results = HashMap::new();
 
-    let stream = stream::iter(tasks).map(|(name, fut)| async move {
-        (name, fut.await)
-    });
-
-    let mut buffered = stream.buffer_unordered(4);
+    let mut buffered = stream::iter(tasks).buffer_unordered(4);
 
     while let Some((name, mut res)) = buffered.next().await {
         if ignore.should_ignore_tool(name) {

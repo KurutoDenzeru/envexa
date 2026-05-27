@@ -21,7 +21,7 @@ fn test_npm_parse_outdated() {
 
     let parsed = parse_outdated(json_output);
     assert_eq!(parsed.len(), 2);
-    
+
     // Test that the parsing correctly identifies fields
     let axios = parsed.iter().find(|p| p.name == "axios").unwrap();
     assert_eq!(axios.current, "1.6.8");
@@ -53,7 +53,7 @@ fn test_cargo_parse_outdated() {
 
     let parsed = cargo_parse_outdated(json_output);
     assert_eq!(parsed.len(), 2);
-    
+
     let serde_pkg = parsed.iter().find(|p| p.name == "serde").unwrap();
     assert_eq!(serde_pkg.current, "1.0.197");
     assert_eq!(serde_pkg.latest, "1.0.203");

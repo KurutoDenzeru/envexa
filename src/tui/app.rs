@@ -1,8 +1,10 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
-use ratatui::DefaultTerminal;
+use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
+use futures::StreamExt;
+use std::collections::HashMap;
+use tokio::sync::mpsc;
 
 use throbber_widgets_tui::ThrobberState;
 
@@ -17,6 +19,21 @@ pub enum View {
     Scanning,
     PackageDetail,
     Updating,
+}
+
+pub enum AppEvent {
+    Tick,
+    Input(crossterm::event::KeyEvent),
+    ScanFinished(HashMap<String, crate::toolchains::ScanResult>),
+    UpdateFinished(String),
+    CleanupFinished {
+        result_msg: String,
+        new_report_res: Option<crate::toolchains::ScanResult>,
+    },
+    SecurityFixFinished {
+        result_msg: String,
+        new_report_res: Option<crate::toolchains::ScanResult>,
+    },
 }
 
 pub struct App {
@@ -77,169 +94,241 @@ impl App {
         }
     }
 
-    pub fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut terminal = ratatui::init();
         terminal.clear()?;
 
-        let tick_rate = Duration::from_millis(150);
-        let mut last_tick = std::time::Instant::now();
+        let (tx, mut rx) = mpsc::unbounded_channel::<AppEvent>();
+        let tx_in = tx.clone();
+
+        tokio::spawn(async move {
+            let mut reader = crossterm::event::EventStream::new();
+            let mut interval = tokio::time::interval(Duration::from_millis(150));
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        let _ = tx_in.send(AppEvent::Tick);
+                    }
+                    Some(Ok(Event::Key(key))) = reader.next() => {
+                        if key.kind == KeyEventKind::Press {
+                            let _ = tx_in.send(AppEvent::Input(key));
+                        }
+                    }
+                }
+            }
+        });
 
         loop {
             terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
 
-            let timeout = tick_rate.saturating_sub(last_tick.elapsed());
-            if crossterm::event::poll(timeout)? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind != KeyEventKind::Press {
-                        continue;
+            if let Some(event) = rx.recv().await {
+                match event {
+                    AppEvent::Tick => {
+                        self.tick_count = self.tick_count.wrapping_add(1);
+                        if matches!(self.view, View::Scanning | View::Updating) {
+                            self.throbber_state.calc_next();
+                            self.progress_counter += 1;
+                        }
                     }
-
-                match key.code {
-                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => break,
-                    KeyCode::Char('q') | KeyCode::Char('Q') => break,
-                    _ => {}
-                }
-
-                if self.search_mode {
-                    match key.code {
-                        KeyCode::Esc => {
-                            self.search_mode = false;
-                            self.search_query.clear();
-                        }
-                        KeyCode::Enter => {
-                            self.search_mode = false;
-                        }
-                        KeyCode::Backspace => {
-                            self.search_query.pop();
-                            self.clamp_selection();
-                        }
-                        KeyCode::Char(c) if !c.is_control() => {
-                            self.search_query.push(c);
-                            self.clamp_selection();
-                        }
-                        _ => {}
-                    }
-                    continue;
-                }
-
-                if matches!(self.view, View::PackageDetail) {
-                    match key.code {
-                        KeyCode::Char(' ')
-                            if !matches!(
-                                self.detail_key.as_deref(),
-                                Some("security") | Some("audit")
-                            ) =>
+                    AppEvent::Input(key) => {
+                        if key.code == KeyCode::Char('c')
+                            && key.modifiers.contains(KeyModifiers::CONTROL)
                         {
-                            if self.detail_checked.contains(&self.detail_selection) {
-                                self.detail_checked.remove(&self.detail_selection);
-                            } else {
-                                self.detail_checked.insert(self.detail_selection);
-                            }
+                            break;
                         }
-                        KeyCode::Char(' ') => {}
-                        KeyCode::Char('y') | KeyCode::Char('Y') => {
-                            match self.detail_key.as_deref() {
-                                Some("cleanup") => {
-                                    self.do_detail_cleanups(&mut terminal)?;
-                                }
-                                Some("security") | Some("audit") => {}
-                                _ => {
-                                    self.do_detail_updates(&mut terminal)?;
-                                }
-                            }
+                        if matches!(key.code, KeyCode::Char('q') | KeyCode::Char('Q')) {
+                            break;
                         }
-                        KeyCode::Char('f') | KeyCode::Char('F') => {
-                            if matches!(self.detail_key.as_deref(), Some("security")) {
-                                self.do_detail_security_fixes(&mut terminal)?;
-                            }
-                        }
-                        KeyCode::Char('e') | KeyCode::Char('E') => {
-                            self.export_detail_report();
-                        }
-                        KeyCode::Down | KeyCode::Char('n') => {
-                            let n = self.detail_len().saturating_sub(1);
-                            self.detail_selection = self.detail_selection.saturating_add(1).min(n);
-                        }
-                        KeyCode::Up | KeyCode::Char('p') => {
-                            self.detail_selection = self.detail_selection.saturating_sub(1);
-                        }
-                        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
-                            self.view = View::Dashboard;
-                            self.tab_index = 0;
-                            self.detail_tool = None;
-                            self.detail_key = None;
-                            self.clear_detail();
-                        }
-                        _ => {}
-                    }
-                    continue;
-                }
 
-                match key.code {
-                    KeyCode::Esc | KeyCode::Char('h') => {
+                        if self.search_mode {
+                            match key.code {
+                                KeyCode::Esc => {
+                                    self.search_mode = false;
+                                    self.search_query.clear();
+                                }
+                                KeyCode::Enter => {
+                                    self.search_mode = false;
+                                }
+                                KeyCode::Backspace => {
+                                    self.search_query.pop();
+                                    self.clamp_selection();
+                                }
+                                KeyCode::Char(c) if !c.is_control() => {
+                                    self.search_query.push(c);
+                                    self.clamp_selection();
+                                }
+                                _ => {}
+                            }
+                            continue;
+                        }
+
+                        if matches!(self.view, View::PackageDetail) {
+                            match key.code {
+                                KeyCode::Char(' ')
+                                    if !matches!(
+                                        self.detail_key.as_deref(),
+                                        Some("security") | Some("audit")
+                                    ) =>
+                                {
+                                    if self.detail_checked.contains(&self.detail_selection) {
+                                        self.detail_checked.remove(&self.detail_selection);
+                                    } else {
+                                        self.detail_checked.insert(self.detail_selection);
+                                    }
+                                }
+                                KeyCode::Char(' ') => {}
+                                KeyCode::Char('y') | KeyCode::Char('Y') => {
+                                    match self.detail_key.as_deref() {
+                                        Some("cleanup") => {
+                                            self.do_detail_cleanups(tx.clone())?;
+                                        }
+                                        Some("security") | Some("audit") => {}
+                                        _ => {
+                                            self.do_detail_updates(tx.clone())?;
+                                        }
+                                    }
+                                }
+                                KeyCode::Char('f') | KeyCode::Char('F') => {
+                                    if matches!(self.detail_key.as_deref(), Some("security")) {
+                                        self.do_detail_security_fixes(tx.clone())?;
+                                    }
+                                }
+                                KeyCode::Char('e') | KeyCode::Char('E') => {
+                                    self.export_detail_report();
+                                }
+                                KeyCode::Down | KeyCode::Char('n') => {
+                                    let n = self.detail_len().saturating_sub(1);
+                                    self.detail_selection =
+                                        self.detail_selection.saturating_add(1).min(n);
+                                }
+                                KeyCode::Up | KeyCode::Char('p') => {
+                                    self.detail_selection = self.detail_selection.saturating_sub(1);
+                                }
+                                KeyCode::Esc | KeyCode::Char('h') | KeyCode::Left => {
+                                    self.view = View::Dashboard;
+                                    self.tab_index = 0;
+                                    self.detail_tool = None;
+                                    self.detail_key = None;
+                                    self.clear_detail();
+                                }
+                                _ => {}
+                            }
+                            continue;
+                        }
+
+                        match key.code {
+                            KeyCode::Esc | KeyCode::Char('h') => {
+                                self.view = View::Dashboard;
+                                self.tab_index = 0;
+                            }
+                            KeyCode::Char('s') | KeyCode::Char('S') => {
+                                self.search_mode = false;
+                                self.search_query.clear();
+                                self.do_scan(tx.clone())?;
+                            }
+                            KeyCode::Char('o') | KeyCode::Char('O') => {
+                                self.view = View::Outdated;
+                                self.tab_index = 1;
+                            }
+                            KeyCode::Char('u') | KeyCode::Char('U')
+                                if matches!(self.view, View::Outdated)
+                                    && !self.checked_outdated.is_empty() =>
+                            {
+                                self.do_checked_updates(tx.clone())?;
+                            }
+                            KeyCode::Char(' ') => {
+                                if matches!(self.view, View::Outdated) {
+                                    if self.checked_outdated.contains(&self.outdated_selection) {
+                                        self.checked_outdated.remove(&self.outdated_selection);
+                                    } else {
+                                        self.checked_outdated.insert(self.outdated_selection);
+                                    }
+                                }
+                            }
+                            KeyCode::Char('/') => {
+                                self.search_mode = true;
+                                self.dashboard_selection = 0;
+                                self.outdated_selection = 0;
+                            }
+                            KeyCode::Right | KeyCode::Char('l') => {
+                                self.tab_index = (self.tab_index + 1).min(1);
+                                self.view = if self.tab_index == 0 {
+                                    View::Dashboard
+                                } else {
+                                    View::Outdated
+                                };
+                            }
+                            KeyCode::Left | KeyCode::Char('j') => {
+                                self.tab_index = self.tab_index.saturating_sub(1);
+                                self.view = if self.tab_index == 0 {
+                                    View::Dashboard
+                                } else {
+                                    View::Outdated
+                                };
+                            }
+                            KeyCode::Down | KeyCode::Char('n') => self.next_item(),
+                            KeyCode::Up | KeyCode::Char('p') => self.prev_item(),
+                            KeyCode::Enter => {
+                                if matches!(self.view, View::Dashboard) {
+                                    self.open_detail();
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    AppEvent::ScanFinished(results) => {
+                        let report = Report {
+                            timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
+                            results,
+                        };
+                        let _ = config::write_cache(&report, 7);
+
+                        self.report = Some(report);
                         self.view = View::Dashboard;
                         self.tab_index = 0;
+                        self.dashboard_selection = 0;
                     }
-                    KeyCode::Char('s') | KeyCode::Char('S') => {
-                        self.search_mode = false;
-                        self.search_query.clear();
-                        self.do_scan(&mut terminal)?
+                    AppEvent::UpdateFinished(msg) => {
+                        self.detail_message = msg;
+                        if self.detail_key.is_some() {
+                            self.view = View::PackageDetail;
+                        } else {
+                            self.view = View::Outdated;
+                        }
                     }
-                    KeyCode::Char('o') | KeyCode::Char('O') => {
-                        self.view = View::Outdated;
-                        self.tab_index = 1;
-                    }
-                    KeyCode::Char('u') | KeyCode::Char('U')
-                        if matches!(self.view, View::Outdated)
-                            && !self.checked_outdated.is_empty() =>
-                    {
-                        self.do_checked_updates(&mut terminal)?;
-                    }
-                    KeyCode::Char(' ') => {
-                        if matches!(self.view, View::Outdated) {
-                            if self.checked_outdated.contains(&self.outdated_selection) {
-                                self.checked_outdated.remove(&self.outdated_selection);
-                            } else {
-                                self.checked_outdated.insert(self.outdated_selection);
+                    AppEvent::CleanupFinished {
+                        result_msg,
+                        new_report_res,
+                    } => {
+                        self.detail_message = result_msg;
+                        self.view = View::PackageDetail;
+
+                        if let Some(res) = new_report_res {
+                            if let Some(ref mut report) = self.report {
+                                report.results.insert("cleanup".to_string(), res.clone());
+                                self.detail_cleanup =
+                                    crate::scanner::extract_cleanup_items(&res).to_vec();
                             }
                         }
+                        self.clamp_selection();
                     }
-                    KeyCode::Char('/') => {
-                        self.search_mode = true;
-                        self.dashboard_selection = 0;
-                        self.outdated_selection = 0;
-                    }
-                    KeyCode::Right | KeyCode::Char('l') => {
-                        self.tab_index = (self.tab_index + 1).min(1);
-                        self.view = if self.tab_index == 0 {
-                            View::Dashboard
-                        } else {
-                            View::Outdated
-                        };
-                    }
-                    KeyCode::Left | KeyCode::Char('j') => {
-                        self.tab_index = self.tab_index.saturating_sub(1);
-                        self.view = if self.tab_index == 0 {
-                            View::Dashboard
-                        } else {
-                            View::Outdated
-                        };
-                    }
-                    KeyCode::Down | KeyCode::Char('n') => self.next_item(),
-                    KeyCode::Up | KeyCode::Char('p') => self.prev_item(),
-                    KeyCode::Enter => {
-                        if matches!(self.view, View::Dashboard) {
-                            self.open_detail();
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            }
+                    AppEvent::SecurityFixFinished {
+                        result_msg,
+                        new_report_res,
+                    } => {
+                        self.detail_message = result_msg;
+                        self.view = View::PackageDetail;
 
-            if last_tick.elapsed() >= tick_rate {
-                self.tick_count = self.tick_count.wrapping_add(1);
-                last_tick = std::time::Instant::now();
+                        if let Some(res) = new_report_res {
+                            if let Some(ref mut report) = self.report {
+                                report.results.insert("security".to_string(), res.clone());
+                                self.detail_vulns =
+                                    crate::scanner::extract_vulnerabilities(&res).to_vec();
+                            }
+                        }
+                        self.clamp_selection();
+                    }
+                }
             }
         }
 
@@ -304,7 +393,7 @@ impl App {
 
     fn do_detail_updates(
         &mut self,
-        terminal: &mut DefaultTerminal,
+        tx: mpsc::UnboundedSender<AppEvent>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let tool = match &self.detail_tool {
             Some(t) => t.clone(),
@@ -326,12 +415,12 @@ impl App {
         self.progress_counter = 0;
         let _count = work.len();
 
-        let handle = std::thread::spawn(move || {
+        tokio::spawn(async move {
             let mut updated = 0usize;
             let mut failed = 0usize;
             let mut errors = vec![];
             for (tool, item) in &work {
-                match run_update(tool, item) {
+                match run_update(tool, item).await {
                     Ok(_) => updated += 1,
                     Err(e) => {
                         failed += 1;
@@ -339,33 +428,20 @@ impl App {
                     }
                 }
             }
-            if errors.is_empty() {
+            let result_msg = if errors.is_empty() {
                 format!("\u{2714} Updated {updated} package(s)")
             } else {
                 let e = errors.join("; ");
                 format!("\u{2714} Updated {updated} | \u{2716} Failed {failed}: {e}")
-            }
+            };
+            let _ = tx.send(AppEvent::UpdateFinished(result_msg));
         });
-
-        loop {
-            terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
-            self.throbber_state.calc_next();
-            self.progress_counter += 1;
-            if handle.is_finished() {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(50));
-        }
-
-        let result = handle.join().unwrap();
-        self.detail_message = result;
-        self.view = View::PackageDetail;
         Ok(())
     }
 
     fn do_detail_cleanups(
         &mut self,
-        terminal: &mut DefaultTerminal,
+        tx: mpsc::UnboundedSender<AppEvent>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let work: Vec<CleanupItem> = self
             .detail_cleanup
@@ -382,15 +458,15 @@ impl App {
         self.view = View::Updating;
         self.progress_counter = 0;
 
-        let handle = std::thread::spawn(move || {
+        tokio::spawn(async move {
             let mut cleaned = 0usize;
             let mut failed = 0usize;
             let mut errors = vec![];
             for item in &work {
                 if let Some(ref cmd_str) = item.command {
-                    let mut command = std::process::Command::new("sh");
+                    let mut command = tokio::process::Command::new("sh");
                     command.arg("-c").arg(cmd_str);
-                    match command.output() {
+                    match command.output().await {
                         Ok(output) if output.status.success() => cleaned += 1,
                         Ok(output) => {
                             failed += 1;
@@ -408,48 +484,25 @@ impl App {
                     errors.push(format!("{}: no command configured", item.description));
                 }
             }
-            if errors.is_empty() {
+            let result_msg = if errors.is_empty() {
                 format!("\u{2714} Successfully cleaned up {cleaned} item(s)")
             } else {
                 let e = errors.join("; ");
                 format!("\u{2714} Cleaned up {cleaned} | \u{2716} Failed {failed}: {e}")
-            }
+            };
+
+            let new_report_res = toolchains::scan_one("cleanup").await;
+            let _ = tx.send(AppEvent::CleanupFinished {
+                result_msg,
+                new_report_res,
+            });
         });
-
-        loop {
-            terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
-            self.throbber_state.calc_next();
-            self.progress_counter += 1;
-            if handle.is_finished() {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(50));
-        }
-
-        let result = handle.join().unwrap();
-        self.detail_message = result;
-        self.view = View::PackageDetail;
-
-        if let Some(ref mut report) = self.report {
-            let rt_handle = tokio::runtime::Handle::current();
-            if let Some(res) = rt_handle.block_on(async { toolchains::scan_one("cleanup").await }) {
-                report.results.insert("cleanup".to_string(), res);
-            }
-        }
-
-        if let Some(ref mut report) = self.report {
-            if let Some(res) = report.results.get("cleanup") {
-                self.detail_cleanup = scanner::extract_cleanup_items(res).to_vec();
-            }
-        }
-
-        self.clamp_selection();
         Ok(())
     }
 
     fn do_detail_security_fixes(
         &mut self,
-        terminal: &mut DefaultTerminal,
+        tx: mpsc::UnboundedSender<AppEvent>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         if self.detail_vulns.is_empty() {
             return Ok(());
@@ -458,15 +511,15 @@ impl App {
         self.view = View::Updating;
         self.progress_counter = 0;
 
-        let handle = std::thread::spawn(move || {
+        tokio::spawn(async move {
             let project_path = toolchains::get_project_path();
             let mut fixed = 0usize;
             let mut errors = vec![];
 
             if project_path.join("package.json").exists() && toolchains::which("npm") {
-                let mut cmd = std::process::Command::new("npm");
+                let mut cmd = tokio::process::Command::new("npm");
                 cmd.current_dir(&project_path).args(["audit", "fix"]);
-                match cmd.output() {
+                match cmd.output().await {
                     Ok(out) if out.status.success() => fixed += 1,
                     Ok(out) => errors.push(format!(
                         "npm audit fix: {}",
@@ -477,9 +530,9 @@ impl App {
             }
 
             if project_path.join("Cargo.toml").exists() && toolchains::which("cargo") {
-                let mut cmd = std::process::Command::new("cargo");
+                let mut cmd = tokio::process::Command::new("cargo");
                 cmd.current_dir(&project_path).args(["update"]);
-                match cmd.output() {
+                match cmd.output().await {
                     Ok(out) if out.status.success() => fixed += 1,
                     Ok(out) => errors.push(format!(
                         "cargo update: {}",
@@ -489,7 +542,7 @@ impl App {
                 }
             }
 
-            if errors.is_empty() {
+            let result_msg = if errors.is_empty() {
                 if fixed > 0 {
                     "\u{2714} Successfully ran automated security fixes".to_string()
                 } else {
@@ -498,38 +551,14 @@ impl App {
             } else {
                 let e = errors.join("; ");
                 format!("\u{2716} Fix attempted with errors: {e}")
-            }
+            };
+
+            let new_report_res = toolchains::scan_one("security").await;
+            let _ = tx.send(AppEvent::SecurityFixFinished {
+                result_msg,
+                new_report_res,
+            });
         });
-
-        loop {
-            terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
-            self.throbber_state.calc_next();
-            self.progress_counter += 1;
-            if handle.is_finished() {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(50));
-        }
-
-        let result = handle.join().unwrap();
-        self.detail_message = result;
-        self.view = View::PackageDetail;
-
-        if let Some(ref mut report) = self.report {
-            let rt_handle = tokio::runtime::Handle::current();
-            if let Some(res) = rt_handle.block_on(async { toolchains::scan_one("security").await })
-            {
-                report.results.insert("security".to_string(), res);
-            }
-        }
-
-        if let Some(ref mut report) = self.report {
-            if let Some(res) = report.results.get("security") {
-                self.detail_vulns = scanner::extract_vulnerabilities(res).to_vec();
-            }
-        }
-
-        self.clamp_selection();
         Ok(())
     }
 
@@ -555,7 +584,7 @@ impl App {
 
     fn do_checked_updates(
         &mut self,
-        terminal: &mut DefaultTerminal,
+        tx: mpsc::UnboundedSender<AppEvent>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let work = self.collect_checked_work();
         self.checked_outdated.clear();
@@ -567,12 +596,12 @@ impl App {
         self.progress_counter = 0;
         let _count = work.len();
 
-        let handle = std::thread::spawn(move || {
+        tokio::spawn(async move {
             let mut updated = 0usize;
             let mut failed = 0usize;
             let mut errors = vec![];
             for (tool, item) in &work {
-                match run_update(tool, item) {
+                match run_update(tool, item).await {
                     Ok(_) => updated += 1,
                     Err(e) => {
                         failed += 1;
@@ -580,27 +609,14 @@ impl App {
                     }
                 }
             }
-            if errors.is_empty() {
+            let result_msg = if errors.is_empty() {
                 format!("\u{2714} Updated {updated} package(s)")
             } else {
                 let e = errors.join("; ");
                 format!("\u{2714} Updated {updated} | \u{2716} Failed {failed}: {e}")
-            }
+            };
+            let _ = tx.send(AppEvent::UpdateFinished(result_msg));
         });
-
-        loop {
-            terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
-            self.throbber_state.calc_next();
-            self.progress_counter += 1;
-            if handle.is_finished() {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(50));
-        }
-
-        let result = handle.join().unwrap();
-        self.detail_message = result;
-        self.view = View::Outdated;
         Ok(())
     }
 
@@ -674,39 +690,15 @@ impl App {
 
     fn do_scan(
         &mut self,
-        terminal: &mut DefaultTerminal,
+        tx: mpsc::UnboundedSender<AppEvent>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.view = View::Scanning;
         self.progress_counter = 0;
 
-        let rt_handle = tokio::runtime::Handle::current();
-        let handle = std::thread::spawn(move || rt_handle.block_on(toolchains::scan_all()));
-
-        loop {
-            terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
-            self.throbber_state.calc_next();
-            self.progress_counter += 1;
-            if handle.is_finished() {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(50));
-        }
-
-        let results = handle.join().expect("Scan thread panicked");
-
-        let report = Report {
-            timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
-            results,
-        };
-        let _ = config::write_cache(&report, 7);
-
-        self.report = Some(report);
-        self.view = View::Dashboard;
-        self.tab_index = 0;
-        self.dashboard_selection = 0;
-        std::thread::sleep(Duration::from_millis(200));
-
-        terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
+        tokio::spawn(async move {
+            let results = toolchains::scan_all().await;
+            let _ = tx.send(AppEvent::ScanFinished(results));
+        });
         Ok(())
     }
 
@@ -824,7 +816,7 @@ impl App {
     }
 }
 
-fn run_update(tool: &str, item: &OutdatedItem) -> Result<String, String> {
+async fn run_update(tool: &str, item: &OutdatedItem) -> Result<String, String> {
     let project_path = toolchains::get_project_path();
     let is_package = item.source == "package";
 
@@ -941,7 +933,7 @@ fn run_update(tool: &str, item: &OutdatedItem) -> Result<String, String> {
         _ => return Err(format!("auto-update not supported for {}", tool)),
     };
 
-    let mut command = std::process::Command::new(&cmd);
+    let mut command = tokio::process::Command::new(&cmd);
     command.args(&args);
     if run_in_project {
         command.current_dir(&project_path);
@@ -949,6 +941,7 @@ fn run_update(tool: &str, item: &OutdatedItem) -> Result<String, String> {
 
     let output = command
         .output()
+        .await
         .map_err(|e| format!("command failed: {e}"))?;
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();

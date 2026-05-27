@@ -241,14 +241,23 @@ async fn check_env_managers() -> Vec<AuditItem> {
     if let Ok(content) = std::fs::read_to_string(&sdkmanrc) {
         for line in content.lines() {
             if line.starts_with("java=") && expected_java.is_none() {
-                expected_java = Some(("sdkmanrc", line.trim_start_matches("java=").trim().to_string()));
+                expected_java = Some((
+                    "sdkmanrc",
+                    line.trim_start_matches("java=").trim().to_string(),
+                ));
             }
         }
     }
 
     if let Some((source, expected)) = expected_java {
         if let Ok(java) = run_cmd("java", &["-version"], None).await {
-            let current = java.lines().next().unwrap_or("").split('"').nth(1).unwrap_or("0");
+            let current = java
+                .lines()
+                .next()
+                .unwrap_or("")
+                .split('"')
+                .nth(1)
+                .unwrap_or("0");
             if !current.starts_with(&expected) {
                 items.push(AuditItem {
                     name: "Java Environment".into(),

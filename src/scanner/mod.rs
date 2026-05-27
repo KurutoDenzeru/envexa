@@ -613,7 +613,7 @@ pub fn format_sarif(report: &Report) -> String {
     for (tool, res) in &report.results {
         for vuln in &res.vulnerabilities {
             let rule_id = format!("{}-vuln-{}", tool, vuln.package);
-            
+
             // Avoid duplicate rules
             if !rules.iter().any(|r: &sarif::Rule| r.id == rule_id) {
                 rules.push(sarif::Rule {
@@ -623,7 +623,10 @@ pub fn format_sarif(report: &Report) -> String {
                         text: format!("{} vulnerability in {}", vuln.severity, vuln.package),
                     },
                     help: sarif::Message {
-                        text: format!("Update {} to version {}", vuln.package, vuln.patched_version),
+                        text: format!(
+                            "Update {} to version {}",
+                            vuln.package, vuln.patched_version
+                        ),
                     },
                     properties: sarif::RuleProperties {
                         tags: vec!["security".into(), tool.clone()],
@@ -645,7 +648,7 @@ pub fn format_sarif(report: &Report) -> String {
                 }],
             });
         }
-        
+
         for outdated in extract_outdated(res) {
             let rule_id = format!("{}-outdated-{}", tool, outdated.name);
 
@@ -654,7 +657,10 @@ pub fn format_sarif(report: &Report) -> String {
                     id: rule_id.clone(),
                     name: format!("Outdated package {}", outdated.name),
                     short_description: sarif::Message {
-                        text: format!("{} is outdated ({} -> {})", outdated.name, outdated.current, outdated.latest),
+                        text: format!(
+                            "{} is outdated ({} -> {})",
+                            outdated.name, outdated.current, outdated.latest
+                        ),
                     },
                     help: sarif::Message {
                         text: format!("Update {} to version {}", outdated.name, outdated.latest),
@@ -668,7 +674,10 @@ pub fn format_sarif(report: &Report) -> String {
             results.push(sarif::ResultEntry {
                 rule_id,
                 message: sarif::Message {
-                    text: format!("{} is outdated ({} -> {})", outdated.name, outdated.current, outdated.latest),
+                    text: format!(
+                        "{} is outdated ({} -> {})",
+                        outdated.name, outdated.current, outdated.latest
+                    ),
                 },
                 locations: vec![sarif::Location {
                     physical_location: sarif::PhysicalLocation {

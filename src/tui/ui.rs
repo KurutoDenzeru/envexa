@@ -257,18 +257,21 @@ fn marquee_text(text: &str, max_width: usize, tick: usize, is_selected: bool) ->
     let len = chars.len();
     if len <= max_width || max_width == 0 || !is_selected {
         if len > max_width && max_width > 0 {
-            let mut s: String = chars.into_iter().take(max_width.saturating_sub(1)).collect();
+            let mut s: String = chars
+                .into_iter()
+                .take(max_width.saturating_sub(1))
+                .collect();
             s.push('…');
             return s;
         }
         return text.to_string();
     }
-    
+
     let distance = len - max_width;
-    let pause = 5; 
+    let pause = 5;
     let period = (distance + pause) * 2;
     let step = tick % period;
-    
+
     let offset = if step < pause {
         0
     } else if step < pause + distance {
@@ -278,7 +281,7 @@ fn marquee_text(text: &str, max_width: usize, tick: usize, is_selected: bool) ->
     } else {
         period - step
     };
-    
+
     chars[offset..offset + max_width].iter().collect()
 }
 
@@ -1058,7 +1061,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             };
             let sel = tool_index == app.dashboard_selection;
             let indicator = if sel { "\u{25b8} " } else { "  " };
-            
+
             let (max_col4, max_col5) = dashboard_max_widths(table_area.width);
             let out_str = marquee_text(&outdated_str, max_col4, app.tick_count, sel);
             let iss_str = marquee_text(&issues_str, max_col5, app.tick_count, sel);

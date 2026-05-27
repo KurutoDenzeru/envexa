@@ -180,7 +180,14 @@ async fn poetry_outdated(dir: &Path, result: &mut ScanResult) {
     if !which("poetry") {
         return;
     }
-    if let Ok(out) = run_cmd_in(dir, "poetry", &["show", "--outdated", "--format=json"], None).await {
+    if let Ok(out) = run_cmd_in(
+        dir,
+        "poetry",
+        &["show", "--outdated", "--format=json"],
+        None,
+    )
+    .await
+    {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
             if let Some(arr) = data.as_array() {
                 for item in arr {
@@ -283,7 +290,8 @@ async fn pip_venv_outdated(dir: &Path, result: &mut ScanResult) {
         } else {
             return;
         };
-        if let Ok(out) = run_cmd_in(dir, cmd, &["list", "--outdated", "--format=json"], None).await {
+        if let Ok(out) = run_cmd_in(dir, cmd, &["list", "--outdated", "--format=json"], None).await
+        {
             parse_pip_outdated(&out, result);
         }
     }
@@ -316,7 +324,14 @@ async fn composer_outdated(dir: &Path, result: &mut ScanResult) {
     if !which("composer") {
         return;
     }
-    if let Ok(out) = run_cmd_in(dir, "composer", &["outdated", "--format=json", "--direct"], None).await {
+    if let Ok(out) = run_cmd_in(
+        dir,
+        "composer",
+        &["outdated", "--format=json", "--direct"],
+        None,
+    )
+    .await
+    {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
             if let Some(installed) = data.get("installed").and_then(|v| v.as_array()) {
                 for item in installed {
