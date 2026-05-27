@@ -26,17 +26,7 @@ pub async fn scan() -> ScanResult {
 
     let project_path = get_project_path();
     if let Ok(out) = run_cmd_in(&project_path, "cargo-outdated", &["--format=json"]).await {
-        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
-            if let Some(crates) = data["dependencies"].as_array() {
-                for c in crates {
-                    result.outdated.push(PackageInfo {
-                        name: c["name"].as_str().unwrap_or("?").to_string(),
-                        current: c["project_version"].as_str().unwrap_or("?").to_string(),
-                        latest: c["latest_version"].as_str().unwrap_or("?").to_string(),
-                    });
-                }
-            }
-        }
+        result.outdated = parse_outdated(&out);
     }
 
     result.status = if result.outdated.is_empty() {
@@ -46,4 +36,20 @@ pub async fn scan() -> ScanResult {
     };
 
     result
+}
+
+pub fn parse_outdated(out: &str) -> Vec<PackageInfo> {
+    let mut packages = Vec::new();
+    if let Ok(data) = serde_json::from_str::<serde_json::Value>(out) {
+        if let Some(crates) = data["dependencies"].as_array() {
+            for c in crates {
+                packages.push(PackageInfo {
+                    name: c["name"].as_str().unwrap_or("?").to_string(),
+                    current: c["project_version"].as_str().unwrap_or("?").to_string(),
+                    latest: c["latest_version"].as_str().unwrap_or("?").to_string(),
+                });
+            }
+        }
+    }
+    packages
 }
