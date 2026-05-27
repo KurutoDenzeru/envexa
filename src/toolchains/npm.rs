@@ -7,29 +7,27 @@ pub async fn scan() -> ScanResult {
 
     let mut result = ScanResult::new("npm");
 
-    if let Ok(ver) = run_cmd("node", &["--version"]).await {
-        result.node_version = Some(ver);
-    }
+    let has_npm = which("npm");
 
-    if !which("npm") {
-        return result;
-    }
+    if has_npm {
+        let (node_ver, npm_ver, outdated) = tokio::join!(
+            run_cmd("node", &["--version"], None),
+            run_cmd("npm", &["--version"], None),
+            run_cmd("npm", &["outdated", "-g", "--json"], None)
+        );
 
-    if let Ok(ver) = run_cmd("npm", &["--version"]).await {
-        result.version = Some(ver);
-    }
-
-    if let Ok(out) = run_cmd("npm", &["outdated", "-g", "--json"]).await {
-        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
-            if let Some(obj) = data.as_object() {
-                for (name, info) in obj {
-                    result.outdated_global.push(PackageInfo {
-                        name: name.clone(),
-                        current: info["current"].as_str().unwrap_or("?").to_string(),
-                        latest: info["latest"].as_str().unwrap_or("?").to_string(),
-                    });
-                }
-            }
+        if let Ok(ver) = node_ver {
+            result.node_version = Some(ver);
+        }
+        if let Ok(ver) = npm_ver {
+            result.version = Some(ver);
+        }
+        if let Ok(out) = outdated {
+            result.outdated_global = parse_outdated(&out);
+        }
+    } else {
+        if let Ok(ver) = run_cmd("node", &["--version"], None).await {
+            result.node_version = Some(ver);
         }
     }
 
@@ -40,4 +38,24 @@ pub async fn scan() -> ScanResult {
     };
 
     result
+}
+
+#[derive(serde::Deserialize)]
+struct NpmOutdated {
+    current: Option<String>,
+    latest: Option<String>,
+}
+
+pub fn parse_outdated(out: &str) -> Vec<PackageInfo> {
+    let mut packages = Vec::new();
+    if let Ok(data) = serde_json::from_str::<std::collections::HashMap<String, NpmOutdated>>(out) {
+        for (name, info) in data {
+            packages.push(PackageInfo {
+                name,
+                current: info.current.unwrap_or_else(|| "?".to_string()),
+                latest: info.latest.unwrap_or_else(|| "?".to_string()),
+            });
+        }
+    }
+    packages
 }

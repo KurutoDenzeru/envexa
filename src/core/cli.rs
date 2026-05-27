@@ -87,14 +87,26 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn run_cmd(cmd: Commands) -> Result<(), anyhow::Error> {
     match cmd {
         Commands::Scan { ttl, format } => {
-            let results = with_spinner("Scanning toolchains...", toolchains::scan_all()).await;
-            let report = Report {
-                timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
-                results,
-            };
-            if let Err(e) = config::write_cache(&report, ttl) {
-                eprintln!("Warning: failed to write cache: {e}");
+            let mut report_opt = None;
+            if let Some(entry) = config::read_cache() {
+                if !config::cache_expired(&entry) {
+                    report_opt = Some(entry.report);
+                }
             }
+
+            let report = if let Some(r) = report_opt {
+                r
+            } else {
+                let results = with_spinner("Scanning toolchains...", toolchains::scan_all()).await;
+                let r = Report {
+                    timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
+                    results,
+                };
+                if let Err(e) = config::write_cache(&r, ttl) {
+                    eprintln!("Warning: failed to write cache: {e}");
+                }
+                r
+            };
             if format.to_lowercase() == "json" {
                 match serde_json::to_string_pretty(&report) {
                     Ok(json) => println!("{}", json),

@@ -137,10 +137,10 @@ fn title_bar(frame: &mut Frame, area: Rect, _app: &App) {
 
 fn tab_bar(frame: &mut Frame, area: Rect, app: &App) {
     let titles = vec![" Dashboard ", " Outdated "];
-    let selected = match app.view {
+    let selected = match app.ui.view {
         View::Dashboard => 0,
         View::Outdated => 1,
-        View::Scanning | View::PackageDetail | View::Updating => app.tab_index,
+        View::Scanning | View::PackageDetail | View::Updating => app.ui.tab_index,
     };
     let tabs = Tabs::new(titles)
         .select(selected)
@@ -155,7 +155,7 @@ fn tab_bar(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
-    let (text, style) = match app.view {
+    let (text, style) = match app.ui.view {
         View::Updating => (
             Line::from(vec![Span::styled(
                 " Updating packages... ",
@@ -166,17 +166,17 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
             Style::default().fg(Color::White).bg(Color::Black),
         ),
         View::PackageDetail => {
-            let msg = if !app.detail_message.is_empty() {
-                format!("  {}", app.detail_message)
+            let msg = if !app.detail.message.is_empty() {
+                format!("  {}", app.detail.message)
             } else {
                 String::new()
             };
-            let readonly_detail = matches!(app.detail_key.as_deref(), Some("audit"));
+            let readonly_detail = matches!(app.detail.key.as_deref(), Some("audit"));
             let mut spans = vec![
                 Span::styled(" [\u{2191}\u{2193}]", Style::default().fg(Color::DarkGray)),
                 Span::raw(" nav "),
             ];
-            if app.detail_key.as_deref() == Some("security") {
+            if app.detail.key.as_deref() == Some("security") {
                 spans.extend([
                     Span::styled("[F]", Style::default().fg(Color::Green)),
                     Span::raw(" fix "),
@@ -199,8 +199,8 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
                 Style::default().fg(Color::White).bg(Color::Black),
             )
         }
-        _ if app.search_mode => {
-            let query = format!(" / {}█", app.search_query);
+        _ if app.ui.search_mode => {
+            let query = format!(" / {}█", app.ui.search_query);
             (
                 Line::from(vec![
                     Span::styled(
@@ -217,12 +217,12 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
             )
         }
         _ => {
-            let update_msg = if matches!(app.view, View::Outdated) && !app.detail_message.is_empty()
-            {
-                format!("  {}", app.detail_message)
-            } else {
-                String::new()
-            };
+            let update_msg =
+                if matches!(app.ui.view, View::Outdated) && !app.detail.message.is_empty() {
+                    format!("  {}", app.detail.message)
+                } else {
+                    String::new()
+                };
             (
                 Line::from(vec![
                     Span::styled(" [S]", Style::default().fg(Color::Green)),
@@ -257,18 +257,21 @@ fn marquee_text(text: &str, max_width: usize, tick: usize, is_selected: bool) ->
     let len = chars.len();
     if len <= max_width || max_width == 0 || !is_selected {
         if len > max_width && max_width > 0 {
-            let mut s: String = chars.into_iter().take(max_width.saturating_sub(1)).collect();
+            let mut s: String = chars
+                .into_iter()
+                .take(max_width.saturating_sub(1))
+                .collect();
             s.push('…');
             return s;
         }
         return text.to_string();
     }
-    
+
     let distance = len - max_width;
-    let pause = 5; 
+    let pause = 5;
     let period = (distance + pause) * 2;
     let step = tick % period;
-    
+
     let offset = if step < pause {
         0
     } else if step < pause + distance {
@@ -278,7 +281,7 @@ fn marquee_text(text: &str, max_width: usize, tick: usize, is_selected: bool) ->
     } else {
         period - step
     };
-    
+
     chars[offset..offset + max_width].iter().collect()
 }
 
@@ -294,9 +297,9 @@ fn dashboard_max_widths(width: u16) -> (usize, usize) {
 
 fn outdated_max_width(width: u16) -> usize {
     if width < 72 {
-        (width.saturating_sub(45)) as usize
+        (width.saturating_sub(48)) as usize
     } else {
-        (width.saturating_sub(66)) as usize
+        (width.saturating_sub(70)) as usize
     }
 }
 
@@ -522,15 +525,16 @@ fn dashboard_table_constraints(width: u16) -> [Constraint; 6] {
     }
 }
 
-fn outdated_table_constraints(width: u16) -> [Constraint; 6] {
+fn outdated_table_constraints(width: u16) -> [Constraint; 7] {
     if width < 72 {
         [
             Constraint::Length(3),
             Constraint::Length(8),
             Constraint::Length(7),
             Constraint::Min(12),
-            Constraint::Length(10),
-            Constraint::Length(10),
+            Constraint::Length(8),
+            Constraint::Length(8),
+            Constraint::Length(8),
         ]
     } else {
         [
@@ -538,8 +542,9 @@ fn outdated_table_constraints(width: u16) -> [Constraint; 6] {
             Constraint::Length(10),
             Constraint::Length(8),
             Constraint::Min(18),
-            Constraint::Length(18),
-            Constraint::Length(18),
+            Constraint::Length(14),
+            Constraint::Length(14),
+            Constraint::Length(10),
         ]
     }
 }
@@ -550,15 +555,17 @@ fn detail_table_constraints(width: u16, kind: &str) -> Vec<Constraint> {
             Constraint::Length(3),
             Constraint::Min(12),
             Constraint::Length(7),
-            Constraint::Length(10),
-            Constraint::Length(10),
+            Constraint::Length(8),
+            Constraint::Length(8),
+            Constraint::Length(8),
         ],
         "outdated" => vec![
             Constraint::Length(5),
             Constraint::Min(18),
             Constraint::Length(8),
-            Constraint::Length(18),
-            Constraint::Length(18),
+            Constraint::Length(14),
+            Constraint::Length(14),
+            Constraint::Length(10),
         ],
         "security" if width < 84 => vec![
             Constraint::Min(12),
@@ -1017,7 +1024,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
         chunks[2]
     };
 
-    let q = app.search_query.to_lowercase();
+    let q = app.ui.search_query.to_lowercase();
     let mut category_tables: Vec<Table> = Vec::new();
     let mut category_heights: Vec<u16> = Vec::new();
     let mut tool_index = 0;
@@ -1030,7 +1037,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
                 if !report.results.contains_key(**t) {
                     return false;
                 }
-                if !q.is_empty() && app.search_mode {
+                if !q.is_empty() && app.ui.search_mode {
                     let name = scanner::display_name(t).to_lowercase();
                     if !name.contains(&q) && !t.contains(&q) {
                         return false;
@@ -1056,12 +1063,12 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             } else {
                 dashboard_cells(tool, res)
             };
-            let sel = tool_index == app.dashboard_selection;
+            let sel = tool_index == app.ui.dashboard_selection;
             let indicator = if sel { "\u{25b8} " } else { "  " };
-            
+
             let (max_col4, max_col5) = dashboard_max_widths(table_area.width);
-            let out_str = marquee_text(&outdated_str, max_col4, app.tick_count, sel);
-            let iss_str = marquee_text(&issues_str, max_col5, app.tick_count, sel);
+            let out_str = marquee_text(&outdated_str, max_col4, app.ui.tick_count, sel);
+            let iss_str = marquee_text(&issues_str, max_col5, app.ui.tick_count, sel);
 
             let mut row = Row::new(vec![
                 Cell::from(indicator),
@@ -1173,6 +1180,7 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         "Package ",
         "Current ",
         "Latest ",
+        "Size ",
     ]
     .iter()
     .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
@@ -1180,7 +1188,7 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         .style(Style::default().bg(Color::Blue).fg(Color::White))
         .height(1);
 
-    let q = app.search_query.to_lowercase();
+    let q = app.ui.search_query.to_lowercase();
     let mut items: Vec<(String, scanner::OutdatedItem)> = Vec::new();
     for tool in &scanner::tool_order() {
         if let Some(res) = report.results.get(*tool) {
@@ -1188,7 +1196,7 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
             if !pkgs.is_empty() {
                 let display = scanner::display_name(tool).to_string();
                 for pkg in pkgs {
-                    if !q.is_empty() && app.search_mode {
+                    if !q.is_empty() && app.ui.search_mode {
                         let tool_lower = display.to_lowercase();
                         if !tool_lower.contains(&q)
                             && !pkg.name.to_lowercase().contains(&q)
@@ -1204,7 +1212,7 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
     }
 
     if items.is_empty() {
-        let msg = if app.search_mode && !q.is_empty() {
+        let msg = if app.ui.search_mode && !q.is_empty() {
             format!("  No packages match \"{q}\" ")
         } else {
             "  All packages are up to date! ".into()
@@ -1229,15 +1237,15 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         .iter()
         .enumerate()
         .map(|(i, (tool, pkg))| {
-            let sel = i == app.outdated_selection;
-            let checked = app.checked_outdated.contains(&i);
+            let sel = i == app.ui.outdated_selection;
+            let checked = app.ui.checked_outdated.contains(&i);
             let cb = if checked { "[x]" } else { "[ ]" };
             let indicator = if sel {
                 format!("{cb}\u{25b8}")
             } else {
                 format!("{cb} ")
             };
-            let pkg_name = marquee_text(&pkg.name, max_col3, app.tick_count, sel);
+            let pkg_name = marquee_text(&pkg.name, max_col3, app.ui.tick_count, sel);
             let mut row = Row::new(vec![
                 Cell::from(indicator),
                 Cell::from(tool.as_str()),
@@ -1245,6 +1253,7 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
                 Cell::from(pkg_name),
                 Cell::from(pkg.current.as_str()),
                 Cell::from(pkg.latest.as_str()),
+                Cell::from(pkg.size.as_str()),
             ]);
             if sel {
                 row = row.style(
@@ -1258,8 +1267,8 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         .collect();
 
     let total = items.len();
-    let checked_count = app.checked_outdated.len();
-    let title = if app.search_mode && !q.is_empty() {
+    let checked_count = app.ui.checked_outdated.len();
+    let title = if app.ui.search_mode && !q.is_empty() {
         format!(" Outdated Packages ({total} matched) ")
     } else if checked_count > 0 {
         format!(" Outdated Packages ({total})  —  {checked_count} selected ")
@@ -1309,9 +1318,9 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
                     Constraint::Min(0),
                 ])
                 .split(inner);
-            frame.render_stateful_widget(throbber, chunks[0], &mut app.throbber_state);
+            frame.render_stateful_widget(throbber, chunks[0], &mut app.ui.throbber_state);
 
-            let ratio = 1.0 - (0.96_f64).powi(app.progress_counter as i32);
+            let ratio = 1.0 - (0.96_f64).powi(app.ui.progress_counter as i32);
             let pct = (ratio * 100.0).round() as u64;
             let gauge = Gauge::default()
                 .block(Block::default().borders(Borders::NONE))
@@ -1324,7 +1333,7 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
             frame.render_widget(gauge, chunks[2]);
 
             // Real-time scan logs and tips
-            let step = app.progress_counter;
+            let step = app.ui.progress_counter;
             let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
             let spin_char = spinner_frames[step % spinner_frames.len()];
             let mut log_lines = vec![Line::from("")];
@@ -1441,7 +1450,7 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
 
             frame.render_widget(Paragraph::new(log_lines), chunks[3]);
         } else {
-            frame.render_stateful_widget(throbber, inner, &mut app.throbber_state);
+            frame.render_stateful_widget(throbber, inner, &mut app.ui.throbber_state);
         }
     }
 }
@@ -1481,7 +1490,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         status_bar(frame, chunks[3], app);
     }
 
-    match app.view {
+    match app.ui.view {
         View::Dashboard => render_dashboard(frame, chunks[4], app),
         View::Outdated => render_outdated(frame, chunks[4], app),
         View::Scanning => render_scanning(frame, chunks[4], app),
@@ -1491,12 +1500,12 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 }
 
 fn render_package_detail(frame: &mut Frame, area: Rect, app: &App) {
-    let tool = match &app.detail_tool {
+    let tool = match &app.detail.tool {
         Some(t) => t.clone(),
         None => return,
     };
 
-    match app.detail_key.as_deref() {
+    match app.detail.key.as_deref() {
         Some("security") => render_vulnerabilities(frame, area, &tool, app),
         Some("audit") => render_audit_items(frame, area, &tool, app),
         Some("cleanup") => render_cleanup_items(frame, area, &tool, app),
@@ -1505,7 +1514,7 @@ fn render_package_detail(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
-    let items = &app.detail_items;
+    let items = &app.detail.items;
 
     if items.is_empty() {
         let block = Block::default()
@@ -1527,7 +1536,7 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         return;
     }
 
-    let header_cells = ["", "Package ", "Source ", "Current ", "Latest "]
+    let header_cells = ["", "Package ", "Source ", "Current ", "Latest ", "Size "]
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
@@ -1538,8 +1547,8 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         .iter()
         .enumerate()
         .map(|(i, item)| {
-            let sel = i == app.detail_selection;
-            let checked = app.detail_checked.contains(&i);
+            let sel = i == app.detail.selection;
+            let checked = app.detail.checked.contains(&i);
             let cb = if checked { "[x]" } else { "[ ]" };
             let indicator = if sel {
                 format!("{cb}\u{25b8}")
@@ -1552,6 +1561,7 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
                 Cell::from(item.source.as_str()).style(source_style(&item.source)),
                 Cell::from(item.current.as_str()),
                 Cell::from(item.latest.as_str()),
+                Cell::from(item.size.as_str()),
             ]);
             if sel {
                 row = row.style(
@@ -1564,8 +1574,8 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         })
         .collect();
 
-    let sub = if !app.detail_message.is_empty() {
-        format!("  {}", app.detail_message)
+    let sub = if !app.detail.message.is_empty() {
+        format!("  {}", app.detail.message)
     } else {
         String::new()
     };
@@ -1585,7 +1595,7 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
 }
 
 fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
-    let items = &app.detail_vulns;
+    let items = &app.detail.vulns;
 
     if items.is_empty() {
         let block = Block::default()
@@ -1618,7 +1628,7 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         .iter()
         .enumerate()
         .map(|(i, v)| {
-            let sel = i == app.detail_selection;
+            let sel = i == app.detail.selection;
             let cve = v.cve.as_deref().unwrap_or("-");
             let mut row = Row::new(vec![
                 Cell::from(v.package.as_str()),
@@ -1638,10 +1648,10 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         })
         .collect();
 
-    let bottom_msg = if !app.detail_message.is_empty() {
+    let bottom_msg = if !app.detail.message.is_empty() {
         format!(
             "  {}  |  [E] Export Report  [Esc] Back ",
-            app.detail_message
+            app.detail.message
         )
     } else {
         "  [E] Export Report  |  [Esc] Back ".to_string()
@@ -1743,7 +1753,7 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         }
 
         // Right Bottom: Dynamic Selection Card
-        if let Some(vuln) = items.get(app.detail_selection) {
+        if let Some(vuln) = items.get(app.detail.selection) {
             let cve = vuln.cve.as_deref().unwrap_or("None");
             let card_border_color = match vuln.severity.to_ascii_lowercase().as_str() {
                 "critical" => Color::Red,
@@ -1812,7 +1822,7 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
 }
 
 fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
-    let items = &app.detail_audits;
+    let items = &app.detail.audits;
 
     if items.is_empty() {
         let block = Block::default()
@@ -1845,7 +1855,7 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         .iter()
         .enumerate()
         .map(|(i, a)| {
-            let sel = i == app.detail_selection;
+            let sel = i == app.detail.selection;
             let mut row = Row::new(vec![
                 Cell::from(a.name.as_str()),
                 Cell::from(a.current.as_str()),
@@ -1862,10 +1872,10 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         })
         .collect();
 
-    let bottom_msg = if !app.detail_message.is_empty() {
+    let bottom_msg = if !app.detail.message.is_empty() {
         format!(
             "  {}  |  [E] Export Report  [Esc] Back ",
-            app.detail_message
+            app.detail.message
         )
     } else {
         "  [E] Export Report  |  [Esc] Back ".to_string()
@@ -1919,7 +1929,7 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         frame.render_widget(gauge, right_chunks[0]);
 
         // Right Bottom: Dynamic Recommendation Card
-        if let Some(audit) = items.get(app.detail_selection) {
+        if let Some(audit) = items.get(app.detail.selection) {
             let lines = vec![
                 Line::from(vec![
                     Span::styled("Audit Rule: ", Style::default().fg(Color::DarkGray)),
@@ -2033,7 +2043,7 @@ fn get_label_color(label: &str) -> Color {
 }
 
 fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
-    let items = &app.detail_cleanup;
+    let items = &app.detail.cleanup;
 
     if items.is_empty() {
         let block = Block::default()
@@ -2066,8 +2076,8 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         .iter()
         .enumerate()
         .map(|(i, c)| {
-            let sel = i == app.detail_selection;
-            let checked = app.detail_checked.contains(&i);
+            let sel = i == app.detail.selection;
+            let checked = app.detail.checked.contains(&i);
             let cb = if checked { "[x]" } else { "[ ]" };
             let indicator = if sel {
                 format!("{cb}\u{25b8}")
@@ -2175,8 +2185,19 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
 }
 
 fn render_updating(frame: &mut Frame, area: Rect, app: &mut App) {
+    let label = if app.ui.update_package_name.is_empty() {
+        "Updating packages...".to_string()
+    } else if app.ui.update_downloaded_mb > 0.0 {
+        format!(
+            "Updating {} ({:.2} MB downloaded)...",
+            app.ui.update_package_name, app.ui.update_downloaded_mb
+        )
+    } else {
+        format!("Updating {}...", app.ui.update_package_name)
+    };
+
     let throbber = throbber_widgets_tui::Throbber::default()
-        .label("Updating packages...")
+        .label(label)
         .style(Style::default().fg(Color::Green))
         .throbber_style(
             Style::default()
@@ -2204,9 +2225,9 @@ fn render_updating(frame: &mut Frame, area: Rect, app: &mut App) {
                     Constraint::Min(0),
                 ])
                 .split(inner);
-            frame.render_stateful_widget(throbber, chunks[0], &mut app.throbber_state);
+            frame.render_stateful_widget(throbber, chunks[0], &mut app.ui.throbber_state);
 
-            let ratio = 1.0 - (0.96_f64).powi(app.progress_counter as i32);
+            let ratio = 1.0 - (0.96_f64).powi(app.ui.progress_counter as i32);
             let pct = (ratio * 100.0).round() as u64;
             let gauge = Gauge::default()
                 .block(Block::default().borders(Borders::NONE))
@@ -2217,8 +2238,47 @@ fn render_updating(frame: &mut Frame, area: Rect, app: &mut App) {
                 ))
                 .ratio(ratio);
             frame.render_widget(gauge, chunks[2]);
+
+            if chunks[3].height >= 3 {
+                let tip_block = Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::DarkGray))
+                    .title(" Loading Tip ")
+                    .title_style(Style::default().fg(Color::Yellow).bold());
+
+                let mut tip_lines = vec![Line::from(vec![
+                    Span::styled("💡 Tip: ", Style::default().fg(Color::Yellow).bold()),
+                    Span::raw("Downloading updates can take a moment depending on your network connection."),
+                ])];
+
+                if app.ui.update_downloaded_mb > 0.0 {
+                    tip_lines.push(Line::from(vec![
+                        Span::styled("⤓ Progress: ", Style::default().fg(Color::Cyan).bold()),
+                        Span::styled(
+                            format!(
+                                "{:.2} MB downloaded so far for {}",
+                                app.ui.update_downloaded_mb, app.ui.update_package_name
+                            ),
+                            Style::default().fg(Color::White).bold(),
+                        ),
+                    ]));
+                } else if !app.ui.update_package_name.is_empty() {
+                    tip_lines.push(Line::from(vec![
+                        Span::styled("⚡ Active: ", Style::default().fg(Color::Cyan).bold()),
+                        Span::styled(
+                            format!("Installing/updating {}...", app.ui.update_package_name),
+                            Style::default().fg(Color::White),
+                        ),
+                    ]));
+                }
+
+                let tip_paragraph = Paragraph::new(tip_lines)
+                    .block(tip_block)
+                    .alignment(Alignment::Left);
+                frame.render_widget(tip_paragraph, chunks[3]);
+            }
         } else {
-            frame.render_stateful_widget(throbber, inner, &mut app.throbber_state);
+            frame.render_stateful_widget(throbber, inner, &mut app.ui.throbber_state);
         }
     }
 }

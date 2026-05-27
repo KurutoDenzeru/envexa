@@ -12,11 +12,11 @@ fn major(ver: &str) -> Option<u64> {
 }
 
 async fn check_node_npm() -> Option<AuditItem> {
-    let node = match run_cmd("node", &["--version"]).await {
+    let node = match run_cmd("node", &["--version"], None).await {
         Ok(v) => v,
         _ => return None,
     };
-    let npm = match run_cmd("npm", &["--version"]).await {
+    let npm = match run_cmd("npm", &["--version"], None).await {
         Ok(v) => v,
         _ => return None,
     };
@@ -52,11 +52,11 @@ async fn check_node_npm() -> Option<AuditItem> {
 }
 
 async fn check_python_pip() -> Option<AuditItem> {
-    let python = match run_cmd("python3", &["--version"]).await {
+    let python = match run_cmd("python3", &["--version"], None).await {
         Ok(v) => v,
         _ => return None,
     };
-    let pip = match run_cmd("pip3", &["--version"]).await {
+    let pip = match run_cmd("pip3", &["--version"], None).await {
         Ok(v) => v,
         _ => return None,
     };
@@ -78,7 +78,7 @@ async fn check_python_pip() -> Option<AuditItem> {
 }
 
 async fn check_brew_age() -> Option<AuditItem> {
-    let out = match run_cmd("brew", &["--version"]).await {
+    let out = match run_cmd("brew", &["--version"], None).await {
         Ok(v) => v,
         _ => return None,
     };
@@ -99,11 +99,11 @@ async fn check_brew_age() -> Option<AuditItem> {
 }
 
 async fn check_cargo_vs_rustc() -> Option<AuditItem> {
-    let rustc = match run_cmd("rustc", &["--version"]).await {
+    let rustc = match run_cmd("rustc", &["--version"], None).await {
         Ok(v) => v,
         _ => return None,
     };
-    let cargo = match run_cmd("cargo", &["--version"]).await {
+    let cargo = match run_cmd("cargo", &["--version"], None).await {
         Ok(v) => v,
         _ => return None,
     };
@@ -127,7 +127,7 @@ async fn check_cargo_vs_rustc() -> Option<AuditItem> {
 }
 
 async fn check_bun_age() -> Option<AuditItem> {
-    if let Ok(ver) = run_cmd("bun", &["--version"]).await {
+    if let Ok(ver) = run_cmd("bun", &["--version"], None).await {
         let m = match major(&ver) {
             Some(v) => v,
             None => return None,
@@ -151,7 +151,7 @@ async fn check_env_managers() -> Vec<AuditItem> {
     let node_version_file = project_dir.join(".node-version");
     let tool_versions = project_dir.join(".tool-versions");
     let mise_toml = project_dir.join("mise.toml");
-    let sdkmanrc = project_dir.join(".sdkmanrc");
+    let _sdkmanrc = project_dir.join(".sdkmanrc");
 
     let mut expected_node = None;
     let mut expected_python = None;
@@ -204,59 +204,78 @@ async fn check_env_managers() -> Vec<AuditItem> {
         }
     }
 
-    if let Some((source, expected)) = expected_node {
-        if let Ok(node) = run_cmd("node", &["--version"]).await {
-            let current = node.trim().trim_start_matches('v');
-            let expected_clean = expected.trim_start_matches('v');
-            if !current.starts_with(expected_clean) {
-                items.push(AuditItem {
-                    name: "Node Environment".into(),
-                    current: format!("node v{current}"),
-                    note: format!("expected v{expected_clean} from .{source}"),
-                });
+    let node_check = async {
+        if let Some((source, expected)) = expected_node {
+            if let Ok(node) = run_cmd("node", &["--version"], None).await {
+                let current = node.trim().trim_start_matches('v');
+                let expected_clean = expected.trim_start_matches('v');
+                if !current.starts_with(expected_clean) {
+                    return Some(AuditItem {
+                        name: "Node Environment".into(),
+                        current: format!("node v{current}"),
+                        note: format!("expected v{expected_clean} from .{source}"),
+                    });
+                }
             }
         }
-    }
+        None
+    };
 
-    let python_version_file = project_dir.join(".python-version");
-    if let Ok(content) = std::fs::read_to_string(&python_version_file) {
-        if expected_python.is_none() {
-            expected_python = Some(("python-version", content.trim().to_string()));
-        }
-    }
-
-    if let Some((source, expected)) = expected_python {
-        if let Ok(python) = run_cmd("python3", &["--version"]).await {
-            let current = python.split_whitespace().nth(1).unwrap_or("0");
-            if !current.starts_with(&expected) {
-                items.push(AuditItem {
-                    name: "Python Environment".into(),
-                    current: format!("python v{current}"),
-                    note: format!("expected v{expected} from .{source}"),
-                });
+    let python_check = async {
+        let python_version_file = project_dir.join(".python-version");
+        let mut ep = expected_python;
+        if let Ok(content) = std::fs::read_to_string(&python_version_file) {
+            if ep.is_none() {
+                ep = Some(("python-version", content.trim().to_string()));
             }
         }
-    }
 
-    if let Ok(content) = std::fs::read_to_string(&sdkmanrc) {
-        for line in content.lines() {
-            if line.starts_with("java=") && expected_java.is_none() {
-                expected_java = Some(("sdkmanrc", line.trim_start_matches("java=").trim().to_string()));
+        if let Some((source, expected)) = ep {
+            if let Ok(python) = run_cmd("python3", &["--version"], None).await {
+                let current = python.split_whitespace().nth(1).unwrap_or("0");
+                if !current.starts_with(&expected) {
+                    return Some(AuditItem {
+                        name: "Python Environment".into(),
+                        current: format!("python v{current}"),
+                        note: format!("expected v{expected} from .{source}"),
+                    });
+                }
             }
         }
-    }
+        None
+    };
 
-    if let Some((source, expected)) = expected_java {
-        if let Ok(java) = run_cmd("java", &["-version"]).await {
-            let current = java.lines().next().unwrap_or("").split('"').nth(1).unwrap_or("0");
-            if !current.starts_with(&expected) {
-                items.push(AuditItem {
-                    name: "Java Environment".into(),
-                    current: format!("java v{current}"),
-                    note: format!("expected v{expected} from .{source}"),
-                });
+    let java_check = async {
+        if let Some((source, expected)) = expected_java {
+            if let Ok(java) = run_cmd("java", &["-version"], None).await {
+                let current = java
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .split('"')
+                    .nth(1)
+                    .unwrap_or("0");
+                if !current.starts_with(&expected) {
+                    return Some(AuditItem {
+                        name: "Java Environment".into(),
+                        current: format!("java v{current}"),
+                        note: format!("expected v{expected} from .{source}"),
+                    });
+                }
             }
         }
+        None
+    };
+
+    let (n_res, p_res, j_res) = tokio::join!(node_check, python_check, java_check);
+    if let Some(item) = n_res {
+        items.push(item);
+    }
+    if let Some(item) = p_res {
+        items.push(item);
+    }
+    if let Some(item) = j_res {
+        items.push(item);
     }
     items
 }

@@ -44,7 +44,7 @@ async fn npm_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
     if !which("npm") {
         return vulns;
     }
-    if let Ok(out) = run_cmd_in(project_path, "npm", &["audit", "--json"]).await {
+    if let Ok(out) = run_cmd_in(project_path, "npm", &["audit", "--json"], None).await {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
             if let Some(vulnerabilities) = data["vulnerabilities"].as_object() {
                 for (name, info) in vulnerabilities {
@@ -65,7 +65,7 @@ async fn pnpm_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
     if !which("pnpm") {
         return vulns;
     }
-    if let Ok(out) = run_cmd_in(project_path, "pnpm", &["audit", "--json"]).await {
+    if let Ok(out) = run_cmd_in(project_path, "pnpm", &["audit", "--json"], None).await {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
             if let Some(vulnerabilities) = data["vulnerabilities"].as_object() {
                 for (name, info) in vulnerabilities {
@@ -85,7 +85,7 @@ async fn bun_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
     if !which("bun") {
         return vulns;
     }
-    if let Ok(out) = run_cmd_in(project_path, "bun", &["audit"]).await {
+    if let Ok(out) = run_cmd_in(project_path, "bun", &["audit"], None).await {
         for line in out.lines() {
             let parts: Vec<&str> = line.splitn(4, ' ').collect();
             if parts.len() >= 3 {
@@ -115,7 +115,7 @@ async fn cargo_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
     if !which("cargo-audit") {
         return vulns;
     }
-    if let Ok(out) = run_cmd_in(project_path, "cargo-audit", &["audit", "--json"]).await {
+    if let Ok(out) = run_cmd_in(project_path, "cargo-audit", &["audit", "--json"], None).await {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
             if let Some(list) = data["vulnerabilities"]["list"].as_array() {
                 for item in list {
@@ -161,6 +161,7 @@ async fn pip_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
         project_path,
         "pip-audit",
         &["--format", "json", "--desc", "--no-deps"],
+        None,
     )
     .await
     {
@@ -206,7 +207,7 @@ async fn go_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
     if !which("govulncheck") {
         return vulns;
     }
-    if let Ok(out) = run_cmd_in(project_path, "govulncheck", &["-json", "./..."]).await {
+    if let Ok(out) = run_cmd_in(project_path, "govulncheck", &["-json", "./..."], None).await {
         for line in out.lines() {
             if let Ok(data) = serde_json::from_str::<serde_json::Value>(line) {
                 if let Some(vuln) = data.get("osv") {
@@ -241,7 +242,7 @@ async fn composer_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo
     if !which("composer") {
         return vulns;
     }
-    if let Ok(out) = run_cmd_in(project_path, "composer", &["audit", "--format=json"]).await {
+    if let Ok(out) = run_cmd_in(project_path, "composer", &["audit", "--format=json"], None).await {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
             if let Some(advisories) = data.get("advisories").and_then(|a| a.as_object()) {
                 for (pkg, list) in advisories {

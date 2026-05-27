@@ -125,9 +125,14 @@ pub fn which(cmd: &str) -> bool {
         .any(|d| std::path::Path::new(d).join(cmd).exists())
 }
 
-pub async fn run_cmd(program: &str, args: &[&str]) -> Result<String, anyhow::Error> {
+pub async fn run_cmd(
+    program: &str,
+    args: &[&str],
+    timeout: Option<Duration>,
+) -> Result<String, anyhow::Error> {
     let cmd = Command::new(program).args(args).output();
-    let output = tokio::time::timeout(TIMEOUT, cmd).await??;
+    let to_wait = timeout.unwrap_or(TIMEOUT);
+    let output = tokio::time::timeout(to_wait, cmd).await??;
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
@@ -135,9 +140,11 @@ pub async fn run_cmd_in(
     dir: &std::path::Path,
     program: &str,
     args: &[&str],
+    timeout: Option<Duration>,
 ) -> Result<String, anyhow::Error> {
     let cmd = Command::new(program).args(args).current_dir(dir).output();
-    let output = tokio::time::timeout(TIMEOUT, cmd).await??;
+    let to_wait = timeout.unwrap_or(TIMEOUT);
+    let output = tokio::time::timeout(to_wait, cmd).await??;
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
@@ -153,6 +160,7 @@ pub mod audit;
 pub mod brew;
 pub mod bun;
 pub mod cargo;
+pub mod ci;
 pub mod cleanup;
 pub mod deno;
 pub mod docker;
@@ -169,43 +177,35 @@ pub async fn scan_all() -> HashMap<String, ScanResult> {
     let project_dir = get_project_path();
     let ignore = crate::core::config::EnvexaIgnore::load(&project_dir);
 
-    let (b, n, p, y, bu, de, pi, g, ca, dk, pr, se, au, cl, git_res) = tokio::join!(
-        brew::scan(),
-        npm::scan(),
-        pnpm::scan(),
-        yarn::scan(),
-        bun::scan(),
-        deno::scan(),
-        pip::scan(),
-        gem::scan(),
-        cargo::scan(),
-        docker::scan(),
-        project::scan(),
-        security::scan(),
-        audit::scan(),
-        cleanup::scan(),
-        git::scan(),
-    );
-    let mut results = HashMap::new();
-    let candidates = vec![
-        ("brew", b),
-        ("npm", n),
-        ("pnpm", p),
-        ("yarn", y),
-        ("bun", bu),
-        ("deno", de),
-        ("pip", pi),
-        ("gem", g),
-        ("cargo", ca),
-        ("docker", dk),
-        ("project", pr),
-        ("security", se),
-        ("audit", au),
-        ("cleanup", cl),
-        ("git", git_res),
+    use futures::stream::{self, StreamExt};
+
+    #[allow(clippy::type_complexity)]
+    let tasks: Vec<
+        std::pin::Pin<Box<dyn std::future::Future<Output = (&'static str, ScanResult)> + Send>>,
+    > = vec![
+        Box::pin(async { ("brew", brew::scan().await) }),
+        Box::pin(async { ("npm", npm::scan().await) }),
+        Box::pin(async { ("pnpm", pnpm::scan().await) }),
+        Box::pin(async { ("yarn", yarn::scan().await) }),
+        Box::pin(async { ("bun", bun::scan().await) }),
+        Box::pin(async { ("deno", deno::scan().await) }),
+        Box::pin(async { ("pip", pip::scan().await) }),
+        Box::pin(async { ("gem", gem::scan().await) }),
+        Box::pin(async { ("cargo", cargo::scan().await) }),
+        Box::pin(async { ("docker", docker::scan().await) }),
+        Box::pin(async { ("project", project::scan().await) }),
+        Box::pin(async { ("security", security::scan().await) }),
+        Box::pin(async { ("audit", audit::scan().await) }),
+        Box::pin(async { ("cleanup", cleanup::scan().await) }),
+        Box::pin(async { ("git", git::scan().await) }),
+        Box::pin(async { ("ci", ci::scan().await) }),
     ];
 
-    for (name, mut res) in candidates.into_iter() {
+    let mut results = HashMap::new();
+
+    let mut buffered = stream::iter(tasks).buffer_unordered(16);
+
+    while let Some((name, mut res)) = buffered.next().await {
         if ignore.should_ignore_tool(name) {
             results.insert(
                 name.to_string(),
@@ -234,6 +234,7 @@ pub async fn scan_all() -> HashMap<String, ScanResult> {
 
         results.insert(name.to_string(), res);
     }
+
     results
 }
 
@@ -255,6 +256,7 @@ pub async fn scan_one(name: &str) -> Option<ScanResult> {
         "audit" => Some(audit::scan().await),
         "cleanup" => Some(cleanup::scan().await),
         "git" => Some(git::scan().await),
+        "ci" => Some(ci::scan().await),
         _ => None,
     }
 }

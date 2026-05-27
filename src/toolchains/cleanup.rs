@@ -18,7 +18,7 @@ async fn check_brew_cleanup() -> Option<CleanupItem> {
     if !which("brew") {
         return None;
     }
-    if let Ok(out) = run_cmd("brew", &["cleanup", "-n"]).await {
+    if let Ok(out) = run_cmd("brew", &["cleanup", "-n"], None).await {
         let lines: Vec<&str> = out.lines().collect();
         let count = lines.len();
         if count > 0 {
@@ -117,7 +117,7 @@ async fn check_docker_disk() -> Vec<CleanupItem> {
     if !which("docker") {
         return items;
     }
-    if let Ok(out) = run_cmd("docker", &["system", "df", "--format", "{{json .}}"]).await {
+    if let Ok(out) = run_cmd("docker", &["system", "df", "--format", "{{json .}}"], None).await {
         for line in out.lines() {
             if let Ok(data) = serde_json::from_str::<serde_json::Value>(line) {
                 let typ = data["Type"].as_str().unwrap_or("unknown");
