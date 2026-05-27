@@ -130,6 +130,7 @@ The Project Tooling sector provides a specialized local lens into your active pr
 | ✨ **Project** | Scans lockfiles (package.json, Cargo.toml, poetry.lock, etc.) and performs dependency drift analysis. |
 | 🔐 **Security** | Audits dependencies using language-specific advisory databases (Rust Sec, npm audit, pip-audit). |
 | 🧪 **Audit** | Validates runtime parity across toolsets (e.g., verifying Node, npm, Python, pip, and Rust compiler alignment). |
+| 🤖 **CI/CD** | Parses GitHub Actions workflows locally (zero-network) to flag outdated CI/CD steps and dependencies. |
 | 🧹 **Cleanup** | Identifies local package caches, build artifacts, and Docker caches that can be safely reclaimed. |
 
 Envexa compiles these signals into:
@@ -241,7 +242,7 @@ envexa/
 │       ├── brew.rs
 │       ├── npm.rs / pnpm.rs / yarn.rs / bun.rs / deno.rs
 │       ├── pip.rs / gem.rs / cargo.rs / docker.rs
-│       └── project.rs / security.rs / audit.rs / cleanup.rs
+│       └── project.rs / security.rs / audit.rs / ci.rs / cleanup.rs
 ├── scripts/
 │   ├── install.sh
 │   └── build-and-upload.sh
