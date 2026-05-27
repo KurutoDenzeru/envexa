@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+pub mod sarif;
+
 use crate::toolchains::{AuditItem, CleanupItem, ScanResult, VulnerabilityInfo};
 
 fn visible_len(s: &str) -> usize {
@@ -602,4 +604,97 @@ pub fn format_outdated(report: &Report) -> String {
     }
 
     format!("# Outdated Packages\n\n{}", t.render())
+}
+
+pub fn format_sarif(report: &Report) -> String {
+    let mut rules = vec![];
+    let mut results = vec![];
+
+    for (tool, res) in &report.results {
+        for vuln in &res.vulnerabilities {
+            let rule_id = format!("{}-vuln-{}", tool, vuln.package);
+            
+            // Avoid duplicate rules
+            if !rules.iter().any(|r: &sarif::Rule| r.id == rule_id) {
+                rules.push(sarif::Rule {
+                    id: rule_id.clone(),
+                    name: format!("Vulnerability in {}", vuln.package),
+                    short_description: sarif::Message {
+                        text: format!("{} vulnerability in {}", vuln.severity, vuln.package),
+                    },
+                    help: sarif::Message {
+                        text: format!("Update {} to version {}", vuln.package, vuln.patched_version),
+                    },
+                    properties: sarif::RuleProperties {
+                        tags: vec!["security".into(), tool.clone()],
+                    },
+                });
+            }
+
+            results.push(sarif::ResultEntry {
+                rule_id,
+                message: sarif::Message {
+                    text: format!("{} vulnerability in {}", vuln.severity, vuln.package),
+                },
+                locations: vec![sarif::Location {
+                    physical_location: sarif::PhysicalLocation {
+                        artifact_location: sarif::ArtifactLocation {
+                            uri: format!("envexa://{}/{}", tool, vuln.package),
+                        },
+                    },
+                }],
+            });
+        }
+        
+        for outdated in extract_outdated(res) {
+            let rule_id = format!("{}-outdated-{}", tool, outdated.name);
+
+            if !rules.iter().any(|r: &sarif::Rule| r.id == rule_id) {
+                rules.push(sarif::Rule {
+                    id: rule_id.clone(),
+                    name: format!("Outdated package {}", outdated.name),
+                    short_description: sarif::Message {
+                        text: format!("{} is outdated ({} -> {})", outdated.name, outdated.current, outdated.latest),
+                    },
+                    help: sarif::Message {
+                        text: format!("Update {} to version {}", outdated.name, outdated.latest),
+                    },
+                    properties: sarif::RuleProperties {
+                        tags: vec!["maintenance".into(), tool.clone()],
+                    },
+                });
+            }
+
+            results.push(sarif::ResultEntry {
+                rule_id,
+                message: sarif::Message {
+                    text: format!("{} is outdated ({} -> {})", outdated.name, outdated.current, outdated.latest),
+                },
+                locations: vec![sarif::Location {
+                    physical_location: sarif::PhysicalLocation {
+                        artifact_location: sarif::ArtifactLocation {
+                            uri: format!("envexa://{}/{}", tool, outdated.name),
+                        },
+                    },
+                }],
+            });
+        }
+    }
+
+    let sarif_log = sarif::SarifLog {
+        schema: "https://json.schemastore.org/sarif-2.1.0.json".into(),
+        version: "2.1.0".into(),
+        runs: vec![sarif::Run {
+            tool: sarif::Tool {
+                driver: sarif::Driver {
+                    name: "Envexa".into(),
+                    version: env!("CARGO_PKG_VERSION").into(),
+                    rules,
+                },
+            },
+            results,
+        }],
+    };
+
+    serde_json::to_string_pretty(&sarif_log).unwrap_or_else(|_| "{}".into())
 }

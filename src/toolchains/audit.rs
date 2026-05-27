@@ -151,9 +151,11 @@ async fn check_env_managers() -> Vec<AuditItem> {
     let node_version_file = project_dir.join(".node-version");
     let tool_versions = project_dir.join(".tool-versions");
     let mise_toml = project_dir.join("mise.toml");
+    let sdkmanrc = project_dir.join(".sdkmanrc");
 
     let mut expected_node = None;
     let mut expected_python = None;
+    let mut expected_java = None;
 
     if let Ok(content) = std::fs::read_to_string(&nvmrc) {
         expected_node = Some(("nvmrc", content.trim().to_string()));
@@ -169,6 +171,8 @@ async fn check_env_managers() -> Vec<AuditItem> {
                     expected_node = Some(("tool-versions", parts[1].to_string()));
                 } else if parts[0] == "python" {
                     expected_python = Some(("tool-versions", parts[1].to_string()));
+                } else if parts[0] == "java" {
+                    expected_java = Some(("tool-versions", parts[1].to_string()));
                 }
             }
         }
@@ -192,6 +196,8 @@ async fn check_env_managers() -> Vec<AuditItem> {
                         expected_node = Some(("mise.toml", v.to_string()));
                     } else if k == "python" && expected_python.is_none() {
                         expected_python = Some(("mise.toml", v.to_string()));
+                    } else if k == "java" && expected_java.is_none() {
+                        expected_java = Some(("mise.toml", v.to_string()));
                     }
                 }
             }
@@ -232,6 +238,30 @@ async fn check_env_managers() -> Vec<AuditItem> {
         }
     }
 
+<<<<<<< HEAD
+    if let Ok(content) = std::fs::read_to_string(&sdkmanrc) {
+        for line in content.lines() {
+            if line.starts_with("java=") && expected_java.is_none() {
+                expected_java = Some(("sdkmanrc", line.trim_start_matches("java=").trim().to_string()));
+            }
+        }
+    }
+
+    if let Some((source, expected)) = expected_java {
+        if let Ok(java) = run_cmd("java", &["-version"]).await {
+            let current = java.lines().next().unwrap_or("").split('"').nth(1).unwrap_or("0");
+            if !current.starts_with(&expected) {
+                items.push(AuditItem {
+                    name: "Java Environment".into(),
+                    current: format!("java v{current}"),
+                    note: format!("expected v{expected} from .{source}"),
+                });
+            }
+        }
+    }
+
+=======
+>>>>>>> main
     items
 }
 

@@ -100,6 +100,8 @@ async fn run_cmd(cmd: Commands) -> Result<(), anyhow::Error> {
                     Ok(json) => println!("{}", json),
                     Err(e) => eprintln!("Error formatting JSON: {}", e),
                 }
+            } else if format.to_lowercase() == "sarif" {
+                println!("{}", scanner::format_sarif(&report));
             } else {
                 println!("{}", scanner::format_report(&report));
             }
