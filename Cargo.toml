@@ -17,3 +17,11 @@ tui-piechart = "0.3.3"
 throbber-widgets-tui = "0.11.0"
 uuid = { version = "1.23.1", features = ["v4"] }
 futures = "0.3.32"
+mimalloc = "0.1.52"
+lazy_static = "1.5.0"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+panic = "abort"

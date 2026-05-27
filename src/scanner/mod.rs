@@ -126,6 +126,7 @@ const DISPLAY_NAMES: &[(&str, &str)] = &[
     ("project", "Project"),
     ("security", "Security"),
     ("audit", "Audit"),
+    ("ci", "CI/CD"),
     ("git", "Git"),
     ("cleanup", "Cleanup"),
 ];
@@ -156,15 +157,15 @@ pub fn tool_categories() -> [ToolCategory; 3] {
         },
         ToolCategory {
             name: "Project Tooling",
-            tools: &["project", "security", "audit", "git", "cleanup"],
+            tools: &["project", "security", "audit", "ci", "git", "cleanup"],
         },
     ]
 }
 
-pub fn tool_order() -> [&'static str; 15] {
+pub fn tool_order() -> [&'static str; 16] {
     [
         "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
-        "security", "audit", "git", "cleanup",
+        "security", "audit", "ci", "git", "cleanup",
     ]
 }
 
