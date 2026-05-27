@@ -252,18 +252,52 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(Paragraph::new(text).block(block), area);
 }
 
-fn truncated_cell(text: &str, max: usize) -> Cell<'static> {
-    if max == 0 {
-        return Cell::from(String::new());
+fn marquee_text(text: &str, max_width: usize, tick: usize, is_selected: bool) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let len = chars.len();
+    if len <= max_width || max_width == 0 || !is_selected {
+        if len > max_width && max_width > 0 {
+            let mut s: String = chars.into_iter().take(max_width.saturating_sub(1)).collect();
+            s.push('…');
+            return s;
+        }
+        return text.to_string();
     }
-    let display = if text.chars().count() > max {
-        let mut s: String = text.chars().take(max.saturating_sub(1)).collect();
-        s.push('…');
-        s
+    
+    let distance = len - max_width;
+    let pause = 5; 
+    let period = (distance + pause) * 2;
+    let step = tick % period;
+    
+    let offset = if step < pause {
+        0
+    } else if step < pause + distance {
+        step - pause
+    } else if step < pause * 2 + distance {
+        distance
     } else {
-        text.to_string()
+        period - step
     };
-    Cell::from(display)
+    
+    chars[offset..offset + max_width].iter().collect()
+}
+
+fn dashboard_max_widths(width: u16) -> (usize, usize) {
+    if width < 64 {
+        (6, (width.saturating_sub(39)) as usize)
+    } else if width < 88 {
+        (8, (width.saturating_sub(49)) as usize)
+    } else {
+        (8, (width.saturating_sub(57)) as usize)
+    }
+}
+
+fn outdated_max_width(width: u16) -> usize {
+    if width < 72 {
+        (width.saturating_sub(45)) as usize
+    } else {
+        (width.saturating_sub(66)) as usize
+    }
 }
 
 fn count_statuses(report: &crate::scanner::Report) -> (usize, usize, usize, usize) {
@@ -852,12 +886,12 @@ fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::s
     frame.render_widget(summary, summary_chunk);
 
     let signal_data = [
-        ("Pkg", project_outdated as u64),
-        ("Cri", critical as u64),
-        ("Hgh", high as u64),
-        ("Med", moderate as u64),
-        ("Oth", other as u64),
-        ("Aud", audit_count as u64),
+        ("Outdated", project_outdated as u64),
+        ("Critical", critical as u64),
+        ("High", high as u64),
+        ("Medium", moderate as u64),
+        ("Other", other as u64),
+        ("Audit", audit_count as u64),
     ];
     let max_signal = signal_data
         .iter()
@@ -866,18 +900,22 @@ fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::s
         .unwrap_or(1)
         .max(1);
 
-    let (bar_width, bar_gap) = if inner.width >= 45 {
-        (5, 3)
+    let (bar_width, bar_gap) = if inner.width >= 60 {
+        (8, 2)
+    } else if inner.width >= 54 {
+        (8, 1)
+    } else if inner.width >= 45 {
+        (5, 2)
     } else if inner.width >= 39 {
-        (4, 3)
-    } else if inner.width >= 34 {
         (4, 2)
+    } else if inner.width >= 34 {
+        (4, 1)
     } else if inner.width >= 28 {
-        (3, 2)
+        (3, 1)
     } else if inner.width >= 22 {
-        (2, 2)
-    } else {
         (2, 1)
+    } else {
+        (2, 0)
     };
 
     let chart = BarChart::default()
@@ -1020,13 +1058,18 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             };
             let sel = tool_index == app.dashboard_selection;
             let indicator = if sel { "\u{25b8} " } else { "  " };
+            
+            let (max_col4, max_col5) = dashboard_max_widths(table_area.width);
+            let out_str = marquee_text(&outdated_str, max_col4, app.tick_count, sel);
+            let iss_str = marquee_text(&issues_str, max_col5, app.tick_count, sel);
+
             let mut row = Row::new(vec![
                 Cell::from(indicator),
                 Cell::from(display),
                 Cell::from(label).style(style),
                 Cell::from(ver),
-                truncated_cell(&outdated_str, 8),
-                truncated_cell(&issues_str, 20),
+                Cell::from(out_str),
+                Cell::from(iss_str),
             ])
             .height(1);
             if sel {
@@ -1180,6 +1223,8 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         return;
     }
 
+    let max_col3 = outdated_max_width(area.width);
+
     let rows: Vec<Row> = items
         .iter()
         .enumerate()
@@ -1192,11 +1237,12 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
             } else {
                 format!("{cb} ")
             };
+            let pkg_name = marquee_text(&pkg.name, max_col3, app.tick_count, sel);
             let mut row = Row::new(vec![
                 Cell::from(indicator),
                 Cell::from(tool.as_str()),
                 Cell::from(pkg.source.as_str()).style(source_style(&pkg.source)),
-                Cell::from(pkg.name.as_str()),
+                Cell::from(pkg_name),
                 Cell::from(pkg.current.as_str()),
                 Cell::from(pkg.latest.as_str()),
             ]);

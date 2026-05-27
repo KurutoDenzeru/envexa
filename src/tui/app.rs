@@ -29,6 +29,7 @@ pub struct App {
     pub search_query: String,
     pub throbber_state: ThrobberState,
     pub progress_counter: usize,
+    pub tick_count: usize,
 
     pub detail_tool: Option<String>,
     pub detail_key: Option<String>,
@@ -56,6 +57,7 @@ impl App {
             search_query: String::new(),
             throbber_state: ThrobberState::default(),
             progress_counter: 0,
+            tick_count: 0,
             detail_tool: None,
             detail_key: None,
             detail_selection: 0,
@@ -73,13 +75,18 @@ impl App {
         let mut terminal = ratatui::init();
         terminal.clear()?;
 
+        let tick_rate = Duration::from_millis(150);
+        let mut last_tick = std::time::Instant::now();
+
         loop {
             terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
 
-            if let Event::Key(key) = event::read()? {
-                if key.kind != KeyEventKind::Press {
-                    continue;
-                }
+            let timeout = tick_rate.saturating_sub(last_tick.elapsed());
+            if crossterm::event::poll(timeout)? {
+                if let Event::Key(key) = event::read()? {
+                    if key.kind != KeyEventKind::Press {
+                        continue;
+                    }
 
                 match key.code {
                     KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => break,
@@ -221,6 +228,12 @@ impl App {
                     }
                     _ => {}
                 }
+            }
+            }
+
+            if last_tick.elapsed() >= tick_rate {
+                self.tick_count = self.tick_count.wrapping_add(1);
+                last_tick = std::time::Instant::now();
             }
         }
 
