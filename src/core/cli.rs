@@ -2,7 +2,7 @@ use clap::Parser;
 use std::io::Write;
 use std::time::Instant;
 
-use crate::config;
+use crate::core::config;
 use crate::scanner::{self, Report};
 use crate::toolchains;
 

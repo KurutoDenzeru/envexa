@@ -6,7 +6,7 @@ use ratatui::DefaultTerminal;
 
 use throbber_widgets_tui::ThrobberState;
 
-use crate::config;
+use crate::core::config;
 use crate::scanner::{self, OutdatedItem, Report};
 use crate::toolchains;
 use crate::toolchains::{AuditItem, CleanupItem, VulnerabilityInfo};

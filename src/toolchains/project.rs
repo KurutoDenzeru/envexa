@@ -345,7 +345,7 @@ async fn maven_outdated(_dir: &Path, result: &mut ScanResult) {
 }
 
 pub async fn scan() -> ScanResult {
-    let project_path = crate::config::load_config()
+    let project_path = crate::core::config::load_config()
         .project_path
         .filter(|p| !p.is_empty())
         .map(PathBuf::from)

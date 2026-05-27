@@ -142,7 +142,7 @@ pub async fn run_cmd_in(
 }
 
 pub fn get_project_path() -> std::path::PathBuf {
-    crate::config::load_config()
+    crate::core::config::load_config()
         .project_path
         .filter(|p| !p.is_empty())
         .map(std::path::PathBuf::from)
@@ -167,7 +167,7 @@ pub mod yarn;
 
 pub async fn scan_all() -> HashMap<String, ScanResult> {
     let project_dir = get_project_path();
-    let ignore = crate::config::EnvexaIgnore::load(&project_dir);
+    let ignore = crate::core::config::EnvexaIgnore::load(&project_dir);
 
     let (b, n, p, y, bu, de, pi, g, ca, dk, pr, se, au, cl, git_res) = tokio::join!(
         brew::scan(),

@@ -238,7 +238,6 @@ async fn check_env_managers() -> Vec<AuditItem> {
         }
     }
 
-<<<<<<< HEAD
     if let Ok(content) = std::fs::read_to_string(&sdkmanrc) {
         for line in content.lines() {
             if line.starts_with("java=") && expected_java.is_none() {
@@ -259,9 +258,6 @@ async fn check_env_managers() -> Vec<AuditItem> {
             }
         }
     }
-
-=======
->>>>>>> main
     items
 }
 
