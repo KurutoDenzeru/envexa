@@ -29,7 +29,10 @@ pub enum AppEvent {
         package_name: String,
         downloaded_mb: f64,
     },
-    UpdateFinished(String),
+    UpdateFinished {
+        result_msg: String,
+        updated_packages: Vec<(String, String, String)>, // (tool_key, name, source)
+    },
     CleanupFinished {
         result_msg: String,
         new_report_res: Option<crate::toolchains::ScanResult>,
@@ -319,13 +322,50 @@ impl App {
                         self.ui.update_package_name = package_name;
                         self.ui.update_downloaded_mb = downloaded_mb;
                     }
-                    AppEvent::UpdateFinished(msg) => {
-                        self.detail.message = msg;
+                    AppEvent::UpdateFinished {
+                        result_msg,
+                        updated_packages,
+                    } => {
+                        self.detail.message = result_msg;
+
+                        if let Some(ref mut report) = self.report {
+                            for (tool_key, name, source) in &updated_packages {
+                                if let Some(res) = report.results.get_mut(tool_key) {
+                                    match source.as_str() {
+                                        "formula" => {
+                                            res.outdated_formulae.retain(|pkg| pkg.name != *name);
+                                        }
+                                        "cask" => {
+                                            res.outdated_casks.retain(|pkg| pkg.name != *name);
+                                        }
+                                        "package" => {
+                                            res.outdated.retain(|pkg| pkg.name != *name);
+                                        }
+                                        "global" => {
+                                            res.outdated_global.retain(|pkg| pkg.name != *name);
+                                        }
+                                        _ => {
+                                            res.outdated.retain(|pkg| pkg.name != *name);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if let Some(ref tool_key) = self.detail.key {
+                            for (tk, name, _) in &updated_packages {
+                                if tk == tool_key {
+                                    self.detail.items.retain(|item| item.name != *name);
+                                }
+                            }
+                        }
+
                         if self.detail.key.is_some() {
                             self.ui.view = View::PackageDetail;
                         } else {
                             self.ui.view = View::Outdated;
                         }
+                        self.clamp_selection();
                     }
                     AppEvent::CleanupFinished {
                         result_msg,
@@ -426,17 +466,21 @@ impl App {
         &mut self,
         tx: mpsc::UnboundedSender<AppEvent>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let tool = match &self.detail.tool {
+        let tool_key = match &self.detail.key {
+            Some(k) => k.clone(),
+            None => return Ok(()),
+        };
+        let tool_display = match &self.detail.tool {
             Some(t) => t.clone(),
             None => return Ok(()),
         };
-        let work: Vec<(String, OutdatedItem)> = self
+        let work: Vec<(String, String, OutdatedItem)> = self
             .detail
             .items
             .iter()
             .enumerate()
             .filter(|(i, _)| self.detail.checked.contains(i))
-            .map(|(_, item)| (tool.clone(), item.clone()))
+            .map(|(_, item)| (tool_key.clone(), tool_display.clone(), item.clone()))
             .collect();
         self.detail.checked.clear();
         if work.is_empty() {
@@ -453,9 +497,17 @@ impl App {
             let mut updated = 0usize;
             let mut failed = 0usize;
             let mut errors = vec![];
-            for (tool, item) in &work {
-                match run_update(tool, item, tx.clone()).await {
-                    Ok(_) => updated += 1,
+            let mut successful_updates = vec![];
+            for (tk, td, item) in &work {
+                match run_update(td, item, tx.clone()).await {
+                    Ok(_) => {
+                        updated += 1;
+                        successful_updates.push((
+                            tk.clone(),
+                            item.name.clone(),
+                            item.source.clone(),
+                        ));
+                    }
                     Err(e) => {
                         failed += 1;
                         errors.push(format!("{}: {}", item.name, e));
@@ -468,7 +520,10 @@ impl App {
                 let e = errors.join("; ");
                 format!("\u{2714} Updated {updated} | \u{2716} Failed {failed}: {e}")
             };
-            let _ = tx.send(AppEvent::UpdateFinished(result_msg));
+            let _ = tx.send(AppEvent::UpdateFinished {
+                result_msg,
+                updated_packages: successful_updates,
+            });
         });
         Ok(())
     }
@@ -597,7 +652,7 @@ impl App {
         Ok(())
     }
 
-    fn collect_checked_work(&self) -> Vec<(String, OutdatedItem)> {
+    fn collect_checked_work(&self) -> Vec<(String, String, OutdatedItem)> {
         let report = match &self.report {
             Some(r) => r,
             None => return vec![],
@@ -608,7 +663,11 @@ impl App {
             if let Some(res) = report.results.get(*tool) {
                 for item in &scanner::extract_outdated(res) {
                     if self.ui.checked_outdated.contains(&idx) {
-                        work.push((scanner::display_name(tool).to_string(), item.clone()));
+                        work.push((
+                            tool.to_string(),
+                            scanner::display_name(tool).to_string(),
+                            item.clone(),
+                        ));
                     }
                     idx += 1;
                 }
@@ -637,9 +696,17 @@ impl App {
             let mut updated = 0usize;
             let mut failed = 0usize;
             let mut errors = vec![];
-            for (tool, item) in &work {
-                match run_update(tool, item, tx.clone()).await {
-                    Ok(_) => updated += 1,
+            let mut successful_updates = vec![];
+            for (tk, td, item) in &work {
+                match run_update(td, item, tx.clone()).await {
+                    Ok(_) => {
+                        updated += 1;
+                        successful_updates.push((
+                            tk.clone(),
+                            item.name.clone(),
+                            item.source.clone(),
+                        ));
+                    }
                     Err(e) => {
                         failed += 1;
                         errors.push(format!("{}: {}", item.name, e));
@@ -652,7 +719,10 @@ impl App {
                 let e = errors.join("; ");
                 format!("\u{2714} Updated {updated} | \u{2716} Failed {failed}: {e}")
             };
-            let _ = tx.send(AppEvent::UpdateFinished(result_msg));
+            let _ = tx.send(AppEvent::UpdateFinished {
+                result_msg,
+                updated_packages: successful_updates,
+            });
         });
         Ok(())
     }
