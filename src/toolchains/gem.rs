@@ -12,7 +12,7 @@ pub async fn scan() -> ScanResult {
 
     let mut result = ScanResult::new("gem");
 
-    if let Ok(ver) = run_cmd("ruby", &["--version"]).await {
+    if let Ok(ver) = run_cmd("ruby", &["--version"], None).await {
         result.ruby_version = Some(ver);
     }
 
@@ -22,7 +22,7 @@ pub async fn scan() -> ScanResult {
         return result;
     }
 
-    if let Ok(out) = run_cmd("gem", &["outdated"]).await {
+    if let Ok(out) = run_cmd("gem", &["outdated"], None).await {
         let re = gem_outdated_re();
         for line in out.lines() {
             if let Some(cap) = re.captures(line) {

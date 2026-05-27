@@ -7,12 +7,12 @@ pub async fn scan() -> ScanResult {
 
     let mut result = ScanResult::new("cargo");
 
-    if let Ok(ver) = run_cmd("rustc", &["--version"]).await {
+    if let Ok(ver) = run_cmd("rustc", &["--version"], None).await {
         result.rustc_version = Some(ver);
     }
 
     if which("cargo") {
-        if let Ok(ver) = run_cmd("cargo", &["--version"]).await {
+        if let Ok(ver) = run_cmd("cargo", &["--version"], None).await {
             result.cargo_version = Some(ver);
         }
     }
@@ -25,7 +25,7 @@ pub async fn scan() -> ScanResult {
     }
 
     let project_path = get_project_path();
-    if let Ok(out) = run_cmd_in(&project_path, "cargo-outdated", &["--format=json"]).await {
+    if let Ok(out) = run_cmd_in(&project_path, "cargo-outdated", &["--format=json"], None).await {
         result.outdated = parse_outdated(&out);
     }
 

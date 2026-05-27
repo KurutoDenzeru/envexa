@@ -7,7 +7,7 @@ pub async fn scan() -> ScanResult {
 
     let mut result = ScanResult::new("npm");
 
-    if let Ok(ver) = run_cmd("node", &["--version"]).await {
+    if let Ok(ver) = run_cmd("node", &["--version"], None).await {
         result.node_version = Some(ver);
     }
 
@@ -15,11 +15,11 @@ pub async fn scan() -> ScanResult {
         return result;
     }
 
-    if let Ok(ver) = run_cmd("npm", &["--version"]).await {
+    if let Ok(ver) = run_cmd("npm", &["--version"], None).await {
         result.version = Some(ver);
     }
 
-    if let Ok(out) = run_cmd("npm", &["outdated", "-g", "--json"]).await {
+    if let Ok(out) = run_cmd("npm", &["outdated", "-g", "--json"], None).await {
         result.outdated_global = parse_outdated(&out);
     }
 

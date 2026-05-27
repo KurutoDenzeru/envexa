@@ -7,7 +7,7 @@ pub async fn scan() -> ScanResult {
 
     let mut result = ScanResult::new("pip");
 
-    if let Ok(ver) = run_cmd("python3", &["--version"]).await {
+    if let Ok(ver) = run_cmd("python3", &["--version"], None).await {
         result.python_version = Some(ver);
     }
 
@@ -15,11 +15,11 @@ pub async fn scan() -> ScanResult {
         return result;
     }
 
-    if let Ok(ver) = run_cmd("pip3", &["--version"]).await {
+    if let Ok(ver) = run_cmd("pip3", &["--version"], None).await {
         result.version = Some(ver);
     }
 
-    if let Ok(out) = run_cmd("pip3", &["list", "--outdated", "--format=json"]).await {
+    if let Ok(out) = run_cmd("pip3", &["list", "--outdated", "--format=json"], None).await {
         if let Ok(packages) = serde_json::from_str::<Vec<serde_json::Value>>(&out) {
             for pkg in packages {
                 result.outdated.push(PackageInfo {

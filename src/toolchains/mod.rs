@@ -125,9 +125,10 @@ pub fn which(cmd: &str) -> bool {
         .any(|d| std::path::Path::new(d).join(cmd).exists())
 }
 
-pub async fn run_cmd(program: &str, args: &[&str]) -> Result<String, anyhow::Error> {
+pub async fn run_cmd(program: &str, args: &[&str], timeout: Option<Duration>) -> Result<String, anyhow::Error> {
     let cmd = Command::new(program).args(args).output();
-    let output = tokio::time::timeout(TIMEOUT, cmd).await??;
+    let to_wait = timeout.unwrap_or(TIMEOUT);
+    let output = tokio::time::timeout(to_wait, cmd).await??;
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
@@ -135,9 +136,11 @@ pub async fn run_cmd_in(
     dir: &std::path::Path,
     program: &str,
     args: &[&str],
+    timeout: Option<Duration>,
 ) -> Result<String, anyhow::Error> {
     let cmd = Command::new(program).args(args).current_dir(dir).output();
-    let output = tokio::time::timeout(TIMEOUT, cmd).await??;
+    let to_wait = timeout.unwrap_or(TIMEOUT);
+    let output = tokio::time::timeout(to_wait, cmd).await??;
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 

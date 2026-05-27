@@ -12,11 +12,11 @@ fn major(ver: &str) -> Option<u64> {
 }
 
 async fn check_node_npm() -> Option<AuditItem> {
-    let node = match run_cmd("node", &["--version"]).await {
+    let node = match run_cmd("node", &["--version"], None).await {
         Ok(v) => v,
         _ => return None,
     };
-    let npm = match run_cmd("npm", &["--version"]).await {
+    let npm = match run_cmd("npm", &["--version"], None).await {
         Ok(v) => v,
         _ => return None,
     };
@@ -52,11 +52,11 @@ async fn check_node_npm() -> Option<AuditItem> {
 }
 
 async fn check_python_pip() -> Option<AuditItem> {
-    let python = match run_cmd("python3", &["--version"]).await {
+    let python = match run_cmd("python3", &["--version"], None).await {
         Ok(v) => v,
         _ => return None,
     };
-    let pip = match run_cmd("pip3", &["--version"]).await {
+    let pip = match run_cmd("pip3", &["--version"], None).await {
         Ok(v) => v,
         _ => return None,
     };
@@ -78,7 +78,7 @@ async fn check_python_pip() -> Option<AuditItem> {
 }
 
 async fn check_brew_age() -> Option<AuditItem> {
-    let out = match run_cmd("brew", &["--version"]).await {
+    let out = match run_cmd("brew", &["--version"], None).await {
         Ok(v) => v,
         _ => return None,
     };
@@ -99,11 +99,11 @@ async fn check_brew_age() -> Option<AuditItem> {
 }
 
 async fn check_cargo_vs_rustc() -> Option<AuditItem> {
-    let rustc = match run_cmd("rustc", &["--version"]).await {
+    let rustc = match run_cmd("rustc", &["--version"], None).await {
         Ok(v) => v,
         _ => return None,
     };
-    let cargo = match run_cmd("cargo", &["--version"]).await {
+    let cargo = match run_cmd("cargo", &["--version"], None).await {
         Ok(v) => v,
         _ => return None,
     };
@@ -127,7 +127,7 @@ async fn check_cargo_vs_rustc() -> Option<AuditItem> {
 }
 
 async fn check_bun_age() -> Option<AuditItem> {
-    if let Ok(ver) = run_cmd("bun", &["--version"]).await {
+    if let Ok(ver) = run_cmd("bun", &["--version"], None).await {
         let m = match major(&ver) {
             Some(v) => v,
             None => return None,
@@ -205,7 +205,7 @@ async fn check_env_managers() -> Vec<AuditItem> {
     }
 
     if let Some((source, expected)) = expected_node {
-        if let Ok(node) = run_cmd("node", &["--version"]).await {
+        if let Ok(node) = run_cmd("node", &["--version"], None).await {
             let current = node.trim().trim_start_matches('v');
             let expected_clean = expected.trim_start_matches('v');
             if !current.starts_with(expected_clean) {
@@ -226,7 +226,7 @@ async fn check_env_managers() -> Vec<AuditItem> {
     }
 
     if let Some((source, expected)) = expected_python {
-        if let Ok(python) = run_cmd("python3", &["--version"]).await {
+        if let Ok(python) = run_cmd("python3", &["--version"], None).await {
             let current = python.split_whitespace().nth(1).unwrap_or("0");
             if !current.starts_with(&expected) {
                 items.push(AuditItem {
@@ -247,7 +247,7 @@ async fn check_env_managers() -> Vec<AuditItem> {
     }
 
     if let Some((source, expected)) = expected_java {
-        if let Ok(java) = run_cmd("java", &["-version"]).await {
+        if let Ok(java) = run_cmd("java", &["-version"], None).await {
             let current = java.lines().next().unwrap_or("").split('"').nth(1).unwrap_or("0");
             if !current.starts_with(&expected) {
                 items.push(AuditItem {

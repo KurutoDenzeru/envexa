@@ -7,7 +7,7 @@ pub async fn scan() -> ScanResult {
 
     let mut result = ScanResult::new("docker");
 
-    if let Ok(ver) = run_cmd("docker", &["--version"]).await {
+    if let Ok(ver) = run_cmd("docker", &["--version"], None).await {
         result.version = Some(ver);
     }
 

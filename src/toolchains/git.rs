@@ -14,6 +14,7 @@ async fn check_stale_branches(dir: &Path, result: &mut ScanResult) {
             "refs/heads/",
             "--format=%(refname:short)|%(committerdate:unix)",
         ],
+        None,
     )
     .await
     {
@@ -37,7 +38,7 @@ async fn check_stale_branches(dir: &Path, result: &mut ScanResult) {
 }
 
 async fn check_uncommitted_changes(dir: &Path, result: &mut ScanResult) {
-    if let Ok(out) = run_cmd_in(dir, "git", &["status", "--porcelain"]).await {
+    if let Ok(out) = run_cmd_in(dir, "git", &["status", "--porcelain"], None).await {
         let changes = out.lines().count();
         if changes > 0 {
             result
@@ -50,7 +51,7 @@ async fn check_uncommitted_changes(dir: &Path, result: &mut ScanResult) {
 async fn check_large_git_dir(dir: &Path, result: &mut ScanResult) {
     let git_dir = dir.join(".git");
     if git_dir.exists() {
-        if let Ok(out) = run_cmd("du", &["-sk", git_dir.to_str().unwrap_or(".git")]).await {
+        if let Ok(out) = run_cmd("du", &["-sk", git_dir.to_str().unwrap_or(".git")], None).await {
             if let Some(size_str) = out.split_whitespace().next() {
                 if let Ok(size_kb) = size_str.parse::<u64>() {
                     let size_mb = size_kb / 1024;

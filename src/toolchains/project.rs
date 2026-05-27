@@ -38,7 +38,7 @@ async fn npm_outdated(dir: &Path, result: &mut ScanResult) {
     if !which("npm") {
         return;
     }
-    if let Ok(out) = run_cmd_in(dir, "npm", &["outdated", "--json"]).await {
+    if let Ok(out) = run_cmd_in(dir, "npm", &["outdated", "--json"], None).await {
         if out.is_empty() || !out.starts_with('{') {
             return;
         }
@@ -63,7 +63,7 @@ async fn pnpm_outdated(dir: &Path, result: &mut ScanResult) {
     if !which("pnpm") {
         return;
     }
-    if let Ok(out) = run_cmd_in(dir, "pnpm", &["outdated", "--json"]).await {
+    if let Ok(out) = run_cmd_in(dir, "pnpm", &["outdated", "--json"], None).await {
         if out.is_empty() || !out.starts_with('{') {
             return;
         }
@@ -85,7 +85,7 @@ async fn yarn_outdated(dir: &Path, result: &mut ScanResult) {
     if !which("yarn") {
         return;
     }
-    if let Ok(out) = run_cmd_in(dir, "yarn", &["outdated", "--json"]).await {
+    if let Ok(out) = run_cmd_in(dir, "yarn", &["outdated", "--json"], None).await {
         for line in out.lines() {
             if let Ok(data) = serde_json::from_str::<serde_json::Value>(line) {
                 let name = data["name"].as_str();
@@ -107,7 +107,7 @@ async fn bun_outdated(dir: &Path, result: &mut ScanResult) {
     if !which("bun") {
         return;
     }
-    if let Ok(out) = run_cmd_in(dir, "bun", &["outdated", "--format=json"]).await {
+    if let Ok(out) = run_cmd_in(dir, "bun", &["outdated", "--format=json"], None).await {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
             if let Some(arr) = data.as_array() {
                 for item in arr {
@@ -126,7 +126,7 @@ async fn deno_outdated(dir: &Path, result: &mut ScanResult) {
     if !which("deno") {
         return;
     }
-    if let Ok(out) = run_cmd_in(dir, "deno", &["outdated", "--json"]).await {
+    if let Ok(out) = run_cmd_in(dir, "deno", &["outdated", "--json"], None).await {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
             if let Some(arr) = data.as_array() {
                 for item in arr {
@@ -145,7 +145,7 @@ async fn cargo_outdated(dir: &Path, result: &mut ScanResult) {
     if !which("cargo-outdated") {
         return;
     }
-    if let Ok(out) = run_cmd_in(dir, "cargo", &["outdated", "--format", "json"]).await {
+    if let Ok(out) = run_cmd_in(dir, "cargo", &["outdated", "--format", "json"], None).await {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
             if let Some(arr) = data.as_array() {
                 for item in arr {
@@ -180,7 +180,7 @@ async fn poetry_outdated(dir: &Path, result: &mut ScanResult) {
     if !which("poetry") {
         return;
     }
-    if let Ok(out) = run_cmd_in(dir, "poetry", &["show", "--outdated", "--format=json"]).await {
+    if let Ok(out) = run_cmd_in(dir, "poetry", &["show", "--outdated", "--format=json"], None).await {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
             if let Some(arr) = data.as_array() {
                 for item in arr {
@@ -197,7 +197,7 @@ async fn poetry_outdated(dir: &Path, result: &mut ScanResult) {
             }
         }
     }
-    if let Ok(out) = run_cmd_in(dir, "poetry", &["show", "--outdated"]).await {
+    if let Ok(out) = run_cmd_in(dir, "poetry", &["show", "--outdated"], None).await {
         for line in out.lines() {
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.len() >= 3 {
@@ -245,6 +245,7 @@ async fn pipenv_outdated(dir: &Path, result: &mut ScanResult) {
         dir,
         "pipenv",
         &["run", "pip", "list", "--outdated", "--format=json"],
+        None,
     )
     .await
     {
@@ -268,6 +269,7 @@ async fn pip_venv_outdated(dir: &Path, result: &mut ScanResult) {
             dir,
             pip.to_str().unwrap_or("pip"),
             &["list", "--outdated", "--format=json"],
+            None,
         )
         .await
         {
@@ -281,7 +283,7 @@ async fn pip_venv_outdated(dir: &Path, result: &mut ScanResult) {
         } else {
             return;
         };
-        if let Ok(out) = run_cmd_in(dir, cmd, &["list", "--outdated", "--format=json"]).await {
+        if let Ok(out) = run_cmd_in(dir, cmd, &["list", "--outdated", "--format=json"], None).await {
             parse_pip_outdated(&out, result);
         }
     }
@@ -291,7 +293,7 @@ async fn go_outdated(dir: &Path, result: &mut ScanResult) {
     if !which("go") {
         return;
     }
-    if let Ok(out) = run_cmd_in(dir, "go", &["list", "-u", "-m", "-json", "all"]).await {
+    if let Ok(out) = run_cmd_in(dir, "go", &["list", "-u", "-m", "-json", "all"], None).await {
         let text = out.replace("}\n{", "}\n---\n{");
         for chunk in text.split("\n---\n") {
             if let Ok(data) = serde_json::from_str::<serde_json::Value>(chunk) {
@@ -314,7 +316,7 @@ async fn composer_outdated(dir: &Path, result: &mut ScanResult) {
     if !which("composer") {
         return;
     }
-    if let Ok(out) = run_cmd_in(dir, "composer", &["outdated", "--format=json", "--direct"]).await {
+    if let Ok(out) = run_cmd_in(dir, "composer", &["outdated", "--format=json", "--direct"], None).await {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
             if let Some(installed) = data.get("installed").and_then(|v| v.as_array()) {
                 for item in installed {

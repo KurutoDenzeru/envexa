@@ -7,7 +7,7 @@ pub async fn scan() -> ScanResult {
 
     let mut result = ScanResult::new("bun");
 
-    if let Ok(ver) = run_cmd("bun", &["--version"]).await {
+    if let Ok(ver) = run_cmd("bun", &["--version"], None).await {
         result.bun_version = Some(ver);
     }
 
