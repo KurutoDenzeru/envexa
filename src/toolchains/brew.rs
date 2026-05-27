@@ -7,11 +7,18 @@ pub async fn scan() -> ScanResult {
 
     let mut result = ScanResult::new("brew");
 
-    if let Ok(ver) = run_cmd("brew", &["--version"], None).await {
+    let (ver_res, outdated_res, cask_res, list_res) = tokio::join!(
+        run_cmd("brew", &["--version"], None),
+        run_cmd("brew", &["outdated", "--json"], None),
+        run_cmd("brew", &["outdated", "--cask", "--greedy", "--json"], None),
+        run_cmd("brew", &["list", "--formula", "--versions"], None)
+    );
+
+    if let Ok(ver) = ver_res {
         result.version = ver.split_whitespace().nth(1).map(|s| s.to_string());
     }
 
-    if let Ok(out) = run_cmd("brew", &["outdated", "--json"], None).await {
+    if let Ok(out) = outdated_res {
         if !out.is_empty() {
             if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
                 if let Some(formulae) = data["formulae"].as_array() {
@@ -30,7 +37,7 @@ pub async fn scan() -> ScanResult {
         }
     }
 
-    if let Ok(out) = run_cmd("brew", &["outdated", "--cask", "--greedy", "--json"], None).await {
+    if let Ok(out) = cask_res {
         if !out.is_empty() {
             if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
                 if let Some(casks) = data["casks"].as_array() {
@@ -49,7 +56,7 @@ pub async fn scan() -> ScanResult {
         }
     }
 
-    if let Ok(out) = run_cmd("brew", &["list", "--formula", "--versions"], None).await {
+    if let Ok(out) = list_res {
         if !out.is_empty() {
             result.installed_count = Some(out.lines().count() as u64);
         }

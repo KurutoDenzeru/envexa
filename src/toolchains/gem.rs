@@ -12,31 +12,41 @@ pub async fn scan() -> ScanResult {
 
     let mut result = ScanResult::new("gem");
 
-    if let Ok(ver) = run_cmd("ruby", &["--version"], None).await {
-        result.ruby_version = Some(ver);
-    }
+    let has_gem = which("gem");
 
-    if !which("gem") {
+    if has_gem {
+        let (ruby_ver, outdated) = tokio::join!(
+            run_cmd("ruby", &["--version"], None),
+            run_cmd("gem", &["outdated"], None)
+        );
+
+        if let Ok(ver) = ruby_ver {
+            result.ruby_version = Some(ver);
+        }
+
+        if let Ok(out) = outdated {
+            let re = gem_outdated_re();
+            for line in out.lines() {
+                if let Some(cap) = re.captures(line) {
+                    result.outdated.push(PackageInfo {
+                        name: cap[1].to_string(),
+                        current: cap[2].to_string(),
+                        latest: if cap.get(3).is_none_or(|m| m.as_str().is_empty()) {
+                            "?".to_string()
+                        } else {
+                            cap[3].to_string()
+                        },
+                    });
+                }
+            }
+        }
+    } else {
+        if let Ok(ver) = run_cmd("ruby", &["--version"], None).await {
+            result.ruby_version = Some(ver);
+        }
         result.status = "warning".into();
         result.issues.push("gem CLI not found".into());
         return result;
-    }
-
-    if let Ok(out) = run_cmd("gem", &["outdated"], None).await {
-        let re = gem_outdated_re();
-        for line in out.lines() {
-            if let Some(cap) = re.captures(line) {
-                result.outdated.push(PackageInfo {
-                    name: cap[1].to_string(),
-                    current: cap[2].to_string(),
-                    latest: if cap.get(3).is_none_or(|m| m.as_str().is_empty()) {
-                        "?".to_string()
-                    } else {
-                        cap[3].to_string()
-                    },
-                });
-            }
-        }
     }
 
     let n = result.outdated.len();

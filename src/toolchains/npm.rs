@@ -7,20 +7,28 @@ pub async fn scan() -> ScanResult {
 
     let mut result = ScanResult::new("npm");
 
-    if let Ok(ver) = run_cmd("node", &["--version"], None).await {
-        result.node_version = Some(ver);
-    }
+    let has_npm = which("npm");
 
-    if !which("npm") {
-        return result;
-    }
+    if has_npm {
+        let (node_ver, npm_ver, outdated) = tokio::join!(
+            run_cmd("node", &["--version"], None),
+            run_cmd("npm", &["--version"], None),
+            run_cmd("npm", &["outdated", "-g", "--json"], None)
+        );
 
-    if let Ok(ver) = run_cmd("npm", &["--version"], None).await {
-        result.version = Some(ver);
-    }
-
-    if let Ok(out) = run_cmd("npm", &["outdated", "-g", "--json"], None).await {
-        result.outdated_global = parse_outdated(&out);
+        if let Ok(ver) = node_ver {
+            result.node_version = Some(ver);
+        }
+        if let Ok(ver) = npm_ver {
+            result.version = Some(ver);
+        }
+        if let Ok(out) = outdated {
+            result.outdated_global = parse_outdated(&out);
+        }
+    } else {
+        if let Ok(ver) = run_cmd("node", &["--version"], None).await {
+            result.node_version = Some(ver);
+        }
     }
 
     result.status = if result.outdated_global.is_empty() {

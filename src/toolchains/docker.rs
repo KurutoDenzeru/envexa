@@ -7,14 +7,20 @@ pub async fn scan() -> ScanResult {
 
     let mut result = ScanResult::new("docker");
 
-    if let Ok(ver) = run_cmd("docker", &["--version"], None).await {
-        result.version = Some(ver);
-    }
-
     let info_cmd = Command::new("docker")
         .args(["info", "--format", "{{json .}}"])
         .output();
-    let info_check = match tokio::time::timeout(Duration::from_secs(10), info_cmd).await {
+
+    let (ver_res, info_res) = tokio::join!(
+        run_cmd("docker", &["--version"], None),
+        tokio::time::timeout(Duration::from_secs(10), info_cmd)
+    );
+
+    if let Ok(ver) = ver_res {
+        result.version = Some(ver);
+    }
+
+    let info_check = match info_res {
         Ok(Ok(out)) => out,
         _ => {
             result.status = "error".into();
