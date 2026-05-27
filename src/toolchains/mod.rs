@@ -201,7 +201,7 @@ pub async fn scan_all() -> HashMap<String, ScanResult> {
 
     let mut results = HashMap::new();
 
-    let mut buffered = stream::iter(tasks).buffer_unordered(4);
+    let mut buffered = stream::iter(tasks).buffer_unordered(16);
 
     while let Some((name, mut res)) = buffered.next().await {
         if ignore.should_ignore_tool(name) {

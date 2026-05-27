@@ -7,10 +7,9 @@ pub async fn scan() -> ScanResult {
 
     let mut result = ScanResult::new("brew");
 
-    let (ver_res, outdated_res, cask_res, list_res) = tokio::join!(
+    let (ver_res, outdated_res, list_res) = tokio::join!(
         run_cmd("brew", &["--version"], None),
-        run_cmd("brew", &["outdated", "--json"], None),
-        run_cmd("brew", &["outdated", "--cask", "--greedy", "--json"], None),
+        run_cmd("brew", &["outdated", "--greedy", "--json"], None),
         run_cmd("brew", &["list", "--formula", "--versions"], None)
     );
 
@@ -33,13 +32,6 @@ pub async fn scan() -> ScanResult {
                         });
                     }
                 }
-            }
-        }
-    }
-
-    if let Ok(out) = cask_res {
-        if !out.is_empty() {
-            if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
                 if let Some(casks) = data["casks"].as_array() {
                     for c in casks {
                         result.outdated_casks.push(PackageInfo {
