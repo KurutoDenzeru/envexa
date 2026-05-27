@@ -26,9 +26,16 @@ enum Commands {
     Scan {
         #[arg(long, default_value = "7")]
         ttl: u64,
+        #[arg(long, default_value = "markdown")]
+        format: String,
     },
     #[command(about = "Self-update to latest release")]
     Update,
+    #[command(about = "Run in background to periodically scan and notify")]
+    Daemon {
+        #[arg(long, default_value = "14400")]
+        interval: u64,
+    },
 }
 
 pub async fn with_spinner<F, T>(label: &str, future: F) -> T
@@ -79,7 +86,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 async fn run_cmd(cmd: Commands) -> Result<(), anyhow::Error> {
     match cmd {
-        Commands::Scan { ttl } => {
+        Commands::Scan { ttl, format } => {
             let results = with_spinner("Scanning toolchains...", toolchains::scan_all()).await;
             let report = Report {
                 timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
@@ -88,7 +95,14 @@ async fn run_cmd(cmd: Commands) -> Result<(), anyhow::Error> {
             if let Err(e) = config::write_cache(&report, ttl) {
                 eprintln!("Warning: failed to write cache: {e}");
             }
-            println!("{}", scanner::format_report(&report));
+            if format.to_lowercase() == "json" {
+                match serde_json::to_string_pretty(&report) {
+                    Ok(json) => println!("{}", json),
+                    Err(e) => eprintln!("Error formatting JSON: {}", e),
+                }
+            } else {
+                println!("{}", scanner::format_report(&report));
+            }
         }
         Commands::Update => {
             if cfg!(debug_assertions) {
@@ -100,8 +114,64 @@ async fn run_cmd(cmd: Commands) -> Result<(), anyhow::Error> {
                 self_update().await;
             }
         }
+        Commands::Daemon { interval } => {
+            run_daemon(interval).await;
+        }
     }
     Ok(())
+}
+
+async fn run_daemon(interval: u64) {
+    println!("Starting envexa daemon. Interval: {}s", interval);
+    loop {
+        let results = toolchains::scan_all().await;
+
+        let mut warnings = 0;
+        let mut errors = 0;
+        let mut outdated = 0;
+
+        for res in results.values() {
+            match res.status.as_str() {
+                "warning" => warnings += 1,
+                "error" => errors += 1,
+                _ => {}
+            }
+            outdated += scanner::extract_outdated(res).len();
+        }
+
+        if warnings > 0 || errors > 0 || outdated > 0 {
+            let mut msgs = vec![];
+            if errors > 0 {
+                msgs.push(format!("{} errors", errors));
+            }
+            if warnings > 0 {
+                msgs.push(format!("{} warnings", warnings));
+            }
+            if outdated > 0 {
+                msgs.push(format!("{} outdated pkgs", outdated));
+            }
+
+            let msg = msgs.join(", ");
+            let title = "Envexa Health Alert";
+
+            #[cfg(target_os = "macos")]
+            {
+                let script = format!("display notification \"{}\" with title \"{}\"", msg, title);
+                let _ = std::process::Command::new("osascript")
+                    .args(["-e", &script])
+                    .status();
+            }
+
+            #[cfg(target_os = "linux")]
+            {
+                let _ = std::process::Command::new("notify-send")
+                    .args([title, &msg])
+                    .status();
+            }
+        }
+
+        tokio::time::sleep(std::time::Duration::from_secs(interval)).await;
+    }
 }
 
 async fn self_update() {

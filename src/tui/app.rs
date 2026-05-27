@@ -135,6 +135,11 @@ impl App {
                                 }
                             }
                         }
+                        KeyCode::Char('f') | KeyCode::Char('F') => {
+                            if matches!(self.detail_key.as_deref(), Some("security")) {
+                                self.do_detail_security_fixes(&mut terminal)?;
+                            }
+                        }
                         KeyCode::Char('e') | KeyCode::Char('E') => {
                             self.export_detail_report();
                         }
@@ -416,6 +421,92 @@ impl App {
         if let Some(ref mut report) = self.report {
             if let Some(res) = report.results.get("cleanup") {
                 self.detail_cleanup = scanner::extract_cleanup_items(res).to_vec();
+            }
+        }
+
+        self.clamp_selection();
+        Ok(())
+    }
+
+    fn do_detail_security_fixes(
+        &mut self,
+        terminal: &mut DefaultTerminal,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if self.detail_vulns.is_empty() {
+            return Ok(());
+        }
+
+        self.view = View::Updating;
+        self.progress_counter = 0;
+
+        let handle = std::thread::spawn(move || {
+            let project_path = toolchains::get_project_path();
+            let mut fixed = 0usize;
+            let mut errors = vec![];
+
+            if project_path.join("package.json").exists() && toolchains::which("npm") {
+                let mut cmd = std::process::Command::new("npm");
+                cmd.current_dir(&project_path).args(["audit", "fix"]);
+                match cmd.output() {
+                    Ok(out) if out.status.success() => fixed += 1,
+                    Ok(out) => errors.push(format!(
+                        "npm audit fix: {}",
+                        String::from_utf8_lossy(&out.stderr).trim()
+                    )),
+                    Err(e) => errors.push(format!("npm audit fix error: {}", e)),
+                }
+            }
+
+            if project_path.join("Cargo.toml").exists() && toolchains::which("cargo") {
+                let mut cmd = std::process::Command::new("cargo");
+                cmd.current_dir(&project_path).args(["update"]);
+                match cmd.output() {
+                    Ok(out) if out.status.success() => fixed += 1,
+                    Ok(out) => errors.push(format!(
+                        "cargo update: {}",
+                        String::from_utf8_lossy(&out.stderr).trim()
+                    )),
+                    Err(e) => errors.push(format!("cargo update error: {}", e)),
+                }
+            }
+
+            if errors.is_empty() {
+                if fixed > 0 {
+                    "\u{2714} Successfully ran automated security fixes".to_string()
+                } else {
+                    "\u{2714} No automated fixes supported for this project type".to_string()
+                }
+            } else {
+                let e = errors.join("; ");
+                format!("\u{2716} Fix attempted with errors: {e}")
+            }
+        });
+
+        loop {
+            terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
+            self.throbber_state.calc_next();
+            self.progress_counter += 1;
+            if handle.is_finished() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+
+        let result = handle.join().unwrap();
+        self.detail_message = result;
+        self.view = View::PackageDetail;
+
+        if let Some(ref mut report) = self.report {
+            let rt_handle = tokio::runtime::Handle::current();
+            if let Some(res) = rt_handle.block_on(async { toolchains::scan_one("security").await })
+            {
+                report.results.insert("security".to_string(), res);
+            }
+        }
+
+        if let Some(ref mut report) = self.report {
+            if let Some(res) = report.results.get("security") {
+                self.detail_vulns = scanner::extract_vulnerabilities(res).to_vec();
             }
         }
 

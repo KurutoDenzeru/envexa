@@ -113,3 +113,49 @@ pub fn remove_all() -> std::io::Result<()> {
     }
     Ok(())
 }
+
+#[derive(Debug, Default)]
+pub struct EnvexaIgnore {
+    pub packages: Vec<String>,
+    pub vulnerabilities: Vec<String>,
+    pub toolchains: Vec<String>,
+}
+
+impl EnvexaIgnore {
+    pub fn load(dir: &std::path::Path) -> Self {
+        let mut ignore = Self::default();
+        let path = dir.join(".envexaignore");
+        if let Ok(content) = std::fs::read_to_string(&path) {
+            for line in content.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                if let Some(pkg) = line.strip_prefix("package:") {
+                    ignore.packages.push(pkg.trim().to_string());
+                } else if let Some(vuln) = line.strip_prefix("cve:") {
+                    ignore.vulnerabilities.push(vuln.trim().to_string());
+                } else if let Some(tool) = line.strip_prefix("tool:") {
+                    ignore.toolchains.push(tool.trim().to_string());
+                } else if let Some(pkg) = line.strip_prefix("pkg:") {
+                    ignore.packages.push(pkg.trim().to_string());
+                } else if let Some(vuln) = line.strip_prefix("vulnerability:") {
+                    ignore.vulnerabilities.push(vuln.trim().to_string());
+                }
+            }
+        }
+        ignore
+    }
+
+    pub fn should_ignore_package(&self, pkg: &str) -> bool {
+        self.packages.iter().any(|i| pkg.contains(i))
+    }
+
+    pub fn should_ignore_vuln(&self, vuln: &str) -> bool {
+        self.vulnerabilities.iter().any(|i| vuln.contains(i))
+    }
+
+    pub fn should_ignore_tool(&self, tool: &str) -> bool {
+        self.toolchains.iter().any(|i| tool == i)
+    }
+}

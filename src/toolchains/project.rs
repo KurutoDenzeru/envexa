@@ -21,6 +21,14 @@ fn detect_project_type(dir: &Path) -> Option<&'static str> {
         Some("requirements")
     } else if dir.join("package.json").exists() {
         Some("npm")
+    } else if dir.join("go.mod").exists() {
+        Some("go")
+    } else if dir.join("build.gradle").exists() || dir.join("build.gradle.kts").exists() {
+        Some("gradle")
+    } else if dir.join("pom.xml").exists() {
+        Some("maven")
+    } else if dir.join("composer.json").exists() {
+        Some("composer")
     } else {
         None
     }
@@ -279,6 +287,63 @@ async fn pip_venv_outdated(dir: &Path, result: &mut ScanResult) {
     }
 }
 
+async fn go_outdated(dir: &Path, result: &mut ScanResult) {
+    if !which("go") {
+        return;
+    }
+    if let Ok(out) = run_cmd_in(dir, "go", &["list", "-u", "-m", "-json", "all"]).await {
+        let text = out.replace("}\n{", "}\n---\n{");
+        for chunk in text.split("\n---\n") {
+            if let Ok(data) = serde_json::from_str::<serde_json::Value>(chunk) {
+                if let Some(update) = data.get("Update") {
+                    let name = data["Path"].as_str().unwrap_or("?").to_string();
+                    let current = data["Version"].as_str().unwrap_or("?").to_string();
+                    let latest = update["Version"].as_str().unwrap_or("?").to_string();
+                    result.outdated.push(PackageInfo {
+                        name,
+                        current,
+                        latest,
+                    });
+                }
+            }
+        }
+    }
+}
+
+async fn composer_outdated(dir: &Path, result: &mut ScanResult) {
+    if !which("composer") {
+        return;
+    }
+    if let Ok(out) = run_cmd_in(dir, "composer", &["outdated", "--format=json", "--direct"]).await {
+        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
+            if let Some(installed) = data.get("installed").and_then(|v| v.as_array()) {
+                for item in installed {
+                    let name = item["name"].as_str().unwrap_or("?").to_string();
+                    let current = item["version"].as_str().unwrap_or("?").to_string();
+                    let latest = item["latest"].as_str().unwrap_or("?").to_string();
+                    result.outdated.push(PackageInfo {
+                        name,
+                        current,
+                        latest,
+                    });
+                }
+            }
+        }
+    }
+}
+
+async fn gradle_outdated(_dir: &Path, result: &mut ScanResult) {
+    result
+        .issues
+        .push("Gradle dependency check requires ben-manes/gradle-versions-plugin (skipped)".into());
+}
+
+async fn maven_outdated(_dir: &Path, result: &mut ScanResult) {
+    result
+        .issues
+        .push("Maven outdated checking requires manual parsing (skipped)".into());
+}
+
 pub async fn scan() -> ScanResult {
     let project_path = crate::config::load_config()
         .project_path
@@ -304,6 +369,10 @@ pub async fn scan() -> ScanResult {
         "poetry" => poetry_outdated(&project_path, &mut result).await,
         "pipenv" => pipenv_outdated(&project_path, &mut result).await,
         "requirements" => pip_venv_outdated(&project_path, &mut result).await,
+        "go" => go_outdated(&project_path, &mut result).await,
+        "composer" => composer_outdated(&project_path, &mut result).await,
+        "gradle" => gradle_outdated(&project_path, &mut result).await,
+        "maven" => maven_outdated(&project_path, &mut result).await,
         _ => {}
     }
 
