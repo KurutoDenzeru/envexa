@@ -740,28 +740,69 @@ fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::s
     }
 
     if inner.height < 7 || inner.width < 34 {
+        let num_blocks = ((readiness * 10.0).round() as usize).min(10);
+        let bar_span = Span::styled("■".repeat(num_blocks), Style::default().fg(readiness_color));
+        let empty_span = Span::styled(
+            "░".repeat(10 - num_blocks),
+            Style::default().fg(Color::DarkGray),
+        );
+        let extra_text = if inner.width >= 28 {
+            format!("  {} outdated  {} vulns", project_outdated, vuln_count)
+        } else {
+            String::new()
+        };
+
         let compact = Paragraph::new(Text::from(vec![
             Line::from(vec![
-                Span::styled("Ready ", Style::default().fg(readiness_color).bold()),
-                Span::raw(format!("{:>3}%", (readiness * 100.0).round() as u64)),
+                Span::styled("Ready ", Style::default().fg(Color::White).bold()),
+                Span::styled(
+                    format!("{:>3}% ", (readiness * 100.0).round() as u64),
+                    Style::default().fg(readiness_color).bold(),
+                ),
+                bar_span,
+                empty_span,
             ]),
             Line::from(vec![
-                Span::styled("Risk ", Style::default().fg(Color::DarkGray)),
-                Span::raw(format!("{risk}/100")),
+                Span::styled("Risk  ", Style::default().fg(Color::White)),
+                Span::styled(format!("{risk}/100"), Style::default().fg(readiness_color)),
+                Span::raw(extra_text),
             ]),
         ]));
         frame.render_widget(compact, inner);
         return;
     }
 
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(2),
-            Constraint::Length(4),
-            Constraint::Min(3),
-        ])
-        .split(inner);
+    let (chunks, has_spacers) = if inner.height >= 11 {
+        (
+            Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(2), // Gauge
+                    Constraint::Length(1), // Spacer
+                    Constraint::Length(3), // Summary text
+                    Constraint::Length(1), // Spacer
+                    Constraint::Min(3),    // BarChart
+                ])
+                .split(inner),
+            true,
+        )
+    } else {
+        (
+            Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(2), // Gauge
+                    Constraint::Length(4), // Summary text (with 1 trailing blank line)
+                    Constraint::Min(3),    // BarChart
+                ])
+                .split(inner),
+            false,
+        )
+    };
+
+    let gauge_chunk = chunks[0];
+    let summary_chunk = if has_spacers { chunks[2] } else { chunks[1] };
+    let chart_chunk = if has_spacers { chunks[4] } else { chunks[2] };
 
     frame.render_widget(
         Gauge::default()
@@ -776,7 +817,7 @@ fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::s
                     .add_modifier(Modifier::BOLD),
             ))
             .ratio(readiness),
-        chunks[0],
+        gauge_chunk,
     );
 
     let summary = Paragraph::new(Text::from(vec![
@@ -806,15 +847,15 @@ fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::s
             Span::raw(format!("  {audit_count} checks flagged")),
         ]),
     ]));
-    frame.render_widget(summary, chunks[1]);
+    frame.render_widget(summary, summary_chunk);
 
     let signal_data = [
         ("Pkg", project_outdated as u64),
-        ("Crit", critical as u64),
-        ("High", high as u64),
-        ("Mod", moderate as u64),
-        ("Other", other as u64),
-        ("Audit", audit_count as u64),
+        ("Cri", critical as u64),
+        ("Hgh", high as u64),
+        ("Med", moderate as u64),
+        ("Oth", other as u64),
+        ("Aud", audit_count as u64),
     ];
     let max_signal = signal_data
         .iter()
@@ -822,12 +863,21 @@ fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::s
         .max()
         .unwrap_or(1)
         .max(1);
-    let bar_width = match inner.width {
-        0..=42 => 3,
-        43..=58 => 4,
-        _ => 5,
+
+    let (bar_width, bar_gap) = if inner.width >= 45 {
+        (5, 3)
+    } else if inner.width >= 39 {
+        (4, 3)
+    } else if inner.width >= 34 {
+        (4, 2)
+    } else if inner.width >= 28 {
+        (3, 2)
+    } else if inner.width >= 22 {
+        (2, 2)
+    } else {
+        (2, 1)
     };
-    let bar_gap = if inner.width < 44 { 0 } else { 1 };
+
     let chart = BarChart::default()
         .data(&signal_data)
         .max(max_signal)
@@ -836,8 +886,8 @@ fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::s
         .bar_style(Style::default().fg(Color::Magenta))
         .value_style(Style::default().fg(Color::White))
         .label_style(Style::default().fg(Color::DarkGray));
-    if chunks[2].height > 1 {
-        frame.render_widget(chart, chunks[2]);
+    if chart_chunk.height > 1 {
+        frame.render_widget(chart, chart_chunk);
     }
 }
 
@@ -888,7 +938,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             .split(area);
         let left_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(12), Constraint::Min(7)])
+            .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
             .split(layout[0]);
 
         render_overview_pie(frame, left_chunks[0], pass, warn, fail, skip);
@@ -902,9 +952,11 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
         render_dashboard_health_panel(frame, right_chunks[0], report, pass, warn, fail, skip);
         right_chunks[1]
     } else {
-        let tooling_height = if area.height >= 20 {
-            8
-        } else if area.height >= 13 {
+        let tooling_height = if area.height >= 22 {
+            9
+        } else if area.height >= 15 {
+            7
+        } else if area.height >= 12 {
             5
         } else {
             0
