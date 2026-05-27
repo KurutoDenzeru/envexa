@@ -128,11 +128,15 @@ impl App {
             loop {
                 tokio::select! {
                     _ = interval.tick() => {
-                        let _ = tx_in.send(AppEvent::Tick);
+                        if tx_in.send(AppEvent::Tick).is_err() {
+                            break;
+                        }
                     }
                     Some(Ok(Event::Key(key))) = reader.next() => {
-                        if key.kind == KeyEventKind::Press {
-                            let _ = tx_in.send(AppEvent::Input(key));
+                        if key.kind == KeyEventKind::Press
+                            && tx_in.send(AppEvent::Input(key)).is_err()
+                        {
+                            break;
                         }
                     }
                 }
