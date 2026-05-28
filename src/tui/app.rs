@@ -293,6 +293,9 @@ impl App {
                                     } else {
                                         self.ui.checked_outdated.insert(self.ui.outdated_selection);
                                     }
+                                } else if matches!(self.ui.view, View::Settings) {
+                                    self.toggle_setting(1);
+                                    let _ = config::save_config(&self.config);
                                 }
                             }
                             KeyCode::Char('/') => {
@@ -301,34 +304,24 @@ impl App {
                                 self.ui.outdated_selection = 0;
                             }
                             KeyCode::Right | KeyCode::Char('l') => {
-                                if matches!(self.ui.view, View::Settings) {
-                                    self.toggle_setting(1);
-                                    let _ = config::save_config(&self.config);
-                                } else {
-                                    self.ui.tab_index = (self.ui.tab_index + 1) % 3;
-                                    self.ui.view = match self.ui.tab_index {
-                                        0 => View::Dashboard,
-                                        1 => View::Outdated,
-                                        _ => View::Settings,
-                                    };
-                                }
+                                self.ui.tab_index = (self.ui.tab_index + 1) % 3;
+                                self.ui.view = match self.ui.tab_index {
+                                    0 => View::Dashboard,
+                                    1 => View::Outdated,
+                                    _ => View::Settings,
+                                };
                             }
                             KeyCode::Left | KeyCode::Char('j') => {
-                                if matches!(self.ui.view, View::Settings) {
-                                    self.toggle_setting(-1);
-                                    let _ = config::save_config(&self.config);
+                                self.ui.tab_index = if self.ui.tab_index == 0 {
+                                    2
                                 } else {
-                                    self.ui.tab_index = if self.ui.tab_index == 0 {
-                                        2
-                                    } else {
-                                        self.ui.tab_index - 1
-                                    };
-                                    self.ui.view = match self.ui.tab_index {
-                                        0 => View::Dashboard,
-                                        1 => View::Outdated,
-                                        _ => View::Settings,
-                                    };
-                                }
+                                    self.ui.tab_index - 1
+                                };
+                                self.ui.view = match self.ui.tab_index {
+                                    0 => View::Dashboard,
+                                    1 => View::Outdated,
+                                    _ => View::Settings,
+                                };
                             }
                             KeyCode::Down | KeyCode::Char('n') => self.next_item(),
                             KeyCode::Up | KeyCode::Char('p') => self.prev_item(),

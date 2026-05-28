@@ -225,9 +225,8 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
                 } else {
                     String::new()
                 };
-            (
-                Line::from(vec![
-                    Span::styled(" [S]", Style::default().fg(app.theme().success)),
+            let mut spans = vec![
+                Span::styled(" [S]", Style::default().fg(app.theme().success)),
                     Span::raw("can "),
                     Span::styled("[O]", Style::default().fg(app.theme().warning)),
                     Span::raw("utdated "),
@@ -244,8 +243,17 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
                     Span::raw("  "),
                     Span::styled("[Q]", Style::default().fg(app.theme().text_muted)),
                     Span::raw("uit"),
-                    Span::styled(update_msg, Style::default().fg(app.theme().text_normal)),
-                ]),
+                ];
+            if matches!(app.ui.view, View::Settings) {
+                spans.extend([
+                    Span::raw("  "),
+                    Span::styled("[Space/Enter]", Style::default().fg(app.theme().warning)),
+                    Span::raw(" toggle"),
+                ]);
+            }
+            spans.push(Span::styled(update_msg, Style::default().fg(app.theme().text_normal)));
+            (
+                Line::from(spans),
                 Style::default().fg(app.theme().text_normal).bg(app.theme().background),
             )
         }
