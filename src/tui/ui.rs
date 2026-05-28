@@ -3,13 +3,33 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span, Text},
-    widgets::{BarChart, Block, Borders, Cell, Gauge, LineGauge, Paragraph, Row, Table, Tabs},
+    widgets::{BarChart, Block, Borders, Cell, Clear, Gauge, LineGauge, List, ListItem, Paragraph, Row, Table, Tabs},
     Frame,
 };
 use tui_piechart::{LegendAlignment, LegendLayout, LegendPosition, PieChart, PieSlice, Resolution};
 
 use crate::scanner;
 use crate::tui::app::{App, View};
+
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(r);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(popup_layout[1])[1]
+}
 
 fn status_style(status: &str, theme: &Theme) -> Style {
     let style = Style::default().fg(status_color(status, theme));
@@ -1576,6 +1596,42 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
         .column_spacing(1);
 
     frame.render_widget(table, area);
+
+    if app.ui.settings_edit_mode {
+        let opts = app.get_settings_options();
+        let items: Vec<ListItem> = opts
+            .iter()
+            .enumerate()
+            .map(|(i, val)| {
+                let is_selected = i == app.ui.settings_edit_selection;
+                let bg = if is_selected { app.theme().text_muted } else { Color::Reset };
+                let fg = if is_selected { app.theme().text_normal } else { Color::Gray };
+                let prefix = if is_selected { " \u{25B6} " } else { "   " };
+                ListItem::new(format!("{}{}", prefix, val)).style(Style::default().bg(bg).fg(fg))
+            })
+            .collect();
+
+        let popup_area = centered_rect(40, 40, area);
+        let title = match app.ui.settings_selection {
+            0 => " Cache TTL ",
+            1 => " Auto-Scan ",
+            2 => " Theme ",
+            3 => " Verbose Logs ",
+            _ => " Options ",
+        };
+
+        let list = List::new(items)
+            .block(
+                Block::default()
+                    .title(title)
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(app.theme().primary))
+                    .bg(app.theme().background),
+            );
+
+        frame.render_widget(Clear, popup_area);
+        frame.render_widget(list, popup_area);
+    }
 }
 
 fn render_package_detail(frame: &mut Frame, area: Rect, app: &App) {

@@ -50,6 +50,8 @@ pub struct UiState {
     pub outdated_selection: usize,
     pub settings_selection: usize,
     pub tab_index: usize,
+    pub settings_edit_mode: bool,
+    pub settings_edit_selection: usize,
     pub search_mode: bool,
     pub search_query: String,
     pub throbber_state: ThrobberState,
@@ -107,6 +109,8 @@ impl App {
                 outdated_selection: 0,
                 settings_selection: 0,
                 tab_index: 0,
+                settings_edit_mode: false,
+                settings_edit_selection: 0,
                 search_mode: false,
                 search_query: String::new(),
                 throbber_state: ThrobberState::default(),
@@ -262,8 +266,12 @@ impl App {
 
                         match key.code {
                             KeyCode::Esc | KeyCode::Char('h') => {
-                                self.ui.view = View::Dashboard;
-                                self.ui.tab_index = 0;
+                                if self.ui.settings_edit_mode {
+                                    self.ui.settings_edit_mode = false;
+                                } else {
+                                    self.ui.view = View::Dashboard;
+                                    self.ui.tab_index = 0;
+                                }
                             }
                             KeyCode::Char('s') | KeyCode::Char('S') => {
                                 self.ui.search_mode = false;
@@ -294,8 +302,13 @@ impl App {
                                         self.ui.checked_outdated.insert(self.ui.outdated_selection);
                                     }
                                 } else if matches!(self.ui.view, View::Settings) {
-                                    self.toggle_setting(1);
-                                    let _ = config::save_config(&self.config);
+                                    if self.ui.settings_edit_mode {
+                                        self.apply_setting_selection();
+                                        self.ui.settings_edit_mode = false;
+                                        let _ = config::save_config(&self.config);
+                                    } else {
+                                        self.enter_settings_edit_mode();
+                                    }
                                 }
                             }
                             KeyCode::Char('/') => {
@@ -329,8 +342,13 @@ impl App {
                                 if matches!(self.ui.view, View::Dashboard) {
                                     self.open_detail();
                                 } else if matches!(self.ui.view, View::Settings) {
-                                    self.toggle_setting(1);
-                                    let _ = config::save_config(&self.config);
+                                    if self.ui.settings_edit_mode {
+                                        self.apply_setting_selection();
+                                        self.ui.settings_edit_mode = false;
+                                        let _ = config::save_config(&self.config);
+                                    } else {
+                                        self.enter_settings_edit_mode();
+                                    }
                                 }
                             }
                             _ => {}
@@ -864,7 +882,12 @@ impl App {
                 self.detail.selection = self.detail.selection.saturating_add(1).min(n);
             }
             View::Settings => {
-                self.ui.settings_selection = self.ui.settings_selection.saturating_add(1).min(3);
+                if self.ui.settings_edit_mode {
+                    let opts_len = self.get_settings_options().len().saturating_sub(1);
+                    self.ui.settings_edit_selection = self.ui.settings_edit_selection.saturating_add(1).min(opts_len);
+                } else {
+                    self.ui.settings_selection = self.ui.settings_selection.saturating_add(1).min(3);
+                }
             }
             View::Updating => {}
         }
@@ -880,7 +903,11 @@ impl App {
             }
             View::Scanning => {}
             View::Settings => {
-                self.ui.settings_selection = self.ui.settings_selection.saturating_sub(1);
+                if self.ui.settings_edit_mode {
+                    self.ui.settings_edit_selection = self.ui.settings_edit_selection.saturating_sub(1);
+                } else {
+                    self.ui.settings_selection = self.ui.settings_selection.saturating_sub(1);
+                }
             }
             View::PackageDetail => {
                 self.detail.selection = self.detail.selection.saturating_sub(1);
@@ -889,55 +916,56 @@ impl App {
         }
     }
 
-    fn toggle_setting(&mut self, direction: i32) {
+    pub fn get_settings_options(&self) -> Vec<String> {
+        match self.ui.settings_selection {
+            0 => vec!["5m".to_string(), "15m".to_string(), "30m".to_string(), "60m".to_string()],
+            1 => vec!["On".to_string(), "Off".to_string()],
+            2 => vec![
+                "default".to_string(), "dark".to_string(), "light".to_string(),
+                "dracula".to_string(), "nord".to_string(), "monokai".to_string(),
+                "solarized-dark".to_string(), "oceanic".to_string()
+            ],
+            3 => vec!["On".to_string(), "Off".to_string()],
+            _ => vec![],
+        }
+    }
+
+    pub fn apply_setting_selection(&mut self) {
+        let opts = self.get_settings_options();
+        if self.ui.settings_edit_selection >= opts.len() {
+            return;
+        }
+        let val = &opts[self.ui.settings_edit_selection];
         match self.ui.settings_selection {
             0 => {
-                // cache_ttl_minutes
-                if direction > 0 {
-                    self.config.cache_ttl_minutes =
-                        self.config.cache_ttl_minutes.saturating_add(5).min(1440);
-                } else {
-                    self.config.cache_ttl_minutes =
-                        self.config.cache_ttl_minutes.saturating_sub(5).max(5);
+                if let Ok(m) = val.replace("m", "").parse::<u64>() {
+                    self.config.cache_ttl_minutes = m;
                 }
             }
             1 => {
-                // auto_scan_on_startup
-                self.config.auto_scan_on_startup = !self.config.auto_scan_on_startup;
+                self.config.auto_scan_on_startup = val == "On";
             }
             2 => {
-                // theme
-                let themes = [
-                    "default",
-                    "dark",
-                    "light",
-                    "dracula",
-                    "nord",
-                    "monokai",
-                    "solarized-dark",
-                    "oceanic",
-                ];
-                let current_idx = themes
-                    .iter()
-                    .position(|&t| t == self.config.theme)
-                    .unwrap_or(0);
-                let next_idx = if direction > 0 {
-                    (current_idx + 1) % themes.len()
-                } else {
-                    if current_idx == 0 {
-                        themes.len() - 1
-                    } else {
-                        current_idx - 1
-                    }
-                };
-                self.config.theme = themes[next_idx].to_string();
+                self.config.theme = val.clone();
             }
             3 => {
-                // verbose_logs
-                self.config.verbose_logs = !self.config.verbose_logs;
+                self.config.verbose_logs = val == "On";
             }
             _ => {}
         }
+    }
+
+    pub fn enter_settings_edit_mode(&mut self) {
+        let opts = self.get_settings_options();
+        let current_val = match self.ui.settings_selection {
+            0 => format!("{}m", self.config.cache_ttl_minutes),
+            1 => if self.config.auto_scan_on_startup { "On".to_string() } else { "Off".to_string() },
+            2 => self.config.theme.clone(),
+            3 => if self.config.verbose_logs { "On".to_string() } else { "Off".to_string() },
+            _ => String::new(),
+        };
+        self.ui.settings_edit_selection = opts.iter().position(|o| o == &current_val).unwrap_or(0);
+        self.ui.settings_edit_mode = true;
     }
 
     fn detail_len(&self) -> usize {
