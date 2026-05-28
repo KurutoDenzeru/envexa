@@ -136,10 +136,11 @@ fn title_bar(frame: &mut Frame, area: Rect, _app: &App) {
 }
 
 fn tab_bar(frame: &mut Frame, area: Rect, app: &App) {
-    let titles = vec![" Dashboard ", " Outdated "];
+    let titles = vec![" Dashboard ", " Outdated ", " Settings "];
     let selected = match app.ui.view {
         View::Dashboard => 0,
         View::Outdated => 1,
+        View::Settings => 2,
         View::Scanning | View::PackageDetail | View::Updating => app.ui.tab_index,
     };
     let tabs = Tabs::new(titles)
@@ -1493,10 +1494,73 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     match app.ui.view {
         View::Dashboard => render_dashboard(frame, chunks[4], app),
         View::Outdated => render_outdated(frame, chunks[4], app),
+        View::Settings => render_settings(frame, chunks[4], app),
         View::Scanning => render_scanning(frame, chunks[4], app),
         View::PackageDetail => render_package_detail(frame, chunks[4], app),
         View::Updating => render_updating(frame, chunks[4], app),
     }
+}
+
+fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
+    let items = [
+        (
+            "Cache TTL (Minutes)",
+            format!("{}m", app.config.cache_ttl_minutes),
+        ),
+        (
+            "Auto-Scan on Startup",
+            if app.config.auto_scan_on_startup {
+                "On"
+            } else {
+                "Off"
+            }
+            .to_string(),
+        ),
+        ("Theme", app.config.theme.clone()),
+        (
+            "Verbose Logs",
+            if app.config.verbose_logs { "On" } else { "Off" }.to_string(),
+        ),
+    ];
+
+    let mut rows = Vec::new();
+    for (i, (label, val)) in items.iter().enumerate() {
+        let sel = i == app.ui.settings_selection;
+        let bg = if sel { Color::DarkGray } else { Color::Reset };
+        let fg = if sel { Color::White } else { Color::Gray };
+
+        let row = Row::new(vec![
+            Cell::from(if sel { " \u{25B6} " } else { "   " }),
+            Cell::from(*label),
+            Cell::from(val.clone()),
+        ])
+        .style(Style::default().bg(bg).fg(fg))
+        .height(2);
+        rows.push(row);
+    }
+
+    let widths = [
+        Constraint::Length(4),
+        Constraint::Percentage(40),
+        Constraint::Percentage(60),
+    ];
+
+    let theme_color = match app.config.theme.as_str() {
+        "dark" => Color::DarkGray,
+        "light" => Color::White,
+        _ => Color::Blue,
+    };
+
+    let table = Table::new(rows, widths)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Application Settings ")
+                .border_style(Style::default().fg(theme_color)),
+        )
+        .column_spacing(1);
+
+    frame.render_widget(table, area);
 }
 
 fn render_package_detail(frame: &mut Frame, area: Rect, app: &App) {

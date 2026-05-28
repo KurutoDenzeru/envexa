@@ -45,6 +45,16 @@ fn ensure() -> std::io::Result<()> {
 pub struct UserConfig {
     pub cache_ttl_minutes: u64,
     pub project_path: Option<String>,
+    #[serde(default)]
+    pub auto_scan_on_startup: bool,
+    #[serde(default = "default_theme")]
+    pub theme: String,
+    #[serde(default)]
+    pub verbose_logs: bool,
+}
+
+fn default_theme() -> String {
+    "default".to_string()
 }
 
 impl Default for UserConfig {
@@ -52,6 +62,9 @@ impl Default for UserConfig {
         Self {
             cache_ttl_minutes: 15,
             project_path: None,
+            auto_scan_on_startup: false,
+            theme: default_theme(),
+            verbose_logs: false,
         }
     }
 }

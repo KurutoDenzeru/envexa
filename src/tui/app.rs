@@ -19,6 +19,7 @@ pub enum View {
     Scanning,
     PackageDetail,
     Updating,
+    Settings,
 }
 
 pub enum AppEvent {
@@ -47,6 +48,7 @@ pub struct UiState {
     pub view: View,
     pub dashboard_selection: usize,
     pub outdated_selection: usize,
+    pub settings_selection: usize,
     pub tab_index: usize,
     pub search_mode: bool,
     pub search_query: String,
@@ -71,6 +73,7 @@ pub struct DetailState {
 }
 
 pub struct App {
+    pub config: config::UserConfig,
     pub report: Option<Report>,
     pub ui: UiState,
     pub detail: DetailState,
@@ -84,6 +87,7 @@ impl Default for App {
 
 impl App {
     pub fn new() -> Self {
+        let config = config::load_config();
         let report = config::read_cache().and_then(|e| {
             if !config::cache_expired(&e) {
                 Some(e.report)
@@ -92,11 +96,13 @@ impl App {
             }
         });
         Self {
+            config,
             report,
             ui: UiState {
                 view: View::Dashboard,
                 dashboard_selection: 0,
                 outdated_selection: 0,
+                settings_selection: 0,
                 tab_index: 0,
                 search_mode: false,
                 search_query: String::new(),
@@ -148,6 +154,10 @@ impl App {
                 }
             }
         });
+
+        if self.config.auto_scan_on_startup && self.report.is_none() {
+            let _ = self.do_scan(tx.clone());
+        }
 
         loop {
             terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
@@ -288,26 +298,43 @@ impl App {
                                 self.ui.outdated_selection = 0;
                             }
                             KeyCode::Right | KeyCode::Char('l') => {
-                                self.ui.tab_index = (self.ui.tab_index + 1).min(1);
-                                self.ui.view = if self.ui.tab_index == 0 {
-                                    View::Dashboard
+                                if matches!(self.ui.view, View::Settings) {
+                                    self.toggle_setting(1);
+                                    let _ = config::save_config(&self.config);
                                 } else {
-                                    View::Outdated
-                                };
+                                    self.ui.tab_index = (self.ui.tab_index + 1) % 3;
+                                    self.ui.view = match self.ui.tab_index {
+                                        0 => View::Dashboard,
+                                        1 => View::Outdated,
+                                        _ => View::Settings,
+                                    };
+                                }
                             }
                             KeyCode::Left | KeyCode::Char('j') => {
-                                self.ui.tab_index = self.ui.tab_index.saturating_sub(1);
-                                self.ui.view = if self.ui.tab_index == 0 {
-                                    View::Dashboard
+                                if matches!(self.ui.view, View::Settings) {
+                                    self.toggle_setting(-1);
+                                    let _ = config::save_config(&self.config);
                                 } else {
-                                    View::Outdated
-                                };
+                                    self.ui.tab_index = if self.ui.tab_index == 0 {
+                                        2
+                                    } else {
+                                        self.ui.tab_index - 1
+                                    };
+                                    self.ui.view = match self.ui.tab_index {
+                                        0 => View::Dashboard,
+                                        1 => View::Outdated,
+                                        _ => View::Settings,
+                                    };
+                                }
                             }
                             KeyCode::Down | KeyCode::Char('n') => self.next_item(),
                             KeyCode::Up | KeyCode::Char('p') => self.prev_item(),
                             KeyCode::Enter => {
                                 if matches!(self.ui.view, View::Dashboard) {
                                     self.open_detail();
+                                } else if matches!(self.ui.view, View::Settings) {
+                                    self.toggle_setting(1);
+                                    let _ = config::save_config(&self.config);
                                 }
                             }
                             _ => {}
@@ -797,6 +824,7 @@ impl App {
                 self.ui.outdated_selection = self.ui.outdated_selection.min(n);
             }
             View::Scanning => {}
+            View::Settings => {}
             View::PackageDetail => {
                 let n = self.detail_len().saturating_sub(1);
                 self.detail.selection = self.detail.selection.min(n);
@@ -839,6 +867,9 @@ impl App {
                 let n = self.detail_len().saturating_sub(1);
                 self.detail.selection = self.detail.selection.saturating_add(1).min(n);
             }
+            View::Settings => {
+                self.ui.settings_selection = self.ui.settings_selection.saturating_add(1).min(3);
+            }
             View::Updating => {}
         }
     }
@@ -852,8 +883,55 @@ impl App {
                 self.ui.outdated_selection = self.ui.outdated_selection.saturating_sub(1)
             }
             View::Scanning => {}
-            View::PackageDetail => self.detail.selection = self.detail.selection.saturating_sub(1),
+            View::Settings => {
+                self.ui.settings_selection = self.ui.settings_selection.saturating_sub(1);
+            }
+            View::PackageDetail => {
+                self.detail.selection = self.detail.selection.saturating_sub(1);
+            }
             View::Updating => {}
+        }
+    }
+
+    fn toggle_setting(&mut self, direction: i32) {
+        match self.ui.settings_selection {
+            0 => {
+                // cache_ttl_minutes
+                if direction > 0 {
+                    self.config.cache_ttl_minutes =
+                        self.config.cache_ttl_minutes.saturating_add(5).min(1440);
+                } else {
+                    self.config.cache_ttl_minutes =
+                        self.config.cache_ttl_minutes.saturating_sub(5).max(5);
+                }
+            }
+            1 => {
+                // auto_scan_on_startup
+                self.config.auto_scan_on_startup = !self.config.auto_scan_on_startup;
+            }
+            2 => {
+                // theme
+                let themes = ["default", "dark", "light"];
+                let current_idx = themes
+                    .iter()
+                    .position(|&t| t == self.config.theme)
+                    .unwrap_or(0);
+                let next_idx = if direction > 0 {
+                    (current_idx + 1) % themes.len()
+                } else {
+                    if current_idx == 0 {
+                        themes.len() - 1
+                    } else {
+                        current_idx - 1
+                    }
+                };
+                self.config.theme = themes[next_idx].to_string();
+            }
+            3 => {
+                // verbose_logs
+                self.config.verbose_logs = !self.config.verbose_logs;
+            }
+            _ => {}
         }
     }
 
