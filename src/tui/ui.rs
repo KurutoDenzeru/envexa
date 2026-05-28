@@ -968,7 +968,8 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
                     Span::raw(" Outdated"),
                 ]),
             ]))
-            .alignment(Alignment::Center);
+            .alignment(Alignment::Center)
+            .block(Block::default().bg(app.theme().background));
             frame.render_widget(text, area);
             return;
         }
@@ -1171,7 +1172,7 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         None => {
             frame.render_widget(
                 Paragraph::new("No scan data. Press S to scan first.")
-                    .block(Block::default().borders(Borders::ALL)),
+                    .block(Block::default().borders(Borders::ALL).bg(app.theme().background)),
                 area,
             );
             return;
@@ -1462,6 +1463,8 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
 
 pub fn render(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
+    frame.render_widget(Block::default().bg(app.theme().background), area);
+
     if area.width < 16 || area.height < 4 {
         render_minimal(frame, area, "Envexa", app);
         return;
