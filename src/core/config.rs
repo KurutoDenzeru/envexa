@@ -51,10 +51,29 @@ pub struct UserConfig {
     pub theme: String,
     #[serde(default)]
     pub verbose_logs: bool,
+    #[serde(default = "default_scan_timeout")]
+    pub scan_timeout_secs: u64,
+    #[serde(default = "default_daemon_interval")]
+    pub daemon_interval_secs: u64,
+    #[serde(default = "default_export_format")]
+    pub export_format: String,
+    pub enabled_scanners: Option<Vec<String>>,
 }
 
 fn default_theme() -> String {
     "default".to_string()
+}
+
+fn default_scan_timeout() -> u64 {
+    30
+}
+
+fn default_daemon_interval() -> u64 {
+    14400
+}
+
+fn default_export_format() -> String {
+    "markdown".to_string()
 }
 
 impl Default for UserConfig {
@@ -65,6 +84,10 @@ impl Default for UserConfig {
             auto_scan_on_startup: false,
             theme: default_theme(),
             verbose_logs: false,
+            scan_timeout_secs: default_scan_timeout(),
+            daemon_interval_secs: default_daemon_interval(),
+            export_format: default_export_format(),
+            enabled_scanners: None,
         }
     }
 }

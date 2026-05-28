@@ -116,7 +116,7 @@ impl ScanResult {
     }
 }
 
-const TIMEOUT: Duration = Duration::from_secs(30);
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub fn which(cmd: &str) -> bool {
     std::env::var("PATH")
@@ -131,7 +131,7 @@ pub async fn run_cmd(
     timeout: Option<Duration>,
 ) -> Result<String, anyhow::Error> {
     let cmd = Command::new(program).args(args).output();
-    let to_wait = timeout.unwrap_or(TIMEOUT);
+    let to_wait = timeout.unwrap_or(DEFAULT_TIMEOUT);
     let output = tokio::time::timeout(to_wait, cmd).await??;
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
@@ -143,7 +143,7 @@ pub async fn run_cmd_in(
     timeout: Option<Duration>,
 ) -> Result<String, anyhow::Error> {
     let cmd = Command::new(program).args(args).current_dir(dir).output();
-    let to_wait = timeout.unwrap_or(TIMEOUT);
+    let to_wait = timeout.unwrap_or(DEFAULT_TIMEOUT);
     let output = tokio::time::timeout(to_wait, cmd).await??;
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
@@ -174,6 +174,13 @@ pub mod security;
 pub mod yarn;
 
 pub async fn scan_all() -> HashMap<String, ScanResult> {
+    scan_all_with(30, None).await
+}
+
+pub async fn scan_all_with(
+    _timeout_secs: u64,
+    enabled: Option<&[String]>,
+) -> HashMap<String, ScanResult> {
     let project_dir = get_project_path();
     let ignore = crate::core::config::EnvexaIgnore::load(&project_dir);
 
@@ -206,6 +213,16 @@ pub async fn scan_all() -> HashMap<String, ScanResult> {
     let mut buffered = stream::iter(tasks).buffer_unordered(16);
 
     while let Some((name, mut res)) = buffered.next().await {
+        if let Some(enabled_list) = enabled {
+            if !enabled_list.iter().any(|e| e == name) {
+                results.insert(
+                    name.to_string(),
+                    ScanResult::skipped("Disabled by user settings"),
+                );
+                continue;
+            }
+        }
+
         if ignore.should_ignore_tool(name) {
             results.insert(
                 name.to_string(),

@@ -1556,6 +1556,11 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
 
 const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
+const ALL_SCANNERS: &[&str] = &[
+    "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
+    "security", "audit", "ci", "git", "cleanup",
+];
+
 pub fn render(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
     let theme = app.theme();
@@ -1619,6 +1624,35 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
             }
             .to_string(),
         ),
+        (
+            "Project Path",
+            app.config.project_path.clone().unwrap_or_else(|| {
+                std::env::current_dir()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_default()
+            }),
+        ),
+        ("Scan Timeout", format!("{}s", app.config.scan_timeout_secs)),
+        (
+            "Daemon Interval",
+            match app.config.daemon_interval_secs {
+                3600 => "1h",
+                14400 => "4h",
+                28800 => "8h",
+                86400 => "24h",
+                _ => "?",
+            }
+            .to_string(),
+        ),
+        ("Enabled Scanners", {
+            let enabled = app
+                .config
+                .enabled_scanners
+                .as_ref()
+                .map_or("All (16)".to_string(), |v| format!("{}/16", v.len()));
+            enabled
+        }),
+        ("Export Format", app.config.export_format.clone()),
         ("Theme", app.config.theme.clone()),
         (
             "Verbose Logs",
@@ -1673,7 +1707,69 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
 
     frame.render_widget(table, area);
 
-    if app.ui.settings_edit_mode {
+    if app.ui.settings_selection == 5 {
+        let scanner_area = Rect {
+            x: area.x + 2,
+            y: area.y + 2,
+            width: area.width.saturating_sub(4).min(50),
+            height: (ALL_SCANNERS.len() as u16 + 2).min(area.height.saturating_sub(4)),
+        };
+
+        let enabled = app.config.enabled_scanners.as_deref().unwrap_or(&[]);
+
+        let block = Block::default()
+            .title(" Enabled Scanners ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(app.theme().primary))
+            .bg(app.theme().background);
+
+        let inner = block.inner(scanner_area);
+        frame.render_widget(Clear, scanner_area);
+        frame.render_widget(block, scanner_area);
+
+        for (i, tool) in ALL_SCANNERS.iter().enumerate() {
+            if (i as u16) >= inner.height {
+                break;
+            }
+            let is_focused = i == app.ui.settings_scanner_focus;
+            let is_all = app.config.enabled_scanners.is_none();
+            let is_checked = is_all || enabled.iter().any(|e| e == tool);
+
+            let checkbox = if is_checked { "[x]" } else { "[ ]" };
+            let indicator = if is_focused { "\u{25B6}" } else { " " };
+
+            let display = crate::scanner::display_name(tool);
+
+            let line = Line::from(vec![
+                Span::styled(
+                    format!(" {} {} ", indicator, checkbox),
+                    Style::default().fg(if is_focused {
+                        app.theme().primary
+                    } else if is_checked {
+                        app.theme().success
+                    } else {
+                        app.theme().text_muted
+                    }),
+                ),
+                Span::styled(
+                    display,
+                    Style::default().fg(if is_focused {
+                        app.theme().text_normal
+                    } else {
+                        app.theme().text_muted
+                    }),
+                ),
+            ]);
+
+            let row_area = Rect {
+                x: inner.x,
+                y: inner.y + i as u16,
+                width: inner.width,
+                height: 1,
+            };
+            frame.render_widget(Paragraph::new(line), row_area);
+        }
+    } else if app.ui.settings_edit_mode {
         let opts = app.get_settings_options();
         let items: Vec<ListItem> = opts
             .iter()
@@ -1705,7 +1801,28 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
                         "Off" => "Wait for manual scan command",
                         _ => "",
                     },
-                    2 => match val.as_str() {
+                    2 => "Root directory scanned by envexa",
+                    3 => match val.as_str() {
+                        "10s" => "Fast scans, may timeout on slow machines",
+                        "30s" => "Balanced timeout, recommended",
+                        "60s" => "Long timeout, for slow networks",
+                        "120s" => "Very long timeout, for CI/server environments",
+                        _ => "",
+                    },
+                    4 => match val.as_str() {
+                        "1h" => "Scan every hour",
+                        "4h" => "Scan every 4 hours, recommended",
+                        "8h" => "Scan every 8 hours, save resources",
+                        "24h" => "Scan once per day",
+                        _ => "",
+                    },
+                    6 => match val.as_str() {
+                        "markdown" => "Human-readable Markdown report",
+                        "sarif" => "Machine-readable SARIF for CI integration",
+                        "json" => "Raw JSON dump of all scan results",
+                        _ => "",
+                    },
+                    7 => match val.as_str() {
                         "default" => "Envexa standard colors",
                         "dark" => "Plain dark theme",
                         "light" => "Plain light theme",
@@ -1716,7 +1833,7 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
                         "oceanic" => "Oceanic dark colors",
                         _ => "",
                     },
-                    3 => match val.as_str() {
+                    8 => match val.as_str() {
                         "On" => "Show detailed background logs",
                         "Off" => "Hide detailed logs",
                         _ => "",
@@ -1750,8 +1867,13 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
         let title = match app.ui.settings_selection {
             0 => " Cache TTL ",
             1 => " Auto-Scan ",
-            2 => " Theme ",
-            3 => " Verbose Logs ",
+            2 => " Project Path ",
+            3 => " Scan Timeout ",
+            4 => " Daemon Interval ",
+            5 => " Enabled Scanners ",
+            6 => " Export Format ",
+            7 => " Theme ",
+            8 => " Verbose Logs ",
             _ => " Options ",
         };
 

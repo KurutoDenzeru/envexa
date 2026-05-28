@@ -13,6 +13,11 @@ use crate::scanner::{self, OutdatedItem, Report};
 use crate::toolchains;
 use crate::toolchains::{AuditItem, CleanupItem, VulnerabilityInfo};
 
+const ALL_SCANNERS: &[&str] = &[
+    "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
+    "security", "audit", "ci", "git", "cleanup",
+];
+
 pub enum View {
     Dashboard,
     Outdated,
@@ -52,6 +57,7 @@ pub struct UiState {
     pub tab_index: usize,
     pub settings_edit_mode: bool,
     pub settings_edit_selection: usize,
+    pub settings_scanner_focus: usize,
     pub search_mode: bool,
     pub search_query: String,
     pub throbber_state: ThrobberState,
@@ -93,13 +99,7 @@ impl App {
     }
     pub fn new() -> Self {
         let config = config::load_config();
-        let report = config::read_cache().and_then(|e| {
-            if !config::cache_expired(&e) {
-                Some(e.report)
-            } else {
-                None
-            }
-        });
+        let report = config::read_cache().map(|e| e.report);
         Self {
             config,
             report,
@@ -111,6 +111,7 @@ impl App {
                 tab_index: 0,
                 settings_edit_mode: false,
                 settings_edit_selection: 0,
+                settings_scanner_focus: 0,
                 search_mode: false,
                 search_query: String::new(),
                 throbber_state: ThrobberState::default(),
@@ -162,7 +163,8 @@ impl App {
             }
         });
 
-        if self.config.auto_scan_on_startup && self.report.is_none() {
+        let cache_expired = config::read_cache().is_none_or(|e| config::cache_expired(&e));
+        if self.config.auto_scan_on_startup && (self.report.is_none() || cache_expired) {
             let _ = self.do_scan(tx.clone());
         }
 
@@ -303,7 +305,10 @@ impl App {
                                         self.ui.checked_outdated.insert(self.ui.outdated_selection);
                                     }
                                 } else if matches!(self.ui.view, View::Settings) {
-                                    if self.ui.settings_edit_mode {
+                                    if self.ui.settings_selection == 5 {
+                                        self.toggle_scanner();
+                                        let _ = config::save_config(&self.config);
+                                    } else if self.ui.settings_edit_mode {
                                         self.apply_setting_selection();
                                         self.ui.settings_edit_mode = false;
                                         let _ = config::save_config(&self.config);
@@ -878,8 +883,11 @@ impl App {
         self.ui.view = View::Scanning;
         self.ui.progress_counter = 0;
 
+        let timeout = self.config.scan_timeout_secs;
+        let enabled = self.config.enabled_scanners.clone();
+
         tokio::spawn(async move {
-            let results = toolchains::scan_all().await;
+            let results = toolchains::scan_all_with(timeout, enabled.as_deref()).await;
             let _ = tx.send(AppEvent::ScanFinished(results));
         });
         Ok(())
@@ -913,9 +921,15 @@ impl App {
                         .settings_edit_selection
                         .saturating_add(1)
                         .min(opts_len);
+                } else if self.ui.settings_selection == 5 {
+                    self.ui.settings_scanner_focus = self
+                        .ui
+                        .settings_scanner_focus
+                        .saturating_add(1)
+                        .min(ALL_SCANNERS.len().saturating_sub(1));
                 } else {
                     self.ui.settings_selection =
-                        self.ui.settings_selection.saturating_add(1).min(3);
+                        self.ui.settings_selection.saturating_add(1).min(8);
                 }
             }
             View::Updating => {}
@@ -935,6 +949,9 @@ impl App {
                 if self.ui.settings_edit_mode {
                     self.ui.settings_edit_selection =
                         self.ui.settings_edit_selection.saturating_sub(1);
+                } else if self.ui.settings_selection == 5 {
+                    self.ui.settings_scanner_focus =
+                        self.ui.settings_scanner_focus.saturating_sub(1);
                 } else {
                     self.ui.settings_selection = self.ui.settings_selection.saturating_sub(1);
                 }
@@ -955,7 +972,31 @@ impl App {
                 "60m".to_string(),
             ],
             1 => vec!["On".to_string(), "Off".to_string()],
-            2 => vec![
+            2 => {
+                let cwd = std::env::current_dir()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_default();
+                vec![cwd, "~/.envexa/project".to_string()]
+            }
+            3 => vec![
+                "10s".to_string(),
+                "30s".to_string(),
+                "60s".to_string(),
+                "120s".to_string(),
+            ],
+            4 => vec![
+                "1h".to_string(),
+                "4h".to_string(),
+                "8h".to_string(),
+                "24h".to_string(),
+            ],
+            5 => vec![],
+            6 => vec![
+                "markdown".to_string(),
+                "sarif".to_string(),
+                "json".to_string(),
+            ],
+            7 => vec![
                 "default".to_string(),
                 "dark".to_string(),
                 "light".to_string(),
@@ -965,7 +1006,7 @@ impl App {
                 "solarized-dark".to_string(),
                 "oceanic".to_string(),
             ],
-            3 => vec!["On".to_string(), "Off".to_string()],
+            8 => vec!["On".to_string(), "Off".to_string()],
             _ => vec![],
         }
     }
@@ -986,9 +1027,31 @@ impl App {
                 self.config.auto_scan_on_startup = val == "On";
             }
             2 => {
-                self.config.theme = val.clone();
+                self.config.project_path = Some(val.clone());
             }
             3 => {
+                if let Ok(s) = val.replace("s", "").parse::<u64>() {
+                    self.config.scan_timeout_secs = s;
+                }
+            }
+            4 => {
+                let secs = match val.as_str() {
+                    "1h" => 3600,
+                    "4h" => 14400,
+                    "8h" => 28800,
+                    "24h" => 86400,
+                    _ => 14400,
+                };
+                self.config.daemon_interval_secs = secs;
+            }
+            5 => {}
+            6 => {
+                self.config.export_format = val.clone();
+            }
+            7 => {
+                self.config.theme = val.clone();
+            }
+            8 => {
                 self.config.verbose_logs = val == "On";
             }
             _ => {}
@@ -996,6 +1059,9 @@ impl App {
     }
 
     pub fn enter_settings_edit_mode(&mut self) {
+        if self.ui.settings_selection == 5 {
+            return;
+        }
         let opts = self.get_settings_options();
         let current_val = match self.ui.settings_selection {
             0 => format!("{}m", self.config.cache_ttl_minutes),
@@ -1006,8 +1072,23 @@ impl App {
                     "Off".to_string()
                 }
             }
-            2 => self.config.theme.clone(),
-            3 => {
+            2 => self.config.project_path.clone().unwrap_or_else(|| {
+                std::env::current_dir()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_default()
+            }),
+            3 => format!("{}s", self.config.scan_timeout_secs),
+            4 => match self.config.daemon_interval_secs {
+                3600 => "1h".to_string(),
+                14400 => "4h".to_string(),
+                28800 => "8h".to_string(),
+                86400 => "24h".to_string(),
+                _ => "4h".to_string(),
+            },
+            5 => String::new(),
+            6 => self.config.export_format.clone(),
+            7 => self.config.theme.clone(),
+            8 => {
                 if self.config.verbose_logs {
                     "On".to_string()
                 } else {
@@ -1018,6 +1099,23 @@ impl App {
         };
         self.ui.settings_edit_selection = opts.iter().position(|o| o == &current_val).unwrap_or(0);
         self.ui.settings_edit_mode = true;
+    }
+
+    fn toggle_scanner(&mut self) {
+        let focus = self
+            .ui
+            .settings_scanner_focus
+            .min(ALL_SCANNERS.len().saturating_sub(1));
+        let tool = ALL_SCANNERS[focus].to_string();
+        let enabled = self.config.enabled_scanners.get_or_insert_with(Vec::new);
+        if let Some(pos) = enabled.iter().position(|e| e == &tool) {
+            enabled.remove(pos);
+        } else {
+            enabled.push(tool);
+        }
+        if enabled.len() == ALL_SCANNERS.len() {
+            self.config.enabled_scanners = None;
+        }
     }
 
     fn detail_len(&self) -> usize {
