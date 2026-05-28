@@ -1200,14 +1200,19 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
         if let Some(footer_area) = cat_chunks.last() {
             if footer_area.height > 0 {
                 let footer = Paragraph::new(Line::from(vec![
-                    Span::raw("  "),
-                    Span::styled("By KurutoDenzeru", Style::default().fg(app.theme().text_muted)),
-                    Span::raw(" \u{2502} "),
+                    Span::styled("🚧 Envexa ", Style::default().fg(app.theme().primary).bold()),
                     Span::styled(
                         concat!("v", env!("CARGO_PKG_VERSION")),
-                        Style::default().fg(app.theme().text_muted),
+                        Style::default().fg(app.theme().text_normal).bold(),
                     ),
-                ]));
+                    Span::styled("  •  ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(
+                        "Crafted by Kuruto Denzeru",
+                        Style::default().fg(app.theme().text_muted).add_modifier(Modifier::ITALIC),
+                    ),
+                    Span::raw("  "),
+                ]))
+                .alignment(Alignment::Right);
                 frame.render_widget(footer, *footer_area);
             }
         }
