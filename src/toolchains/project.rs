@@ -47,7 +47,9 @@ async fn npm_outdated(dir: &Path, result: &mut ScanResult) {
             current: Option<String>,
             latest: Option<String>,
         }
-        if let Ok(data) = serde_json::from_str::<std::collections::HashMap<String, NpmOutdated>>(&out) {
+        if let Ok(data) =
+            serde_json::from_str::<std::collections::HashMap<String, NpmOutdated>>(&out)
+        {
             for (name, info) in data {
                 if name == "error" {
                     continue;
@@ -75,7 +77,9 @@ async fn pnpm_outdated(dir: &Path, result: &mut ScanResult) {
             current: Option<String>,
             latest: Option<String>,
         }
-        if let Ok(data) = serde_json::from_str::<std::collections::HashMap<String, PnpmOutdated>>(&out) {
+        if let Ok(data) =
+            serde_json::from_str::<std::collections::HashMap<String, PnpmOutdated>>(&out)
+        {
             for (name, info) in data {
                 result.outdated.push(PackageInfo {
                     name,

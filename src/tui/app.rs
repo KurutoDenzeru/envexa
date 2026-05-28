@@ -86,6 +86,9 @@ impl Default for App {
 }
 
 impl App {
+    pub fn theme(&self) -> crate::tui::theme::Theme {
+        crate::tui::theme::Theme::parse(&self.config.theme)
+    }
     pub fn new() -> Self {
         let config = config::load_config();
         let report = config::read_cache().and_then(|e| {
@@ -911,7 +914,16 @@ impl App {
             }
             2 => {
                 // theme
-                let themes = ["default", "dark", "light"];
+                let themes = [
+                    "default",
+                    "dark",
+                    "light",
+                    "dracula",
+                    "nord",
+                    "monokai",
+                    "solarized-dark",
+                    "oceanic",
+                ];
                 let current_idx = themes
                     .iter()
                     .position(|&t| t == self.config.theme)

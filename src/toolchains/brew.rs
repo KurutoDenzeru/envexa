@@ -36,14 +36,22 @@ pub async fn scan() -> ScanResult {
                 for f in data.formulae {
                     result.outdated_formulae.push(PackageInfo {
                         name: f.name,
-                        current: f.installed_versions.into_iter().next().unwrap_or_else(|| "?".to_string()),
+                        current: f
+                            .installed_versions
+                            .into_iter()
+                            .next()
+                            .unwrap_or_else(|| "?".to_string()),
                         latest: f.current_version,
                     });
                 }
                 for c in data.casks {
                     result.outdated_casks.push(PackageInfo {
                         name: c.name,
-                        current: c.installed_versions.into_iter().next().unwrap_or_else(|| "?".to_string()),
+                        current: c
+                            .installed_versions
+                            .into_iter()
+                            .next()
+                            .unwrap_or_else(|| "?".to_string()),
                         latest: c.current_version,
                     });
                 }
