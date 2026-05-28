@@ -3,7 +3,10 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span, Text},
-    widgets::{BarChart, Block, Borders, Cell, Clear, Gauge, LineGauge, List, ListItem, Paragraph, Row, Table, Tabs},
+    widgets::{
+        BarChart, Block, Borders, Cell, Clear, Gauge, LineGauge, List, ListItem, ListState,
+        Paragraph, Row, Table, TableState, Tabs,
+    },
     Frame,
 };
 use tui_piechart::{LegendAlignment, LegendLayout, LegendPosition, PieChart, PieSlice, Resolution};
@@ -1607,11 +1610,56 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
                 let bg = if is_selected { app.theme().text_muted } else { Color::Reset };
                 let fg = if is_selected { app.theme().text_normal } else { Color::Gray };
                 let prefix = if is_selected { " \u{25B6} " } else { "   " };
-                ListItem::new(format!("{}{}", prefix, val)).style(Style::default().bg(bg).fg(fg))
+                
+                let desc = match app.ui.settings_selection {
+                    0 => match val.as_str() {
+                        "5m" => "Aggressive caching, frequent scans",
+                        "15m" => "Balanced caching, recommended",
+                        "30m" => "Long caching, saves resources",
+                        "60m" => "Very long caching, for slow networks",
+                        _ => "",
+                    },
+                    1 => match val.as_str() {
+                        "On" => "Automatically scan when the app starts",
+                        "Off" => "Wait for manual scan command",
+                        _ => "",
+                    },
+                    2 => match val.as_str() {
+                        "default" => "Envexa standard colors",
+                        "dark" => "Plain dark theme",
+                        "light" => "Plain light theme",
+                        "dracula" => "Vibrant dark theme",
+                        "nord" => "Arctic, north-bluish colors",
+                        "monokai" => "High-contrast dark theme",
+                        "solarized-dark" => "Low-contrast dark theme",
+                        "oceanic" => "Oceanic dark colors",
+                        _ => "",
+                    },
+                    3 => match val.as_str() {
+                        "On" => "Show detailed background logs",
+                        "Off" => "Hide detailed logs",
+                        _ => "",
+                    },
+                    _ => "",
+                };
+
+                let mut lines = vec![
+                    Line::from(vec![
+                        Span::styled(format!("{}{}", prefix, val), Style::default().add_modifier(Modifier::BOLD)),
+                    ]),
+                ];
+                if !desc.is_empty() {
+                    lines.push(Line::from(vec![
+                        Span::raw("    "),
+                        Span::styled(desc, Style::default().fg(if is_selected { app.theme().text_normal } else { app.theme().text_muted })),
+                    ]));
+                }
+
+                ListItem::new(lines).style(Style::default().bg(bg).fg(fg))
             })
             .collect();
 
-        let popup_area = centered_rect(40, 40, area);
+        let popup_area = centered_rect(50, 50, area);
         let title = match app.ui.settings_selection {
             0 => " Cache TTL ",
             1 => " Auto-Scan ",
@@ -1630,7 +1678,10 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
             );
 
         frame.render_widget(Clear, popup_area);
-        frame.render_widget(list, popup_area);
+        
+        let mut state = ListState::default();
+        state.select(Some(app.ui.settings_edit_selection));
+        frame.render_stateful_widget(list, popup_area, &mut state);
     }
 }
 
@@ -1726,7 +1777,9 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         )
         .column_spacing(1);
 
-    frame.render_widget(table, area);
+    let mut state = TableState::default();
+    state.select(Some(app.detail.selection));
+    frame.render_stateful_widget(table, area, &mut state);
 }
 
 fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
@@ -1813,7 +1866,9 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             .header(header)
             .block(table_block)
             .column_spacing(1);
-        frame.render_widget(table, left_area);
+        let mut state = TableState::default();
+        state.select(Some(app.detail.selection));
+        frame.render_stateful_widget(table, left_area, &mut state);
 
         // Draw Right Stats and Detail Panel
         let right_chunks = Layout::default()
@@ -1952,7 +2007,9 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             .header(header)
             .block(table_block)
             .column_spacing(1);
-        frame.render_widget(table, area);
+        let mut state = TableState::default();
+        state.select(Some(app.detail.selection));
+        frame.render_stateful_widget(table, area, &mut state);
     }
 }
 
@@ -2037,7 +2094,9 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
             .header(header)
             .block(table_block)
             .column_spacing(1);
-        frame.render_widget(table, left_area);
+        let mut state = TableState::default();
+        state.select(Some(app.detail.selection));
+        frame.render_stateful_widget(table, left_area, &mut state);
 
         // Draw Right Stats and Detail Panel
         let right_chunks = Layout::default()
@@ -2111,7 +2170,9 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
             .header(header)
             .block(table_block)
             .column_spacing(1);
-        frame.render_widget(table, area);
+        let mut state = TableState::default();
+        state.select(Some(app.detail.selection));
+        frame.render_stateful_widget(table, area, &mut state);
     }
 }
 
@@ -2309,13 +2370,17 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         let table = Table::new(rows, detail_table_constraints(chunks[1].width, "cleanup"))
             .header(header)
             .column_spacing(1);
-        frame.render_widget(table, chunks[1]);
+        let mut state = TableState::default();
+        state.select(Some(app.detail.selection));
+        frame.render_stateful_widget(table, chunks[1], &mut state);
     } else {
         let table = Table::new(rows, detail_table_constraints(area.width, "cleanup"))
             .header(header)
             .block(block)
             .column_spacing(1);
-        frame.render_widget(table, area);
+        let mut state = TableState::default();
+        state.select(Some(app.detail.selection));
+        frame.render_stateful_widget(table, area, &mut state);
     }
 }
 
