@@ -175,7 +175,8 @@ impl App {
                         self.ui.tick_count = self.ui.tick_count.wrapping_add(1);
                         if matches!(self.ui.view, View::Scanning | View::Updating) {
                             self.ui.throbber_state.calc_next();
-                            self.ui.progress_counter += 1;
+                            self.ui.progress_counter =
+                                self.ui.progress_counter.wrapping_add(1) % 60;
                         }
                     }
                     AppEvent::Input(key) => {
@@ -804,7 +805,7 @@ impl App {
     fn clamp_selection(&mut self) {
         match self.ui.view {
             View::Dashboard => {
-                let n = self.filtered_tools().len().saturating_sub(1);
+                let n = self.count_filtered_tools().saturating_sub(1);
                 self.ui.dashboard_selection = self.ui.dashboard_selection.min(n);
             }
             View::Outdated => {
@@ -847,6 +848,29 @@ impl App {
         }
     }
 
+    fn count_filtered_tools(&self) -> usize {
+        let report = match &self.report {
+            Some(r) => r,
+            None => return 0,
+        };
+        let q = self.ui.search_query.to_lowercase();
+        let mut count = 0;
+        for cat in scanner::tool_categories() {
+            for tool in cat.tools {
+                let matches_search = if q.is_empty() || !self.ui.search_mode {
+                    true
+                } else {
+                    let name = scanner::display_name(tool).to_lowercase();
+                    name.contains(&q) || tool.contains(&q)
+                };
+                if matches_search && report.results.contains_key(*tool) {
+                    count += 1;
+                }
+            }
+        }
+        count
+    }
+
     fn do_scan(
         &mut self,
         tx: mpsc::UnboundedSender<AppEvent>,
@@ -864,7 +888,7 @@ impl App {
     fn next_item(&mut self) {
         match self.ui.view {
             View::Dashboard => {
-                let n = self.filtered_tools().len().saturating_sub(1);
+                let n = self.count_filtered_tools().saturating_sub(1);
                 self.ui.dashboard_selection = self.ui.dashboard_selection.saturating_add(1).min(n);
             }
             View::Outdated => {

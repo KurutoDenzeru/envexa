@@ -31,7 +31,7 @@ impl Theme {
                 warning: Color::Rgb(241, 250, 140),     // Yellow
                 error: Color::Rgb(255, 85, 85),         // Red
                 info: Color::Rgb(139, 233, 253),        // Cyan
-                background: Color::Reset,               // Transparent
+                background: Color::Black,
             },
             "nord" => Theme {
                 primary: Color::Rgb(136, 192, 208),     // Frost Light Blue
@@ -42,7 +42,7 @@ impl Theme {
                 warning: Color::Rgb(235, 203, 139),     // Aurora Yellow
                 error: Color::Rgb(191, 97, 106),        // Aurora Red
                 info: Color::Rgb(143, 188, 187),        // Frost Cyan
-                background: Color::Reset,
+                background: Color::Rgb(46, 52, 64),     // Polar Night
             },
             "monokai" => Theme {
                 primary: Color::Rgb(253, 151, 31),      // Orange
@@ -53,7 +53,7 @@ impl Theme {
                 warning: Color::Rgb(230, 219, 116),     // Yellow
                 error: Color::Rgb(249, 38, 114),        // Pink/Red
                 info: Color::Rgb(174, 129, 255),        // Purple
-                background: Color::Reset,
+                background: Color::Rgb(39, 40, 34),     // Monokai bg
             },
             "solarized-dark" => Theme {
                 primary: Color::Rgb(38, 139, 210),      // Blue
@@ -64,7 +64,7 @@ impl Theme {
                 warning: Color::Rgb(181, 137, 0),       // Yellow
                 error: Color::Rgb(220, 50, 47),         // Red
                 info: Color::Rgb(108, 113, 196),        // Violet
-                background: Color::Reset,
+                background: Color::Rgb(0, 43, 54),      // Base03
             },
             "oceanic" => Theme {
                 primary: Color::Rgb(102, 153, 204),     // Blue
@@ -75,7 +75,7 @@ impl Theme {
                 warning: Color::Rgb(250, 200, 99),      // Yellow
                 error: Color::Rgb(236, 95, 103),        // Red
                 info: Color::Rgb(95, 187, 175),         // Cyan
-                background: Color::Reset,
+                background: Color::Rgb(40, 44, 52),     // Material bg
             },
             "light" => Theme {
                 primary: Color::Blue,
@@ -86,7 +86,7 @@ impl Theme {
                 warning: Color::Yellow,
                 error: Color::Red,
                 info: Color::Cyan,
-                background: Color::Reset,
+                background: Color::White,
             },
             "dark" => Theme {
                 primary: Color::Cyan,
@@ -97,7 +97,7 @@ impl Theme {
                 warning: Color::Yellow,
                 error: Color::Red,
                 info: Color::Blue,
-                background: Color::Reset,
+                background: Color::Black,
             },
             // Default
             _ => Theme {
@@ -109,7 +109,7 @@ impl Theme {
                 warning: Color::Yellow,
                 error: Color::Red,
                 info: Color::LightCyan,
-                background: Color::Reset,
+                background: Color::Black,
             },
         }
     }

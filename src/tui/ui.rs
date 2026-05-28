@@ -1465,19 +1465,15 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
                 .ratio(ratio);
             frame.render_widget(gauge, chunks[2]);
 
-            // Real-time scan logs and tips
-            let step = app.ui.progress_counter;
-            let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-            let spin_char = spinner_frames[step % spinner_frames.len()];
+            let step = app.ui.progress_counter % 60;
+            let spin_char = SPINNER_FRAMES[step % SPINNER_FRAMES.len()];
             let mut log_lines = vec![Line::from("")];
 
-            // Step 1: Project Environment (started at step 0)
             if step > 0 {
-                let sym = if step < 10 { spin_char } else { "✔" };
-                let color = if step < 10 {
-                    app.theme().primary
+                let (sym, color) = if step < 10 {
+                    (spin_char, app.theme().primary)
                 } else {
-                    app.theme().success
+                    ("\u{2714}", app.theme().success)
                 };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
@@ -1488,13 +1484,11 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
                 ]));
             }
 
-            // Step 2: Homebrew (started at step 10)
             if step >= 10 {
-                let sym = if step < 22 { spin_char } else { "✔" };
-                let color = if step < 22 {
-                    app.theme().primary
+                let (sym, color) = if step < 22 {
+                    (spin_char, app.theme().primary)
                 } else {
-                    app.theme().success
+                    ("\u{2714}", app.theme().success)
                 };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
@@ -1505,116 +1499,67 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
                 ]));
             }
 
-            // Step 3: Web Runtimes (started at step 22)
             if step >= 22 {
-                let sym = if step < 35 { spin_char } else { "✔" };
-                let color = if step < 35 {
-                    app.theme().primary
+                let (sym, color) = if step < 35 {
+                    (spin_char, app.theme().primary)
                 } else {
-                    app.theme().success
+                    ("\u{2714}", app.theme().success)
                 };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
                     Span::styled(
-                        "Scanning Web Development runtimes (npm, pnpm, Bun, Deno)...",
+                        "Scanning web development runtimes...",
                         Style::default().fg(app.theme().text_normal),
                     ),
                 ]));
             }
 
-            // Step 4: Cargo / pip / gem (started at step 35)
             if step >= 35 {
-                let sym = if step < 48 { spin_char } else { "✔" };
-                let color = if step < 48 {
-                    app.theme().primary
+                let (sym, color) = if step < 45 {
+                    (spin_char, app.theme().primary)
                 } else {
-                    app.theme().success
+                    ("\u{2714}", app.theme().success)
                 };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
                     Span::styled(
-                        "Checking compiler dependencies (cargo-outdated, pip, gem)...",
+                        "Auditing project security & dependencies...",
                         Style::default().fg(app.theme().text_normal),
                     ),
                 ]));
             }
 
-            // Step 5: Security Advisory (started at step 48)
-            if step >= 48 {
-                let sym = if step < 62 { spin_char } else { "✔" };
-                let color = if step < 62 {
-                    app.theme().primary
+            if step >= 45 {
+                let (sym, color) = if step < 55 {
+                    (spin_char, app.theme().primary)
                 } else {
-                    app.theme().success
+                    ("\u{2714}", app.theme().success)
                 };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
                     Span::styled(
-                        "Running security advisory audits (RustSec, npm audit, pip-audit)...",
+                        "Collecting cleanup candidates...",
                         Style::default().fg(app.theme().text_normal),
                     ),
                 ]));
             }
 
-            // Step 6: Docker / Cleanup (started at step 62)
-            if step >= 62 {
-                let sym = if step < 75 { spin_char } else { "✔" };
-                let color = if step < 75 {
-                    app.theme().primary
-                } else {
-                    app.theme().success
-                };
-                log_lines.push(Line::from(vec![
-                    Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
-                    Span::styled(
-                        "Checking Docker daemons & local cache reclaimables...",
-                        Style::default().fg(app.theme().text_normal),
-                    ),
-                ]));
+            if chunks[3].height > 0 {
+                let progress = Paragraph::new(log_lines).alignment(Alignment::Left);
+                frame.render_widget(progress, chunks[3]);
             }
-
-            // Step 7: Compiling results (started at step 75)
-            if step >= 75 {
-                log_lines.push(Line::from(vec![
-                    Span::styled(
-                        format!("  {} ", spin_char),
-                        Style::default().fg(app.theme().primary).bold(),
-                    ),
-                    Span::styled(
-                        "Compiling final health reports and consolidating cache...",
-                        Style::default().fg(app.theme().text_normal),
-                    ),
-                ]));
-            }
-
-            // Rotating tool tips
-            let tips = [
-                "💡 Tip: Press '/' to filter outdated packages by name or manager in real-time.",
-                "💡 Tip: Use the 'Space' key to select packages and 'U' to update them concurrently.",
-                "💡 Tip: Run 'envexa scan' in your terminal to get a clean Markdown report for your CI.",
-                "💡 Tip: Change your default target project directory in '~/.envexa/config.json'.",
-                "💡 Tip: Cleanup scanner checks docker, npm, and cargo local cache spaces.",
-                "💡 Tip: Outdated tab shows global as well as local project dependencies.",
-            ];
-            let tip_index = (step / 80) % tips.len();
-            let current_tip = tips[tip_index];
-
-            log_lines.push(Line::from(""));
-            log_lines.push(Line::from(vec![Span::styled(
-                format!("  {}", current_tip),
-                Style::default().fg(app.theme().text_muted),
-            )]));
-
-            frame.render_widget(Paragraph::new(log_lines), chunks[3]);
         } else {
             frame.render_stateful_widget(throbber, inner, &mut app.ui.throbber_state);
         }
     }
 }
 
+const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
 pub fn render(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
-    frame.render_widget(Block::default().bg(app.theme().background), area);
+    let theme = app.theme();
+    frame.render_widget(Block::default().bg(theme.background), area);
 
     if area.width < 16 || area.height < 4 {
         render_minimal(frame, area, "Envexa", app);
