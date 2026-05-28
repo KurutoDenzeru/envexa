@@ -884,9 +884,14 @@ impl App {
             View::Settings => {
                 if self.ui.settings_edit_mode {
                     let opts_len = self.get_settings_options().len().saturating_sub(1);
-                    self.ui.settings_edit_selection = self.ui.settings_edit_selection.saturating_add(1).min(opts_len);
+                    self.ui.settings_edit_selection = self
+                        .ui
+                        .settings_edit_selection
+                        .saturating_add(1)
+                        .min(opts_len);
                 } else {
-                    self.ui.settings_selection = self.ui.settings_selection.saturating_add(1).min(3);
+                    self.ui.settings_selection =
+                        self.ui.settings_selection.saturating_add(1).min(3);
                 }
             }
             View::Updating => {}
@@ -904,7 +909,8 @@ impl App {
             View::Scanning => {}
             View::Settings => {
                 if self.ui.settings_edit_mode {
-                    self.ui.settings_edit_selection = self.ui.settings_edit_selection.saturating_sub(1);
+                    self.ui.settings_edit_selection =
+                        self.ui.settings_edit_selection.saturating_sub(1);
                 } else {
                     self.ui.settings_selection = self.ui.settings_selection.saturating_sub(1);
                 }
@@ -918,12 +924,22 @@ impl App {
 
     pub fn get_settings_options(&self) -> Vec<String> {
         match self.ui.settings_selection {
-            0 => vec!["5m".to_string(), "15m".to_string(), "30m".to_string(), "60m".to_string()],
+            0 => vec![
+                "5m".to_string(),
+                "15m".to_string(),
+                "30m".to_string(),
+                "60m".to_string(),
+            ],
             1 => vec!["On".to_string(), "Off".to_string()],
             2 => vec![
-                "default".to_string(), "dark".to_string(), "light".to_string(),
-                "dracula".to_string(), "nord".to_string(), "monokai".to_string(),
-                "solarized-dark".to_string(), "oceanic".to_string()
+                "default".to_string(),
+                "dark".to_string(),
+                "light".to_string(),
+                "dracula".to_string(),
+                "nord".to_string(),
+                "monokai".to_string(),
+                "solarized-dark".to_string(),
+                "oceanic".to_string(),
             ],
             3 => vec!["On".to_string(), "Off".to_string()],
             _ => vec![],
@@ -959,9 +975,21 @@ impl App {
         let opts = self.get_settings_options();
         let current_val = match self.ui.settings_selection {
             0 => format!("{}m", self.config.cache_ttl_minutes),
-            1 => if self.config.auto_scan_on_startup { "On".to_string() } else { "Off".to_string() },
+            1 => {
+                if self.config.auto_scan_on_startup {
+                    "On".to_string()
+                } else {
+                    "Off".to_string()
+                }
+            }
             2 => self.config.theme.clone(),
-            3 => if self.config.verbose_logs { "On".to_string() } else { "Off".to_string() },
+            3 => {
+                if self.config.verbose_logs {
+                    "On".to_string()
+                } else {
+                    "Off".to_string()
+                }
+            }
             _ => String::new(),
         };
         self.ui.settings_edit_selection = opts.iter().position(|o| o == &current_val).unwrap_or(0);
