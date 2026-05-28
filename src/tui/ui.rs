@@ -34,6 +34,17 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
         .split(popup_layout[1])[1]
 }
 
+fn get_cwd_display() -> String {
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let cwd_str = cwd.to_string_lossy().to_string();
+    if let Ok(home) = std::env::var("HOME") {
+        if cwd_str.starts_with(&home) {
+            return cwd_str.replacen(&home, "~", 1);
+        }
+    }
+    cwd_str
+}
+
 fn status_style(status: &str, theme: &Theme) -> Style {
     let style = Style::default().fg(status_color(status, theme));
     match status {
@@ -142,12 +153,7 @@ fn title_bar(frame: &mut Frame, area: Rect, app: &App) {
 
     frame.render_widget(
         Paragraph::new(Line::from(vec![
-            Span::styled("By KurutoDenzeru", Style::default().fg(app.theme().text_muted)),
-            Span::raw(" \u{2502} "),
-            Span::styled(
-                concat!("v", env!("CARGO_PKG_VERSION")),
-                Style::default().fg(app.theme().text_muted),
-            ),
+            Span::styled(get_cwd_display(), Style::default().fg(app.theme().text_muted)),
         ]))
         .alignment(Alignment::Center),
         chunks[2],
@@ -1172,13 +1178,15 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
         category_tables.push(table);
     }
 
-    let constraints: Vec<Constraint> = category_heights
+    let mut constraints: Vec<Constraint> = category_heights
         .iter()
         .map(|h| Constraint::Length(*h))
         .collect();
 
+    constraints.push(Constraint::Length(2));
+
     let total_outdated = scanner::count_outdated(report);
-    if !constraints.is_empty() {
+    if !category_tables.is_empty() {
         let cat_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints(constraints)
@@ -1186,6 +1194,21 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
         for (i, table) in category_tables.into_iter().enumerate() {
             if cat_chunks[i].height > 0 {
                 frame.render_widget(table, cat_chunks[i]);
+            }
+        }
+        
+        if let Some(footer_area) = cat_chunks.last() {
+            if footer_area.height > 0 {
+                let footer = Paragraph::new(Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled("By KurutoDenzeru", Style::default().fg(app.theme().text_muted)),
+                    Span::raw(" \u{2502} "),
+                    Span::styled(
+                        concat!("v", env!("CARGO_PKG_VERSION")),
+                        Style::default().fg(app.theme().text_muted),
+                    ),
+                ]));
+                frame.render_widget(footer, *footer_area);
             }
         }
     } else if !q.is_empty() && total_outdated > 0 {
