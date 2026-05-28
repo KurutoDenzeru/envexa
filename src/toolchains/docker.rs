@@ -35,7 +35,9 @@ pub async fn scan() -> ScanResult {
             #[serde(rename = "Driver")]
             driver: Option<String>,
         }
-        if let Ok(info) = serde_json::from_str::<DockerInfo>(&String::from_utf8_lossy(&info_check.stdout)) {
+        if let Ok(info) =
+            serde_json::from_str::<DockerInfo>(&String::from_utf8_lossy(&info_check.stdout))
+        {
             let mut disk = serde_json::Map::new();
             if let Some(driver) = info.driver {
                 disk.insert("driver".into(), serde_json::Value::String(driver));

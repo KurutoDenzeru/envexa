@@ -19,6 +19,7 @@ pub enum View {
     Scanning,
     PackageDetail,
     Updating,
+    Settings,
 }
 
 pub enum AppEvent {
@@ -47,7 +48,10 @@ pub struct UiState {
     pub view: View,
     pub dashboard_selection: usize,
     pub outdated_selection: usize,
+    pub settings_selection: usize,
     pub tab_index: usize,
+    pub settings_edit_mode: bool,
+    pub settings_edit_selection: usize,
     pub search_mode: bool,
     pub search_query: String,
     pub throbber_state: ThrobberState,
@@ -71,6 +75,7 @@ pub struct DetailState {
 }
 
 pub struct App {
+    pub config: config::UserConfig,
     pub report: Option<Report>,
     pub ui: UiState,
     pub detail: DetailState,
@@ -83,7 +88,11 @@ impl Default for App {
 }
 
 impl App {
+    pub fn theme(&self) -> crate::tui::theme::Theme {
+        crate::tui::theme::Theme::parse(&self.config.theme)
+    }
     pub fn new() -> Self {
+        let config = config::load_config();
         let report = config::read_cache().and_then(|e| {
             if !config::cache_expired(&e) {
                 Some(e.report)
@@ -92,12 +101,16 @@ impl App {
             }
         });
         Self {
+            config,
             report,
             ui: UiState {
                 view: View::Dashboard,
                 dashboard_selection: 0,
                 outdated_selection: 0,
+                settings_selection: 0,
                 tab_index: 0,
+                settings_edit_mode: false,
+                settings_edit_selection: 0,
                 search_mode: false,
                 search_query: String::new(),
                 throbber_state: ThrobberState::default(),
@@ -148,6 +161,10 @@ impl App {
                 }
             }
         });
+
+        if self.config.auto_scan_on_startup && self.report.is_none() {
+            let _ = self.do_scan(tx.clone());
+        }
 
         loop {
             terminal.draw(|frame| crate::tui::ui::render(frame, self))?;
@@ -249,8 +266,12 @@ impl App {
 
                         match key.code {
                             KeyCode::Esc | KeyCode::Char('h') => {
-                                self.ui.view = View::Dashboard;
-                                self.ui.tab_index = 0;
+                                if self.ui.settings_edit_mode {
+                                    self.ui.settings_edit_mode = false;
+                                } else {
+                                    self.ui.view = View::Dashboard;
+                                    self.ui.tab_index = 0;
+                                }
                             }
                             KeyCode::Char('s') | KeyCode::Char('S') => {
                                 self.ui.search_mode = false;
@@ -280,6 +301,14 @@ impl App {
                                     } else {
                                         self.ui.checked_outdated.insert(self.ui.outdated_selection);
                                     }
+                                } else if matches!(self.ui.view, View::Settings) {
+                                    if self.ui.settings_edit_mode {
+                                        self.apply_setting_selection();
+                                        self.ui.settings_edit_mode = false;
+                                        let _ = config::save_config(&self.config);
+                                    } else {
+                                        self.enter_settings_edit_mode();
+                                    }
                                 }
                             }
                             KeyCode::Char('/') => {
@@ -288,19 +317,23 @@ impl App {
                                 self.ui.outdated_selection = 0;
                             }
                             KeyCode::Right | KeyCode::Char('l') => {
-                                self.ui.tab_index = (self.ui.tab_index + 1).min(1);
-                                self.ui.view = if self.ui.tab_index == 0 {
-                                    View::Dashboard
-                                } else {
-                                    View::Outdated
+                                self.ui.tab_index = (self.ui.tab_index + 1) % 3;
+                                self.ui.view = match self.ui.tab_index {
+                                    0 => View::Dashboard,
+                                    1 => View::Outdated,
+                                    _ => View::Settings,
                                 };
                             }
                             KeyCode::Left | KeyCode::Char('j') => {
-                                self.ui.tab_index = self.ui.tab_index.saturating_sub(1);
-                                self.ui.view = if self.ui.tab_index == 0 {
-                                    View::Dashboard
+                                self.ui.tab_index = if self.ui.tab_index == 0 {
+                                    2
                                 } else {
-                                    View::Outdated
+                                    self.ui.tab_index - 1
+                                };
+                                self.ui.view = match self.ui.tab_index {
+                                    0 => View::Dashboard,
+                                    1 => View::Outdated,
+                                    _ => View::Settings,
                                 };
                             }
                             KeyCode::Down | KeyCode::Char('n') => self.next_item(),
@@ -308,6 +341,14 @@ impl App {
                             KeyCode::Enter => {
                                 if matches!(self.ui.view, View::Dashboard) {
                                     self.open_detail();
+                                } else if matches!(self.ui.view, View::Settings) {
+                                    if self.ui.settings_edit_mode {
+                                        self.apply_setting_selection();
+                                        self.ui.settings_edit_mode = false;
+                                        let _ = config::save_config(&self.config);
+                                    } else {
+                                        self.enter_settings_edit_mode();
+                                    }
                                 }
                             }
                             _ => {}
@@ -797,6 +838,7 @@ impl App {
                 self.ui.outdated_selection = self.ui.outdated_selection.min(n);
             }
             View::Scanning => {}
+            View::Settings => {}
             View::PackageDetail => {
                 let n = self.detail_len().saturating_sub(1);
                 self.detail.selection = self.detail.selection.min(n);
@@ -839,6 +881,14 @@ impl App {
                 let n = self.detail_len().saturating_sub(1);
                 self.detail.selection = self.detail.selection.saturating_add(1).min(n);
             }
+            View::Settings => {
+                if self.ui.settings_edit_mode {
+                    let opts_len = self.get_settings_options().len().saturating_sub(1);
+                    self.ui.settings_edit_selection = self.ui.settings_edit_selection.saturating_add(1).min(opts_len);
+                } else {
+                    self.ui.settings_selection = self.ui.settings_selection.saturating_add(1).min(3);
+                }
+            }
             View::Updating => {}
         }
     }
@@ -852,9 +902,70 @@ impl App {
                 self.ui.outdated_selection = self.ui.outdated_selection.saturating_sub(1)
             }
             View::Scanning => {}
-            View::PackageDetail => self.detail.selection = self.detail.selection.saturating_sub(1),
+            View::Settings => {
+                if self.ui.settings_edit_mode {
+                    self.ui.settings_edit_selection = self.ui.settings_edit_selection.saturating_sub(1);
+                } else {
+                    self.ui.settings_selection = self.ui.settings_selection.saturating_sub(1);
+                }
+            }
+            View::PackageDetail => {
+                self.detail.selection = self.detail.selection.saturating_sub(1);
+            }
             View::Updating => {}
         }
+    }
+
+    pub fn get_settings_options(&self) -> Vec<String> {
+        match self.ui.settings_selection {
+            0 => vec!["5m".to_string(), "15m".to_string(), "30m".to_string(), "60m".to_string()],
+            1 => vec!["On".to_string(), "Off".to_string()],
+            2 => vec![
+                "default".to_string(), "dark".to_string(), "light".to_string(),
+                "dracula".to_string(), "nord".to_string(), "monokai".to_string(),
+                "solarized-dark".to_string(), "oceanic".to_string()
+            ],
+            3 => vec!["On".to_string(), "Off".to_string()],
+            _ => vec![],
+        }
+    }
+
+    pub fn apply_setting_selection(&mut self) {
+        let opts = self.get_settings_options();
+        if self.ui.settings_edit_selection >= opts.len() {
+            return;
+        }
+        let val = &opts[self.ui.settings_edit_selection];
+        match self.ui.settings_selection {
+            0 => {
+                if let Ok(m) = val.replace("m", "").parse::<u64>() {
+                    self.config.cache_ttl_minutes = m;
+                }
+            }
+            1 => {
+                self.config.auto_scan_on_startup = val == "On";
+            }
+            2 => {
+                self.config.theme = val.clone();
+            }
+            3 => {
+                self.config.verbose_logs = val == "On";
+            }
+            _ => {}
+        }
+    }
+
+    pub fn enter_settings_edit_mode(&mut self) {
+        let opts = self.get_settings_options();
+        let current_val = match self.ui.settings_selection {
+            0 => format!("{}m", self.config.cache_ttl_minutes),
+            1 => if self.config.auto_scan_on_startup { "On".to_string() } else { "Off".to_string() },
+            2 => self.config.theme.clone(),
+            3 => if self.config.verbose_logs { "On".to_string() } else { "Off".to_string() },
+            _ => String::new(),
+        };
+        self.ui.settings_edit_selection = opts.iter().position(|o| o == &current_val).unwrap_or(0);
+        self.ui.settings_edit_mode = true;
     }
 
     fn detail_len(&self) -> usize {

@@ -7,7 +7,7 @@ use super::*;
 
 lazy_static::lazy_static! {
     static ref USES_RE: Regex = Regex::new(r"uses:\s+([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)@([vV]?\d+(?:\.\d+)*)").unwrap();
-    
+
     static ref LATEST_ACTIONS: HashMap<&'static str, &'static str> = {
         let mut m = HashMap::new();
         m.insert("actions/checkout", "v4");
@@ -51,18 +51,20 @@ pub async fn scan() -> ScanResult {
                             if let (Some(action), Some(version)) = (cap.get(1), cap.get(2)) {
                                 let action_str = action.as_str();
                                 let version_str = version.as_str();
-                                
+
                                 if let Some(&latest) = LATEST_ACTIONS.get(action_str) {
                                     // Strip leading 'v' for comparison
                                     let current_v = version_str.trim_start_matches('v');
                                     let latest_v = latest.trim_start_matches('v');
-                                    
+
                                     // Very basic major version check
-                                    if let (Ok(c), Ok(l)) = (current_v.parse::<u32>(), latest_v.parse::<u32>()) {
+                                    if let (Ok(c), Ok(l)) =
+                                        (current_v.parse::<u32>(), latest_v.parse::<u32>())
+                                    {
                                         if c < l {
                                             outdated_map.insert(
-                                                action_str.to_string(), 
-                                                (version_str.to_string(), latest.to_string())
+                                                action_str.to_string(),
+                                                (version_str.to_string(), latest.to_string()),
                                             );
                                         }
                                     }
@@ -89,9 +91,11 @@ pub async fn scan() -> ScanResult {
     } else {
         "warning".into()
     };
-    
+
     if n > 0 {
-        result.issues.push(format!("{n} outdated GitHub Action(s) found"));
+        result
+            .issues
+            .push(format!("{n} outdated GitHub Action(s) found"));
     }
 
     result

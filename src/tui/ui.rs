@@ -1,8 +1,12 @@
+use crate::tui::theme::Theme;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span, Text},
-    widgets::{BarChart, Block, Borders, Cell, Gauge, LineGauge, Paragraph, Row, Table, Tabs},
+    widgets::{
+        BarChart, Block, Borders, Cell, Clear, Gauge, LineGauge, List, ListItem, ListState,
+        Paragraph, Row, Table, TableState, Tabs,
+    },
     Frame,
 };
 use tui_piechart::{LegendAlignment, LegendLayout, LegendPosition, PieChart, PieSlice, Resolution};
@@ -10,41 +14,72 @@ use tui_piechart::{LegendAlignment, LegendLayout, LegendPosition, PieChart, PieS
 use crate::scanner;
 use crate::tui::app::{App, View};
 
-fn status_style(status: &str) -> Style {
-    let style = Style::default().fg(status_color(status));
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(r);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(popup_layout[1])[1]
+}
+
+fn get_cwd_display() -> String {
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let cwd_str = cwd.to_string_lossy().to_string();
+    if let Ok(home) = std::env::var("HOME") {
+        if cwd_str.starts_with(&home) {
+            return cwd_str.replacen(&home, "~", 1);
+        }
+    }
+    cwd_str
+}
+
+fn status_style(status: &str, theme: &Theme) -> Style {
+    let style = Style::default().fg(status_color(status, theme));
     match status {
         "ok" | "warning" | "error" => style.add_modifier(Modifier::BOLD),
         _ => style,
     }
 }
 
-fn source_style(source: &str) -> Style {
+fn source_style(source: &str, theme: &Theme) -> Style {
     match source {
-        "formula" => Style::default().fg(Color::Blue),
-        "cask" => Style::default().fg(Color::Magenta),
-        "global" => Style::default().fg(Color::Cyan),
-        "package" => Style::default().fg(Color::DarkGray),
+        "formula" => Style::default().fg(theme.secondary),
+        "cask" => Style::default().fg(theme.secondary),
+        "global" => Style::default().fg(theme.primary),
+        "package" => Style::default().fg(theme.text_muted),
         _ => Style::default(),
     }
 }
 
-fn status_color(status: &str) -> Color {
+fn status_color(status: &str, theme: &Theme) -> Color {
     match status {
-        "ok" => Color::Green,
-        "warning" => Color::Yellow,
-        "error" => Color::Red,
-        "skipped" => Color::DarkGray,
-        _ => Color::White,
+        "ok" => theme.success,
+        "warning" => theme.warning,
+        "error" => theme.error,
+        "skipped" => theme.text_muted,
+        _ => theme.text_normal,
     }
 }
 
-fn severity_style(severity: &str) -> Style {
+fn severity_style(severity: &str, theme: &Theme) -> Style {
     match severity.to_ascii_lowercase().as_str() {
-        "critical" => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-        "high" => Style::default().fg(Color::Red),
-        "moderate" | "medium" => Style::default().fg(Color::Yellow),
-        "low" => Style::default().fg(Color::Blue),
-        _ => Style::default().fg(Color::DarkGray),
+        "critical" => Style::default().fg(theme.error).add_modifier(Modifier::BOLD),
+        "high" => Style::default().fg(theme.error),
+        "moderate" | "medium" => Style::default().fg(theme.warning),
+        "low" => Style::default().fg(theme.secondary),
+        _ => Style::default().fg(theme.text_muted),
     }
 }
 
@@ -66,36 +101,36 @@ fn severity_counts(vulns: &[crate::toolchains::VulnerabilityInfo]) -> (usize, us
     (critical, high, moderate, other)
 }
 
-fn render_minimal(frame: &mut Frame, area: Rect, msg: &str) {
+fn render_minimal(frame: &mut Frame, area: Rect, msg: &str, app: &App) {
     if area.width == 0 || area.height == 0 {
         return;
     }
     frame.render_widget(
         Paragraph::new(msg)
             .alignment(Alignment::Center)
-            .style(Style::default().fg(Color::DarkGray)),
+            .style(Style::default().fg(app.theme().text_muted)),
         area,
     );
 }
 
-fn title_bar(frame: &mut Frame, area: Rect, _app: &App) {
+fn title_bar(frame: &mut Frame, area: Rect, app: &App) {
     if area.height == 0 {
         return;
     }
     if area.height < 9 || area.width < 72 {
         let title = Paragraph::new(Line::from(vec![
-            Span::styled("Envexa", Style::default().fg(Color::Cyan).bold()),
+            Span::styled("Envexa", Style::default().fg(app.theme().primary).bold()),
             Span::raw(" "),
             Span::styled(
                 concat!("v", env!("CARGO_PKG_VERSION")),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(app.theme().text_muted),
             ),
         ]))
         .alignment(Alignment::Center)
         .block(
             Block::default()
                 .borders(Borders::BOTTOM)
-                .border_style(Style::default().fg(Color::DarkGray)),
+                .border_style(Style::default().fg(app.theme().text_muted)),
         );
         frame.render_widget(title, area);
         return;
@@ -113,17 +148,12 @@ fn title_bar(frame: &mut Frame, area: Rect, _app: &App) {
 
     let art = Paragraph::new(Text::from(ENVEXA_LOGO))
         .alignment(Alignment::Center)
-        .style(Style::default().fg(Color::Cyan));
+        .style(Style::default().fg(app.theme().primary));
     frame.render_widget(art, chunks[1]);
 
     frame.render_widget(
         Paragraph::new(Line::from(vec![
-            Span::styled("By KurutoDenzeru", Style::default().fg(Color::DarkGray)),
-            Span::raw(" \u{2502} "),
-            Span::styled(
-                concat!("v", env!("CARGO_PKG_VERSION")),
-                Style::default().fg(Color::DarkGray),
-            ),
+            Span::styled(get_cwd_display(), Style::default().fg(app.theme().text_muted)),
         ]))
         .alignment(Alignment::Center),
         chunks[2],
@@ -131,25 +161,26 @@ fn title_bar(frame: &mut Frame, area: Rect, _app: &App) {
 
     let block = Block::default()
         .borders(Borders::BOTTOM)
-        .border_style(Style::default().fg(Color::DarkGray));
+        .border_style(Style::default().fg(app.theme().text_muted));
     frame.render_widget(block, chunks[3]);
 }
 
 fn tab_bar(frame: &mut Frame, area: Rect, app: &App) {
-    let titles = vec![" Dashboard ", " Outdated "];
+    let titles = vec![" Dashboard ", " Outdated ", " Settings "];
     let selected = match app.ui.view {
         View::Dashboard => 0,
         View::Outdated => 1,
+        View::Settings => 2,
         View::Scanning | View::PackageDetail | View::Updating => app.ui.tab_index,
     };
     let tabs = Tabs::new(titles)
         .select(selected)
         .highlight_style(
             Style::default()
-                .fg(Color::Cyan)
+                .fg(app.theme().primary)
                 .add_modifier(Modifier::BOLD),
         )
-        .style(Style::default().fg(Color::DarkGray))
+        .style(Style::default().fg(app.theme().text_muted))
         .block(Block::default().borders(Borders::NONE));
     frame.render_widget(tabs, area);
 }
@@ -160,10 +191,10 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
             Line::from(vec![Span::styled(
                 " Updating packages... ",
                 Style::default()
-                    .fg(Color::Green)
+                    .fg(app.theme().success)
                     .add_modifier(Modifier::BOLD),
             )]),
-            Style::default().fg(Color::White).bg(Color::Black),
+            Style::default().fg(app.theme().text_normal).bg(app.theme().background),
         ),
         View::PackageDetail => {
             let msg = if !app.detail.message.is_empty() {
@@ -173,30 +204,30 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
             };
             let readonly_detail = matches!(app.detail.key.as_deref(), Some("audit"));
             let mut spans = vec![
-                Span::styled(" [\u{2191}\u{2193}]", Style::default().fg(Color::DarkGray)),
+                Span::styled(" [\u{2191}\u{2193}]", Style::default().fg(app.theme().text_muted)),
                 Span::raw(" nav "),
             ];
             if app.detail.key.as_deref() == Some("security") {
                 spans.extend([
-                    Span::styled("[F]", Style::default().fg(Color::Green)),
+                    Span::styled("[F]", Style::default().fg(app.theme().success)),
                     Span::raw(" fix "),
                 ]);
             } else if !readonly_detail {
                 spans.extend([
-                    Span::styled("[Space]", Style::default().fg(Color::Yellow)),
+                    Span::styled("[Space]", Style::default().fg(app.theme().warning)),
                     Span::raw(" toggle "),
-                    Span::styled("[Y]", Style::default().fg(Color::Green)),
+                    Span::styled("[Y]", Style::default().fg(app.theme().success)),
                     Span::raw(" update/clean "),
                 ]);
             }
             spans.extend([
-                Span::styled("[Esc]", Style::default().fg(Color::Red)),
+                Span::styled("[Esc]", Style::default().fg(app.theme().error)),
                 Span::raw(" back"),
-                Span::styled(msg, Style::default().fg(Color::White)),
+                Span::styled(msg, Style::default().fg(app.theme().text_normal)),
             ]);
             (
                 Line::from(spans),
-                Style::default().fg(Color::White).bg(Color::Black),
+                Style::default().fg(app.theme().text_normal).bg(app.theme().background),
             )
         }
         _ if app.ui.search_mode => {
@@ -206,11 +237,11 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
                     Span::styled(
                         "Search:",
                         Style::default()
-                            .fg(Color::Yellow)
+                            .fg(app.theme().warning)
                             .add_modifier(Modifier::BOLD),
                     ),
                     Span::raw(query),
-                    Span::styled("  Esc", Style::default().fg(Color::DarkGray)),
+                    Span::styled("  Esc", Style::default().fg(app.theme().text_muted)),
                     Span::raw(" clear"),
                 ]),
                 Style::default(),
@@ -223,28 +254,36 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
                 } else {
                     String::new()
                 };
-            (
-                Line::from(vec![
-                    Span::styled(" [S]", Style::default().fg(Color::Green)),
+            let mut spans = vec![
+                Span::styled(" [S]", Style::default().fg(app.theme().success)),
                     Span::raw("can "),
-                    Span::styled("[O]", Style::default().fg(Color::Yellow)),
+                    Span::styled("[O]", Style::default().fg(app.theme().warning)),
                     Span::raw("utdated "),
-                    Span::styled("[/]", Style::default().fg(Color::Cyan)),
+                    Span::styled("[/]", Style::default().fg(app.theme().primary)),
                     Span::raw("earch "),
-                    Span::styled("\u{2190}\u{2192}", Style::default().fg(Color::DarkGray)),
+                    Span::styled("\u{2190}\u{2192}", Style::default().fg(app.theme().text_muted)),
                     Span::raw(" tabs "),
-                    Span::styled("\u{2191}\u{2193}", Style::default().fg(Color::DarkGray)),
+                    Span::styled("\u{2191}\u{2193}", Style::default().fg(app.theme().text_muted)),
                     Span::raw(" nav "),
-                    Span::styled("[U]", Style::default().fg(Color::Green)),
+                    Span::styled("[U]", Style::default().fg(app.theme().success)),
                     Span::raw("pdate "),
-                    Span::styled("^C", Style::default().fg(Color::Red)),
-                    Span::styled(" Exit", Style::default().fg(Color::Red)),
+                    Span::styled("^C", Style::default().fg(app.theme().error)),
+                    Span::styled(" Exit", Style::default().fg(app.theme().error)),
                     Span::raw("  "),
-                    Span::styled("[Q]", Style::default().fg(Color::DarkGray)),
+                    Span::styled("[Q]", Style::default().fg(app.theme().text_muted)),
                     Span::raw("uit"),
-                    Span::styled(update_msg, Style::default().fg(Color::White)),
-                ]),
-                Style::default().fg(Color::White).bg(Color::Black),
+                ];
+            if matches!(app.ui.view, View::Settings) {
+                spans.extend([
+                    Span::raw("  "),
+                    Span::styled("[Space/Enter]", Style::default().fg(app.theme().warning)),
+                    Span::raw(" toggle"),
+                ]);
+            }
+            spans.push(Span::styled(update_msg, Style::default().fg(app.theme().text_normal)));
+            (
+                Line::from(spans),
+                Style::default().fg(app.theme().text_normal).bg(app.theme().background),
             )
         }
     };
@@ -338,48 +377,49 @@ fn scan_age(timestamp: &str) -> String {
     }
 }
 
-fn dashboard_stats_line(frame: &mut Frame, area: Rect, report: &crate::scanner::Report) {
+fn dashboard_stats_line(frame: &mut Frame, area: Rect, report: &crate::scanner::Report, app: &App) {
     let (pass, warn, fail, skip) = count_statuses(report);
     let outdated = crate::scanner::count_outdated(report);
     let age = scan_age(&report.timestamp);
     let items = vec![
         Span::styled(
             format!(" \u{25CF} {pass} "),
-            Style::default().fg(Color::Green),
+            Style::default().fg(app.theme().success),
         ),
         Span::raw(" "),
         Span::styled(
             format!("\u{25CF} {warn} "),
-            Style::default().fg(Color::Yellow),
+            Style::default().fg(app.theme().warning),
         ),
         Span::raw(" "),
-        Span::styled(format!("\u{25CF} {fail} "), Style::default().fg(Color::Red)),
+        Span::styled(format!("\u{25CF} {fail} "), Style::default().fg(app.theme().error)),
         Span::raw(" "),
         Span::styled(
             format!("\u{25CF} {skip} "),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(app.theme().text_muted),
         ),
         Span::raw("  "),
         Span::styled(
             format!("\u{25C9} {outdated} outdated"),
             Style::default().fg(if outdated > 0 {
-                Color::Yellow
+                app.theme().warning
             } else {
-                Color::Green
+                app.theme().success
             }),
         ),
         Span::raw("  "),
         Span::styled(
             format!("\u{23F0} {age}"),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(app.theme().text_muted),
         ),
     ];
     let block = Block::default()
         .borders(Borders::NONE)
-        .style(Style::default().bg(Color::Black));
+        .style(Style::default().bg(app.theme().background));
     frame.render_widget(Paragraph::new(Line::from(items)).block(block), area);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_dashboard_health_panel(
     frame: &mut Frame,
     area: Rect,
@@ -388,6 +428,7 @@ fn render_dashboard_health_panel(
     warn: usize,
     fail: usize,
     skip: usize,
+    app: &App,
 ) {
     if area.height == 0 || area.width == 0 {
         return;
@@ -401,7 +442,7 @@ fn render_dashboard_health_panel(
     };
 
     if area.height == 1 || area.width < 42 {
-        dashboard_stats_line(frame, area, report);
+        dashboard_stats_line(frame, area, report, app);
         return;
     }
 
@@ -416,28 +457,28 @@ fn render_dashboard_health_panel(
 
     frame.render_widget(
         LineGauge::default()
-            .filled_style(Style::default().fg(Color::Green))
-            .unfilled_style(Style::default().fg(Color::DarkGray))
+            .filled_style(Style::default().fg(app.theme().success))
+            .unfilled_style(Style::default().fg(app.theme().text_muted))
             .ratio(health),
         chunks[0],
     );
 
-    dashboard_stats_line(frame, chunks[1], report);
+    dashboard_stats_line(frame, chunks[1], report, app);
 
     if chunks[2].height > 0 && area.width >= 56 {
         let summary = Paragraph::new(Line::from(vec![
-            Span::styled(" [S]", Style::default().fg(Color::Green)),
+            Span::styled(" [S]", Style::default().fg(app.theme().success)),
             Span::raw("can  "),
-            Span::styled("[O]", Style::default().fg(Color::Yellow)),
+            Span::styled("[O]", Style::default().fg(app.theme().warning)),
             Span::raw("utdated  "),
-            Span::styled("[/]", Style::default().fg(Color::Cyan)),
+            Span::styled("[/]", Style::default().fg(app.theme().primary)),
             Span::raw("Search  "),
-            Span::styled("^C", Style::default().fg(Color::Red)),
+            Span::styled("^C", Style::default().fg(app.theme().error)),
             Span::raw(" Exit  "),
-            Span::styled("[Q]", Style::default().fg(Color::DarkGray)),
+            Span::styled("[Q]", Style::default().fg(app.theme().text_muted)),
             Span::raw("uit"),
         ]))
-        .style(Style::default().fg(Color::White))
+        .style(Style::default().fg(app.theme().text_normal))
         .block(Block::default().borders(Borders::NONE));
         frame.render_widget(summary, chunks[2]);
     }
@@ -450,6 +491,7 @@ fn render_overview_pie(
     warn: usize,
     fail: usize,
     skip: usize,
+    app: &App,
 ) {
     if area.width < 24 || area.height < 7 {
         return;
@@ -462,20 +504,20 @@ fn render_overview_pie(
 
     let mut slices = Vec::new();
     if pass > 0 {
-        slices.push(PieSlice::new(&pass_label, pass as f64, Color::Green));
+        slices.push(PieSlice::new(&pass_label, pass as f64, app.theme().success));
     }
     if warn > 0 {
-        slices.push(PieSlice::new(&warn_label, warn as f64, Color::Yellow));
+        slices.push(PieSlice::new(&warn_label, warn as f64, app.theme().warning));
     }
     if fail > 0 {
-        slices.push(PieSlice::new(&fail_label, fail as f64, Color::Red));
+        slices.push(PieSlice::new(&fail_label, fail as f64, app.theme().error));
     }
     if skip > 0 {
-        slices.push(PieSlice::new(&skip_label, skip as f64, Color::DarkGray));
+        slices.push(PieSlice::new(&skip_label, skip as f64, app.theme().text_muted));
     }
 
     if slices.is_empty() {
-        slices.push(PieSlice::new("EMPTY", 1.0, Color::DarkGray));
+        slices.push(PieSlice::new("EMPTY", 1.0, app.theme().text_muted));
     }
 
     let piechart = PieChart::new(slices)
@@ -489,7 +531,7 @@ fn render_overview_pie(
             Block::default()
                 .borders(Borders::ALL)
                 .title(" Overview ")
-                .border_style(Style::default().fg(Color::Cyan)),
+                .border_style(Style::default().fg(app.theme().primary)),
         );
     frame.render_widget(piechart, area);
 }
@@ -625,7 +667,7 @@ fn project_tooling_risk(
     score.min(100) as u64
 }
 
-fn dashboard_cells(tool: &str, res: &crate::toolchains::ScanResult) -> (String, String) {
+fn dashboard_cells(tool: &str, res: &crate::toolchains::ScanResult, _app: &App) -> (String, String) {
     match tool {
         "security" => {
             let n = res.vulnerabilities.len();
@@ -673,7 +715,7 @@ fn dashboard_cells(tool: &str, res: &crate::toolchains::ScanResult) -> (String, 
     }
 }
 
-fn project_tooling_cells(tool: &str, res: &crate::toolchains::ScanResult) -> (String, String) {
+fn project_tooling_cells(tool: &str, res: &crate::toolchains::ScanResult, app: &App) -> (String, String) {
     match tool {
         "project" => {
             let outdated = scanner::extract_outdated(res).len();
@@ -722,13 +764,13 @@ fn project_tooling_cells(tool: &str, res: &crate::toolchains::ScanResult) -> (St
                 .unwrap_or_else(|| "runtime pairs ok".into());
             (signal, focus)
         }
-        _ => dashboard_cells(tool, res),
+        _ => dashboard_cells(tool, res, app),
     }
 }
 
-fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::scanner::Report) {
+fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::scanner::Report, app: &App) {
     if area.width < 18 || area.height < 3 {
-        render_minimal(frame, area, "Project Tooling");
+        render_minimal(frame, area, "Project Tooling", app);
         return;
     }
 
@@ -764,17 +806,17 @@ fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::s
     );
     let readiness = 1.0 - (risk as f64 / 100.0);
     let readiness_color = if risk >= 70 {
-        Color::Red
+        app.theme().error
     } else if risk >= 35 {
-        Color::Yellow
+        app.theme().warning
     } else {
-        Color::Green
+        app.theme().success
     };
 
     let block = Block::default()
         .borders(Borders::ALL)
         .title(" Project Tooling ")
-        .border_style(Style::default().fg(Color::Magenta));
+        .border_style(Style::default().fg(app.theme().secondary));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -787,7 +829,7 @@ fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::s
         let bar_span = Span::styled("■".repeat(num_blocks), Style::default().fg(readiness_color));
         let empty_span = Span::styled(
             "░".repeat(10 - num_blocks),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(app.theme().text_muted),
         );
         let extra_text = if inner.width >= 28 {
             format!("  {} outdated  {} vulns", project_outdated, vuln_count)
@@ -797,7 +839,7 @@ fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::s
 
         let compact = Paragraph::new(Text::from(vec![
             Line::from(vec![
-                Span::styled("Ready ", Style::default().fg(Color::White).bold()),
+                Span::styled("Ready ", Style::default().fg(app.theme().text_normal).bold()),
                 Span::styled(
                     format!("{:>3}% ", (readiness * 100.0).round() as u64),
                     Style::default().fg(readiness_color).bold(),
@@ -806,7 +848,7 @@ fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::s
                 empty_span,
             ]),
             Line::from(vec![
-                Span::styled("Risk  ", Style::default().fg(Color::White)),
+                Span::styled("Risk  ", Style::default().fg(app.theme().text_normal)),
                 Span::styled(format!("{risk}/100"), Style::default().fg(readiness_color)),
                 Span::raw(extra_text),
             ]),
@@ -856,7 +898,7 @@ fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::s
                     (readiness * 100.0).round() as u64
                 ),
                 Style::default()
-                    .fg(Color::White)
+                    .fg(app.theme().text_normal)
                     .add_modifier(Modifier::BOLD),
             ))
             .ratio(readiness),
@@ -865,27 +907,27 @@ fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::s
 
     let summary = Paragraph::new(Text::from(vec![
         Line::from(vec![
-            Span::styled("Project ", Style::default().fg(Color::Cyan)),
+            Span::styled("Project ", Style::default().fg(app.theme().primary)),
             Span::styled(
                 scanner::status_label(project_status),
-                status_style(project_status),
+                status_style(project_status, &app.theme()),
             ),
             Span::raw(format!("  {project_type} / {project_outdated} outdated")),
         ]),
         Line::from(vec![
-            Span::styled("Security", Style::default().fg(Color::Red)),
+            Span::styled("Security", Style::default().fg(app.theme().error)),
             Span::raw(" "),
             Span::styled(
                 scanner::status_label(security_status),
-                status_style(security_status),
+                status_style(security_status, &app.theme()),
             ),
             Span::raw(format!("  {vuln_count} vulns")),
         ]),
         Line::from(vec![
-            Span::styled("Audit   ", Style::default().fg(Color::Yellow)),
+            Span::styled("Audit   ", Style::default().fg(app.theme().warning)),
             Span::styled(
                 scanner::status_label(audit_status),
-                status_style(audit_status),
+                status_style(audit_status, &app.theme()),
             ),
             Span::raw(format!("  {audit_count} checks flagged")),
         ]),
@@ -930,9 +972,9 @@ fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::s
         .max(max_signal)
         .bar_width(bar_width)
         .bar_gap(bar_gap)
-        .bar_style(Style::default().fg(Color::Magenta))
-        .value_style(Style::default().fg(Color::White))
-        .label_style(Style::default().fg(Color::DarkGray));
+        .bar_style(Style::default().fg(app.theme().secondary))
+        .value_style(Style::default().fg(app.theme().text_normal))
+        .label_style(Style::default().fg(app.theme().text_muted));
     if chart_chunk.height > 1 {
         frame.render_widget(chart, chart_chunk);
     }
@@ -954,16 +996,17 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
                 Line::from(""),
                 Line::from(vec![Span::styled(
                     "Press [S] to scan your environment",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(app.theme().text_muted),
                 )]),
                 Line::from(vec![
-                    Span::styled("[S]", Style::default().fg(Color::Green)),
+                    Span::styled("[S]", Style::default().fg(app.theme().success)),
                     Span::raw(" Scan  "),
-                    Span::styled("[O]", Style::default().fg(Color::Yellow)),
+                    Span::styled("[O]", Style::default().fg(app.theme().warning)),
                     Span::raw(" Outdated"),
                 ]),
             ]))
-            .alignment(Alignment::Center);
+            .alignment(Alignment::Center)
+            .block(Block::default().bg(app.theme().background));
             frame.render_widget(text, area);
             return;
         }
@@ -971,7 +1014,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
 
     if area.width < 24 || area.height < 6 {
         let (pass, warn, fail, skip) = count_statuses(report);
-        render_minimal(frame, area, &format!("Envexa {pass}/{warn}/{fail}/{skip}"));
+        render_minimal(frame, area, &format!("Envexa {pass}/{warn}/{fail}/{skip}"), app);
         return;
     }
 
@@ -988,15 +1031,15 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
             .split(layout[0]);
 
-        render_overview_pie(frame, left_chunks[0], pass, warn, fail, skip);
-        render_project_tooling_panel(frame, left_chunks[1], report);
+        render_overview_pie(frame, left_chunks[0], pass, warn, fail, skip, app);
+        render_project_tooling_panel(frame, left_chunks[1], report, app);
 
         let header_height = if layout[1].height >= 6 { 4 } else { 2 };
         let right_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(header_height), Constraint::Min(1)])
             .split(layout[1]);
-        render_dashboard_health_panel(frame, right_chunks[0], report, pass, warn, fail, skip);
+        render_dashboard_health_panel(frame, right_chunks[0], report, pass, warn, fail, skip, app);
         right_chunks[1]
     } else {
         let tooling_height = if area.height >= 22 {
@@ -1018,9 +1061,9 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             ])
             .split(area);
         if tooling_height > 0 {
-            render_project_tooling_panel(frame, chunks[0], report);
+            render_project_tooling_panel(frame, chunks[0], report, app);
         }
-        render_dashboard_health_panel(frame, chunks[1], report, pass, warn, fail, skip);
+        render_dashboard_health_panel(frame, chunks[1], report, pass, warn, fail, skip, app);
         chunks[2]
     };
 
@@ -1056,12 +1099,12 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             let res = report.results.get(*tool).unwrap();
             let display = scanner::display_name(tool);
             let label = scanner::status_label(&res.status);
-            let style = status_style(&res.status);
+            let style = status_style(&res.status, &app.theme());
             let ver = scanner::first_version(res);
             let (outdated_str, issues_str) = if cat.name == "Project Tooling" {
-                project_tooling_cells(tool, res)
+                project_tooling_cells(tool, res, app)
             } else {
-                dashboard_cells(tool, res)
+                dashboard_cells(tool, res, app)
             };
             let sel = tool_index == app.ui.dashboard_selection;
             let indicator = if sel { "\u{25b8} " } else { "  " };
@@ -1082,7 +1125,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             if sel {
                 row = row.style(
                     Style::default()
-                        .bg(Color::DarkGray)
+                        .bg(app.theme().text_muted)
                         .add_modifier(Modifier::BOLD),
                 );
             }
@@ -1114,7 +1157,7 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             .iter()
             .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD)),
         )
-        .style(Style::default().bg(Color::Blue).fg(Color::White))
+        .style(Style::default().bg(app.theme().secondary).fg(app.theme().text_normal))
         .height(1);
 
         let table = Table::new(rows, dashboard_table_constraints(table_area.width))
@@ -1124,9 +1167,9 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
                     .borders(Borders::ALL)
                     .title(format!(" {} ", cat.name))
                     .border_style(Style::default().fg(if cat.name == "Project Tooling" {
-                        Color::Magenta
+                        app.theme().secondary
                     } else {
-                        Color::Cyan
+                        app.theme().primary
                     })),
             )
             .column_spacing(1);
@@ -1135,13 +1178,15 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
         category_tables.push(table);
     }
 
-    let constraints: Vec<Constraint> = category_heights
+    let mut constraints: Vec<Constraint> = category_heights
         .iter()
         .map(|h| Constraint::Length(*h))
         .collect();
 
+    constraints.push(Constraint::Length(2));
+
     let total_outdated = scanner::count_outdated(report);
-    if !constraints.is_empty() {
+    if !category_tables.is_empty() {
         let cat_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints(constraints)
@@ -1151,11 +1196,31 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
                 frame.render_widget(table, cat_chunks[i]);
             }
         }
+        
+        if let Some(footer_area) = cat_chunks.last() {
+            if footer_area.height > 0 {
+                let footer = Paragraph::new(Line::from(vec![
+                    Span::styled("🚧 Envexa ", Style::default().fg(app.theme().primary).bold()),
+                    Span::styled(
+                        concat!("v", env!("CARGO_PKG_VERSION")),
+                        Style::default().fg(app.theme().text_normal).bold(),
+                    ),
+                    Span::styled("  •  ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(
+                        "Crafted by Kuruto Denzeru",
+                        Style::default().fg(app.theme().text_muted).add_modifier(Modifier::ITALIC),
+                    ),
+                    Span::raw("  "),
+                ]))
+                .alignment(Alignment::Right);
+                frame.render_widget(footer, *footer_area);
+            }
+        }
     } else if !q.is_empty() && total_outdated > 0 {
         let text = Paragraph::new(Text::from(Line::from(Span::raw(
             "No matches found for filter.",
         ))))
-        .style(Style::default().fg(Color::DarkGray));
+        .style(Style::default().fg(app.theme().text_muted));
         frame.render_widget(text, table_area);
     }
 }
@@ -1166,7 +1231,7 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         None => {
             frame.render_widget(
                 Paragraph::new("No scan data. Press S to scan first.")
-                    .block(Block::default().borders(Borders::ALL)),
+                    .block(Block::default().borders(Borders::ALL).bg(app.theme().background)),
                 area,
             );
             return;
@@ -1185,7 +1250,7 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
     .iter()
     .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
-        .style(Style::default().bg(Color::Blue).fg(Color::White))
+        .style(Style::default().bg(app.theme().secondary).fg(app.theme().text_normal))
         .height(1);
 
     let q = app.ui.search_query.to_lowercase();
@@ -1219,13 +1284,13 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         };
         let text = Paragraph::new(Text::from(vec![
             Line::from(""),
-            Line::from(vec![Span::styled(msg, Style::default().fg(Color::Green))]),
+            Line::from(vec![Span::styled(msg, Style::default().fg(app.theme().success))]),
         ]))
         .block(
             Block::default()
                 .borders(Borders::ALL)
                 .title(" Outdated Packages ")
-                .border_style(Style::default().fg(Color::Green)),
+                .border_style(Style::default().fg(app.theme().success)),
         );
         frame.render_widget(text, area);
         return;
@@ -1249,7 +1314,7 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
             let mut row = Row::new(vec![
                 Cell::from(indicator),
                 Cell::from(tool.as_str()),
-                Cell::from(pkg.source.as_str()).style(source_style(&pkg.source)),
+                Cell::from(pkg.source.as_str()).style(source_style(&pkg.source, &app.theme())),
                 Cell::from(pkg_name),
                 Cell::from(pkg.current.as_str()),
                 Cell::from(pkg.latest.as_str()),
@@ -1258,7 +1323,7 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
             if sel {
                 row = row.style(
                     Style::default()
-                        .bg(Color::DarkGray)
+                        .bg(app.theme().text_muted)
                         .add_modifier(Modifier::BOLD),
                 );
             }
@@ -1281,7 +1346,7 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
             Block::default()
                 .borders(Borders::ALL)
                 .title(title)
-                .border_style(Style::default().fg(Color::Yellow)),
+                .border_style(Style::default().fg(app.theme().warning)),
         )
         .column_spacing(1);
 
@@ -1291,10 +1356,10 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
 fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
     let throbber = throbber_widgets_tui::Throbber::default()
         .label("Scanning all toolchains...")
-        .style(Style::default().fg(Color::Cyan))
+        .style(Style::default().fg(app.theme().primary))
         .throbber_style(
             Style::default()
-                .fg(Color::Cyan)
+                .fg(app.theme().primary)
                 .add_modifier(Modifier::BOLD),
         )
         .throbber_set(throbber_widgets_tui::BRAILLE_EIGHT)
@@ -1303,7 +1368,7 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
     let block = Block::default()
         .borders(Borders::ALL)
         .title(" Envexa ")
-        .border_style(Style::default().fg(Color::Cyan));
+        .border_style(Style::default().fg(app.theme().primary));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -1324,10 +1389,10 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
             let pct = (ratio * 100.0).round() as u64;
             let gauge = Gauge::default()
                 .block(Block::default().borders(Borders::NONE))
-                .gauge_style(Style::default().fg(Color::Cyan))
+                .gauge_style(Style::default().fg(app.theme().primary))
                 .label(Span::styled(
                     format!(" scanning... {}% ", pct),
-                    Style::default().fg(Color::White).bold(),
+                    Style::default().fg(app.theme().text_normal).bold(),
                 ))
                 .ratio(ratio);
             frame.render_widget(gauge, chunks[2]);
@@ -1341,12 +1406,12 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
             // Step 1: Project Environment (started at step 0)
             if step > 0 {
                 let sym = if step < 10 { spin_char } else { "✔" };
-                let color = if step < 10 { Color::Cyan } else { Color::Green };
+                let color = if step < 10 { app.theme().primary } else { app.theme().success };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
                     Span::styled(
                         "Checking project environment & lockfiles...",
-                        Style::default().fg(Color::White),
+                        Style::default().fg(app.theme().text_normal),
                     ),
                 ]));
             }
@@ -1354,12 +1419,12 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
             // Step 2: Homebrew (started at step 10)
             if step >= 10 {
                 let sym = if step < 22 { spin_char } else { "✔" };
-                let color = if step < 22 { Color::Cyan } else { Color::Green };
+                let color = if step < 22 { app.theme().primary } else { app.theme().success };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
                     Span::styled(
                         "Auditing system runtimes & Homebrew formulas...",
-                        Style::default().fg(Color::White),
+                        Style::default().fg(app.theme().text_normal),
                     ),
                 ]));
             }
@@ -1367,12 +1432,12 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
             // Step 3: Web Runtimes (started at step 22)
             if step >= 22 {
                 let sym = if step < 35 { spin_char } else { "✔" };
-                let color = if step < 35 { Color::Cyan } else { Color::Green };
+                let color = if step < 35 { app.theme().primary } else { app.theme().success };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
                     Span::styled(
                         "Scanning Web Development runtimes (npm, pnpm, Bun, Deno)...",
-                        Style::default().fg(Color::White),
+                        Style::default().fg(app.theme().text_normal),
                     ),
                 ]));
             }
@@ -1380,12 +1445,12 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
             // Step 4: Cargo / pip / gem (started at step 35)
             if step >= 35 {
                 let sym = if step < 48 { spin_char } else { "✔" };
-                let color = if step < 48 { Color::Cyan } else { Color::Green };
+                let color = if step < 48 { app.theme().primary } else { app.theme().success };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
                     Span::styled(
                         "Checking compiler dependencies (cargo-outdated, pip, gem)...",
-                        Style::default().fg(Color::White),
+                        Style::default().fg(app.theme().text_normal),
                     ),
                 ]));
             }
@@ -1393,12 +1458,12 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
             // Step 5: Security Advisory (started at step 48)
             if step >= 48 {
                 let sym = if step < 62 { spin_char } else { "✔" };
-                let color = if step < 62 { Color::Cyan } else { Color::Green };
+                let color = if step < 62 { app.theme().primary } else { app.theme().success };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
                     Span::styled(
                         "Running security advisory audits (RustSec, npm audit, pip-audit)...",
-                        Style::default().fg(Color::White),
+                        Style::default().fg(app.theme().text_normal),
                     ),
                 ]));
             }
@@ -1406,12 +1471,12 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
             // Step 6: Docker / Cleanup (started at step 62)
             if step >= 62 {
                 let sym = if step < 75 { spin_char } else { "✔" };
-                let color = if step < 75 { Color::Cyan } else { Color::Green };
+                let color = if step < 75 { app.theme().primary } else { app.theme().success };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
                     Span::styled(
                         "Checking Docker daemons & local cache reclaimables...",
-                        Style::default().fg(Color::White),
+                        Style::default().fg(app.theme().text_normal),
                     ),
                 ]));
             }
@@ -1421,11 +1486,11 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
                 log_lines.push(Line::from(vec![
                     Span::styled(
                         format!("  {} ", spin_char),
-                        Style::default().fg(Color::Cyan).bold(),
+                        Style::default().fg(app.theme().primary).bold(),
                     ),
                     Span::styled(
                         "Compiling final health reports and consolidating cache...",
-                        Style::default().fg(Color::White),
+                        Style::default().fg(app.theme().text_normal),
                     ),
                 ]));
             }
@@ -1445,7 +1510,7 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
             log_lines.push(Line::from(""));
             log_lines.push(Line::from(vec![Span::styled(
                 format!("  {}", current_tip),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(app.theme().text_muted),
             )]));
 
             frame.render_widget(Paragraph::new(log_lines), chunks[3]);
@@ -1457,8 +1522,10 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
 
 pub fn render(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
+    frame.render_widget(Block::default().bg(app.theme().background), area);
+
     if area.width < 16 || area.height < 4 {
-        render_minimal(frame, area, "Envexa");
+        render_minimal(frame, area, "Envexa", app);
         return;
     }
 
@@ -1493,9 +1560,156 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     match app.ui.view {
         View::Dashboard => render_dashboard(frame, chunks[4], app),
         View::Outdated => render_outdated(frame, chunks[4], app),
+        View::Settings => render_settings(frame, chunks[4], app),
         View::Scanning => render_scanning(frame, chunks[4], app),
         View::PackageDetail => render_package_detail(frame, chunks[4], app),
         View::Updating => render_updating(frame, chunks[4], app),
+    }
+}
+
+fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
+    let items = [
+        (
+            "Cache TTL (Minutes)",
+            format!("{}m", app.config.cache_ttl_minutes),
+        ),
+        (
+            "Auto-Scan on Startup",
+            if app.config.auto_scan_on_startup {
+                "On"
+            } else {
+                "Off"
+            }
+            .to_string(),
+        ),
+        ("Theme", app.config.theme.clone()),
+        (
+            "Verbose Logs",
+            if app.config.verbose_logs { "On" } else { "Off" }.to_string(),
+        ),
+    ];
+
+    let mut rows = Vec::new();
+    for (i, (label, val)) in items.iter().enumerate() {
+        let sel = i == app.ui.settings_selection;
+        let bg = if sel { app.theme().text_muted } else { Color::Reset };
+        let fg = if sel { app.theme().text_normal } else { Color::Gray };
+
+        let row = Row::new(vec![
+            Cell::from(if sel { " \u{25B6} " } else { "   " }),
+            Cell::from(*label),
+            Cell::from(val.clone()),
+        ])
+        .style(Style::default().bg(bg).fg(fg))
+        .height(2);
+        rows.push(row);
+    }
+
+    let widths = [
+        Constraint::Length(4),
+        Constraint::Percentage(40),
+        Constraint::Percentage(60),
+    ];
+
+    let theme_color = match app.config.theme.as_str() {
+        "dark" => app.theme().text_muted,
+        "light" => app.theme().text_normal,
+        _ => app.theme().secondary,
+    };
+
+    let table = Table::new(rows, widths)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Application Settings ")
+                .border_style(Style::default().fg(theme_color)),
+        )
+        .column_spacing(1);
+
+    frame.render_widget(table, area);
+
+    if app.ui.settings_edit_mode {
+        let opts = app.get_settings_options();
+        let items: Vec<ListItem> = opts
+            .iter()
+            .enumerate()
+            .map(|(i, val)| {
+                let is_selected = i == app.ui.settings_edit_selection;
+                let bg = if is_selected { app.theme().text_muted } else { Color::Reset };
+                let fg = if is_selected { app.theme().text_normal } else { Color::Gray };
+                let prefix = if is_selected { " \u{25B6} " } else { "   " };
+                
+                let desc = match app.ui.settings_selection {
+                    0 => match val.as_str() {
+                        "5m" => "Aggressive caching, frequent scans",
+                        "15m" => "Balanced caching, recommended",
+                        "30m" => "Long caching, saves resources",
+                        "60m" => "Very long caching, for slow networks",
+                        _ => "",
+                    },
+                    1 => match val.as_str() {
+                        "On" => "Automatically scan when the app starts",
+                        "Off" => "Wait for manual scan command",
+                        _ => "",
+                    },
+                    2 => match val.as_str() {
+                        "default" => "Envexa standard colors",
+                        "dark" => "Plain dark theme",
+                        "light" => "Plain light theme",
+                        "dracula" => "Vibrant dark theme",
+                        "nord" => "Arctic, north-bluish colors",
+                        "monokai" => "High-contrast dark theme",
+                        "solarized-dark" => "Low-contrast dark theme",
+                        "oceanic" => "Oceanic dark colors",
+                        _ => "",
+                    },
+                    3 => match val.as_str() {
+                        "On" => "Show detailed background logs",
+                        "Off" => "Hide detailed logs",
+                        _ => "",
+                    },
+                    _ => "",
+                };
+
+                let mut lines = vec![
+                    Line::from(vec![
+                        Span::styled(format!("{}{}", prefix, val), Style::default().add_modifier(Modifier::BOLD)),
+                    ]),
+                ];
+                if !desc.is_empty() {
+                    lines.push(Line::from(vec![
+                        Span::raw("    "),
+                        Span::styled(desc, Style::default().fg(if is_selected { app.theme().text_normal } else { app.theme().text_muted })),
+                    ]));
+                }
+
+                ListItem::new(lines).style(Style::default().bg(bg).fg(fg))
+            })
+            .collect();
+
+        let popup_area = centered_rect(50, 50, area);
+        let title = match app.ui.settings_selection {
+            0 => " Cache TTL ",
+            1 => " Auto-Scan ",
+            2 => " Theme ",
+            3 => " Verbose Logs ",
+            _ => " Options ",
+        };
+
+        let list = List::new(items)
+            .block(
+                Block::default()
+                    .title(title)
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(app.theme().primary))
+                    .bg(app.theme().background),
+            );
+
+        frame.render_widget(Clear, popup_area);
+        
+        let mut state = ListState::default();
+        state.select(Some(app.ui.settings_edit_selection));
+        frame.render_stateful_widget(list, popup_area, &mut state);
     }
 }
 
@@ -1520,14 +1734,14 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(" {tool} — Outdated Packages (0) "))
-            .border_style(Style::default().fg(Color::Green));
+            .border_style(Style::default().fg(app.theme().success));
         let text = Paragraph::new(Text::from(vec![
             Line::from(""),
             Line::from(vec![
-                Span::styled("  \u{2714} ", Style::default().fg(Color::Green).bold()),
+                Span::styled("  \u{2714} ", Style::default().fg(app.theme().success).bold()),
                 Span::styled(
                     "All packages are completely up to date!",
-                    Style::default().fg(Color::White),
+                    Style::default().fg(app.theme().text_normal),
                 ),
             ]),
         ]))
@@ -1540,7 +1754,7 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
-        .style(Style::default().bg(Color::Blue).fg(Color::White))
+        .style(Style::default().bg(app.theme().secondary).fg(app.theme().text_normal))
         .height(1);
 
     let rows: Vec<Row> = items
@@ -1558,7 +1772,7 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             let mut row = Row::new(vec![
                 Cell::from(indicator),
                 Cell::from(item.name.as_str()),
-                Cell::from(item.source.as_str()).style(source_style(&item.source)),
+                Cell::from(item.source.as_str()).style(source_style(&item.source, &app.theme())),
                 Cell::from(item.current.as_str()),
                 Cell::from(item.latest.as_str()),
                 Cell::from(item.size.as_str()),
@@ -1566,7 +1780,7 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             if sel {
                 row = row.style(
                     Style::default()
-                        .bg(Color::DarkGray)
+                        .bg(app.theme().text_muted)
                         .add_modifier(Modifier::BOLD),
                 );
             }
@@ -1587,11 +1801,13 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
                 .borders(Borders::ALL)
                 .title(format!(" {tool} — Outdated Packages ({}) ", items.len()))
                 .title_bottom(sub)
-                .border_style(Style::default().fg(Color::Cyan)),
+                .border_style(Style::default().fg(app.theme().primary)),
         )
         .column_spacing(1);
 
-    frame.render_widget(table, area);
+    let mut state = TableState::default();
+    state.select(Some(app.detail.selection));
+    frame.render_stateful_widget(table, area, &mut state);
 }
 
 fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
@@ -1601,14 +1817,14 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(" {tool} — Vulnerabilities (0) "))
-            .border_style(Style::default().fg(Color::Green));
+            .border_style(Style::default().fg(app.theme().success));
         let text = Paragraph::new(Text::from(vec![
             Line::from(""),
             Line::from(vec![
-                Span::styled("  \u{2714} ", Style::default().fg(Color::Green).bold()),
+                Span::styled("  \u{2714} ", Style::default().fg(app.theme().success).bold()),
                 Span::styled(
                     "No security vulnerabilities detected!",
-                    Style::default().fg(Color::White),
+                    Style::default().fg(app.theme().text_normal),
                 ),
             ]),
         ]))
@@ -1621,7 +1837,7 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
-        .style(Style::default().bg(Color::Blue).fg(Color::White))
+        .style(Style::default().bg(app.theme().secondary).fg(app.theme().text_normal))
         .height(1);
 
     let rows: Vec<Row> = items
@@ -1632,7 +1848,7 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             let cve = v.cve.as_deref().unwrap_or("-");
             let mut row = Row::new(vec![
                 Cell::from(v.package.as_str()),
-                Cell::from(v.severity.as_str()).style(severity_style(&v.severity)),
+                Cell::from(v.severity.as_str()).style(severity_style(&v.severity, &app.theme())),
                 Cell::from(cve),
                 Cell::from(v.title.as_str()),
                 Cell::from(v.patched_version.as_str()),
@@ -1640,7 +1856,7 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             if sel {
                 row = row.style(
                     Style::default()
-                        .bg(Color::DarkGray)
+                        .bg(app.theme().text_muted)
                         .add_modifier(Modifier::BOLD),
                 );
             }
@@ -1661,7 +1877,7 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         .borders(Borders::ALL)
         .title(format!(" {tool} — Vulnerabilities ({}) ", items.len()))
         .title_bottom(bottom_msg)
-        .border_style(Style::default().fg(Color::Red));
+        .border_style(Style::default().fg(app.theme().error));
 
     // Responsive 2-column layout
     if area.width >= 100 && area.height >= 8 {
@@ -1678,7 +1894,9 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             .header(header)
             .block(table_block)
             .column_spacing(1);
-        frame.render_widget(table, left_area);
+        let mut state = TableState::default();
+        state.select(Some(app.detail.selection));
+        frame.render_stateful_widget(table, left_area, &mut state);
 
         // Draw Right Stats and Detail Panel
         let right_chunks = Layout::default()
@@ -1692,44 +1910,44 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             .saturating_sub(crit * 25 + high * 10 + mod_cnt * 5)
             .clamp(0, 100) as u16;
         let score_color = if score >= 90 {
-            Color::Green
+            app.theme().success
         } else if score >= 70 {
-            Color::Yellow
+            app.theme().warning
         } else {
-            Color::Red
+            app.theme().error
         };
 
         let gauge = LineGauge::default()
             .block(Block::default().title(" Security Health Score "))
             .filled_style(Style::default().fg(score_color))
-            .unfilled_style(Style::default().fg(Color::DarkGray))
+            .unfilled_style(Style::default().fg(app.theme().text_muted))
             .ratio(score as f64 / 100.0);
 
         let overview_text = vec![Line::from(vec![
-            Span::styled("Critical: ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Critical: ", Style::default().fg(app.theme().text_muted)),
             Span::styled(
                 format!("{} ", crit),
-                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                Style::default().fg(app.theme().error).add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" High: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" High: ", Style::default().fg(app.theme().text_muted)),
             Span::styled(
                 format!("{} ", high),
                 Style::default()
                     .fg(Color::LightRed)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" Mod: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Mod: ", Style::default().fg(app.theme().text_muted)),
             Span::styled(
                 format!("{} ", mod_cnt),
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(app.theme().warning)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" Low: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Low: ", Style::default().fg(app.theme().text_muted)),
             Span::styled(
                 format!("{} ", other),
                 Style::default()
-                    .fg(Color::Blue)
+                    .fg(app.theme().secondary)
                     .add_modifier(Modifier::BOLD),
             ),
         ])];
@@ -1737,7 +1955,7 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         let overview_block = Block::default()
             .borders(Borders::ALL)
             .title(" Security Scorecard ")
-            .border_style(Style::default().fg(Color::Magenta));
+            .border_style(Style::default().fg(app.theme().secondary));
 
         let overview_inner = overview_block.inner(right_chunks[0]);
         frame.render_widget(overview_block, right_chunks[0]);
@@ -1756,41 +1974,41 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         if let Some(vuln) = items.get(app.detail.selection) {
             let cve = vuln.cve.as_deref().unwrap_or("None");
             let card_border_color = match vuln.severity.to_ascii_lowercase().as_str() {
-                "critical" => Color::Red,
+                "critical" => app.theme().error,
                 "high" => Color::LightRed,
-                "moderate" | "medium" => Color::Yellow,
-                "low" => Color::Blue,
-                _ => Color::DarkGray,
+                "moderate" | "medium" => app.theme().warning,
+                "low" => app.theme().secondary,
+                _ => app.theme().text_muted,
             };
 
             let lines = vec![
                 Line::from(vec![
-                    Span::styled("Package: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Package: ", Style::default().fg(app.theme().text_muted)),
                     Span::styled(
                         &vuln.package,
                         Style::default()
-                            .fg(Color::White)
+                            .fg(app.theme().text_normal)
                             .add_modifier(Modifier::BOLD),
                     ),
                 ]),
                 Line::from(vec![
-                    Span::styled("Severity: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(&vuln.severity, severity_style(&vuln.severity)),
+                    Span::styled("Severity: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(&vuln.severity, severity_style(&vuln.severity, &app.theme())),
                 ]),
                 Line::from(vec![
-                    Span::styled("CVE ID: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(cve, Style::default().fg(Color::Cyan)),
+                    Span::styled("CVE ID: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(cve, Style::default().fg(app.theme().primary)),
                 ]),
                 Line::from(vec![
-                    Span::styled("Patched: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(&vuln.patched_version, Style::default().fg(Color::Green)),
+                    Span::styled("Patched: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(&vuln.patched_version, Style::default().fg(app.theme().success)),
                 ]),
                 Line::from(""),
                 Line::from(Span::styled(
                     "Title / Description:",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(app.theme().text_muted),
                 )),
-                Line::from(Span::styled(&vuln.title, Style::default().fg(Color::White))),
+                Line::from(Span::styled(&vuln.title, Style::default().fg(app.theme().text_normal))),
             ];
 
             let detail_card = Paragraph::new(lines)
@@ -1817,7 +2035,9 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             .header(header)
             .block(table_block)
             .column_spacing(1);
-        frame.render_widget(table, area);
+        let mut state = TableState::default();
+        state.select(Some(app.detail.selection));
+        frame.render_stateful_widget(table, area, &mut state);
     }
 }
 
@@ -1828,14 +2048,14 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(" {tool} — Audit Items (0) "))
-            .border_style(Style::default().fg(Color::Green));
+            .border_style(Style::default().fg(app.theme().success));
         let text = Paragraph::new(Text::from(vec![
             Line::from(""),
             Line::from(vec![
-                Span::styled("  \u{2714} ", Style::default().fg(Color::Green).bold()),
+                Span::styled("  \u{2714} ", Style::default().fg(app.theme().success).bold()),
                 Span::styled(
                     "System and toolchains are aligned! No issues flagged.",
-                    Style::default().fg(Color::White),
+                    Style::default().fg(app.theme().text_normal),
                 ),
             ]),
         ]))
@@ -1848,7 +2068,7 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
-        .style(Style::default().bg(Color::Blue).fg(Color::White))
+        .style(Style::default().bg(app.theme().secondary).fg(app.theme().text_normal))
         .height(1);
 
     let rows: Vec<Row> = items
@@ -1864,7 +2084,7 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
             if sel {
                 row = row.style(
                     Style::default()
-                        .bg(Color::DarkGray)
+                        .bg(app.theme().text_muted)
                         .add_modifier(Modifier::BOLD),
                 );
             }
@@ -1885,7 +2105,7 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         .borders(Borders::ALL)
         .title(format!(" {tool} — Audit Items ({}) ", items.len()))
         .title_bottom(bottom_msg)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(app.theme().warning));
 
     // Responsive 2-column layout
     if area.width >= 100 && area.height >= 8 {
@@ -1902,7 +2122,9 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
             .header(header)
             .block(table_block)
             .column_spacing(1);
-        frame.render_widget(table, left_area);
+        let mut state = TableState::default();
+        state.select(Some(app.detail.selection));
+        frame.render_stateful_widget(table, left_area, &mut state);
 
         // Draw Right Stats and Detail Panel
         let right_chunks = Layout::default()
@@ -1913,17 +2135,17 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         // Right Top: Alignment meter with LineGauge
         let alignment_score = 100_usize.saturating_sub(items.len() * 20).clamp(0, 100) as u16;
         let gauge_color = if alignment_score >= 80 {
-            Color::Green
+            app.theme().success
         } else if alignment_score >= 50 {
-            Color::Yellow
+            app.theme().warning
         } else {
-            Color::Red
+            app.theme().error
         };
 
         let gauge = LineGauge::default()
             .block(Block::default().title(" System Alignment Score "))
             .filled_style(Style::default().fg(gauge_color))
-            .unfilled_style(Style::default().fg(Color::DarkGray))
+            .unfilled_style(Style::default().fg(app.theme().text_muted))
             .ratio(alignment_score as f64 / 100.0);
 
         frame.render_widget(gauge, right_chunks[0]);
@@ -1932,24 +2154,24 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         if let Some(audit) = items.get(app.detail.selection) {
             let lines = vec![
                 Line::from(vec![
-                    Span::styled("Audit Rule: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Audit Rule: ", Style::default().fg(app.theme().text_muted)),
                     Span::styled(
                         &audit.name,
                         Style::default()
-                            .fg(Color::White)
+                            .fg(app.theme().text_normal)
                             .add_modifier(Modifier::BOLD),
                     ),
                 ]),
                 Line::from(vec![
-                    Span::styled("Current State: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(&audit.current, Style::default().fg(Color::Yellow)),
+                    Span::styled("Current State: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(&audit.current, Style::default().fg(app.theme().warning)),
                 ]),
                 Line::from(""),
                 Line::from(Span::styled(
                     "Recommendation / Note:",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(app.theme().text_muted),
                 )),
-                Line::from(Span::styled(&audit.note, Style::default().fg(Color::White))),
+                Line::from(Span::styled(&audit.note, Style::default().fg(app.theme().text_normal))),
             ];
 
             let detail_card = Paragraph::new(lines)
@@ -1958,7 +2180,7 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
                     Block::default()
                         .borders(Borders::ALL)
                         .title(" Recommendation Detail ")
-                        .border_style(Style::default().fg(Color::Yellow)),
+                        .border_style(Style::default().fg(app.theme().warning)),
                 );
 
             frame.render_widget(detail_card, right_chunks[1]);
@@ -1976,7 +2198,9 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
             .header(header)
             .block(table_block)
             .column_spacing(1);
-        frame.render_widget(table, area);
+        let mut state = TableState::default();
+        state.select(Some(app.detail.selection));
+        frame.render_stateful_widget(table, area, &mut state);
     }
 }
 
@@ -2030,15 +2254,15 @@ fn get_cleanup_label(item: &crate::toolchains::CleanupItem) -> String {
     }
 }
 
-fn get_label_color(label: &str) -> Color {
+fn get_label_color(label: &str, theme: &Theme) -> Color {
     match label {
-        "NPM" => Color::Red,
+        "NPM" => theme.error,
         "Cargo" => Color::LightRed,
-        "Bun" => Color::Yellow,
-        "Pip" => Color::Green,
-        "Docker" => Color::Blue,
-        "Homebrew" => Color::Magenta,
-        _ => Color::Cyan,
+        "Bun" => theme.warning,
+        "Pip" => theme.success,
+        "Docker" => theme.secondary,
+        "Homebrew" => theme.secondary,
+        _ => theme.primary,
     }
 }
 
@@ -2049,14 +2273,14 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(" {tool} — Cleanup (0) "))
-            .border_style(Style::default().fg(Color::Green));
+            .border_style(Style::default().fg(app.theme().success));
         let text = Paragraph::new(Text::from(vec![
             Line::from(""),
             Line::from(vec![
-                Span::styled("  \u{2714} ", Style::default().fg(Color::Green).bold()),
+                Span::styled("  \u{2714} ", Style::default().fg(app.theme().success).bold()),
                 Span::styled(
                     "Your environment is fully clean! No cache cleanup needed.",
-                    Style::default().fg(Color::White),
+                    Style::default().fg(app.theme().text_normal),
                 ),
             ]),
         ]))
@@ -2069,7 +2293,7 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
-        .style(Style::default().bg(Color::Blue).fg(Color::White))
+        .style(Style::default().bg(app.theme().secondary).fg(app.theme().text_normal))
         .height(1);
 
     let rows: Vec<Row> = items
@@ -2096,7 +2320,7 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
             if sel {
                 row = row.style(
                     Style::default()
-                        .bg(Color::DarkGray)
+                        .bg(app.theme().text_muted)
                         .add_modifier(Modifier::BOLD),
                 );
             }
@@ -2107,7 +2331,7 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
     let block = Block::default()
         .borders(Borders::ALL)
         .title(format!(" {tool} — Cleanup ({}) ", items.len()))
-        .border_style(Style::default().fg(Color::Green));
+        .border_style(Style::default().fg(app.theme().success));
 
     let inner_area = block.inner(area);
 
@@ -2147,13 +2371,13 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         let mut slices = Vec::new();
         for (i, (label, mb)) in sorted_categories.iter().enumerate() {
             if *mb > 0.0 {
-                let color = get_label_color(label);
+                let color = get_label_color(label, &app.theme());
                 slices.push(PieSlice::new(&slice_labels[i], *mb, color));
             }
         }
 
         if slices.is_empty() {
-            slices.push(PieSlice::new("EMPTY", 1.0, Color::DarkGray));
+            slices.push(PieSlice::new("EMPTY", 1.0, app.theme().text_muted));
         }
 
         let piechart = PieChart::new(slices)
@@ -2167,20 +2391,24 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
                 Block::default()
                     .borders(Borders::ALL)
                     .title(" Heatmap ")
-                    .border_style(Style::default().fg(Color::Cyan)),
+                    .border_style(Style::default().fg(app.theme().primary)),
             );
         frame.render_widget(piechart, chunks[0]);
 
         let table = Table::new(rows, detail_table_constraints(chunks[1].width, "cleanup"))
             .header(header)
             .column_spacing(1);
-        frame.render_widget(table, chunks[1]);
+        let mut state = TableState::default();
+        state.select(Some(app.detail.selection));
+        frame.render_stateful_widget(table, chunks[1], &mut state);
     } else {
         let table = Table::new(rows, detail_table_constraints(area.width, "cleanup"))
             .header(header)
             .block(block)
             .column_spacing(1);
-        frame.render_widget(table, area);
+        let mut state = TableState::default();
+        state.select(Some(app.detail.selection));
+        frame.render_stateful_widget(table, area, &mut state);
     }
 }
 
@@ -2198,10 +2426,10 @@ fn render_updating(frame: &mut Frame, area: Rect, app: &mut App) {
 
     let throbber = throbber_widgets_tui::Throbber::default()
         .label(label)
-        .style(Style::default().fg(Color::Green))
+        .style(Style::default().fg(app.theme().success))
         .throbber_style(
             Style::default()
-                .fg(Color::Green)
+                .fg(app.theme().success)
                 .add_modifier(Modifier::BOLD),
         )
         .throbber_set(throbber_widgets_tui::BRAILLE_EIGHT)
@@ -2210,7 +2438,7 @@ fn render_updating(frame: &mut Frame, area: Rect, app: &mut App) {
     let block = Block::default()
         .borders(Borders::ALL)
         .title(" Updating ")
-        .border_style(Style::default().fg(Color::Green));
+        .border_style(Style::default().fg(app.theme().success));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -2231,10 +2459,10 @@ fn render_updating(frame: &mut Frame, area: Rect, app: &mut App) {
             let pct = (ratio * 100.0).round() as u64;
             let gauge = Gauge::default()
                 .block(Block::default().borders(Borders::NONE))
-                .gauge_style(Style::default().fg(Color::Green))
+                .gauge_style(Style::default().fg(app.theme().success))
                 .label(Span::styled(
                     format!(" updating... {}% ", pct),
-                    Style::default().fg(Color::White).bold(),
+                    Style::default().fg(app.theme().text_normal).bold(),
                 ))
                 .ratio(ratio);
             frame.render_widget(gauge, chunks[2]);
@@ -2242,32 +2470,32 @@ fn render_updating(frame: &mut Frame, area: Rect, app: &mut App) {
             if chunks[3].height >= 3 {
                 let tip_block = Block::default()
                     .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::DarkGray))
+                    .border_style(Style::default().fg(app.theme().text_muted))
                     .title(" Loading Tip ")
-                    .title_style(Style::default().fg(Color::Yellow).bold());
+                    .title_style(Style::default().fg(app.theme().warning).bold());
 
                 let mut tip_lines = vec![Line::from(vec![
-                    Span::styled("💡 Tip: ", Style::default().fg(Color::Yellow).bold()),
+                    Span::styled("💡 Tip: ", Style::default().fg(app.theme().warning).bold()),
                     Span::raw("Downloading updates can take a moment depending on your network connection."),
                 ])];
 
                 if app.ui.update_downloaded_mb > 0.0 {
                     tip_lines.push(Line::from(vec![
-                        Span::styled("⤓ Progress: ", Style::default().fg(Color::Cyan).bold()),
+                        Span::styled("⤓ Progress: ", Style::default().fg(app.theme().primary).bold()),
                         Span::styled(
                             format!(
                                 "{:.2} MB downloaded so far for {}",
                                 app.ui.update_downloaded_mb, app.ui.update_package_name
                             ),
-                            Style::default().fg(Color::White).bold(),
+                            Style::default().fg(app.theme().text_normal).bold(),
                         ),
                     ]));
                 } else if !app.ui.update_package_name.is_empty() {
                     tip_lines.push(Line::from(vec![
-                        Span::styled("⚡ Active: ", Style::default().fg(Color::Cyan).bold()),
+                        Span::styled("⚡ Active: ", Style::default().fg(app.theme().primary).bold()),
                         Span::styled(
                             format!("Installing/updating {}...", app.ui.update_package_name),
-                            Style::default().fg(Color::White),
+                            Style::default().fg(app.theme().text_normal),
                         ),
                     ]));
                 }
