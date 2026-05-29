@@ -305,7 +305,8 @@ impl App {
                                         self.ui.checked_outdated.insert(self.ui.outdated_selection);
                                     }
                                 } else if matches!(self.ui.view, View::Settings) {
-                                    if self.ui.settings_selection == 5 {
+                                    if self.ui.settings_edit_mode && self.ui.settings_selection == 5
+                                    {
                                         self.toggle_scanner();
                                         let _ = config::save_config(&self.config);
                                     } else if self.ui.settings_edit_mode {
@@ -323,7 +324,11 @@ impl App {
                                 self.ui.outdated_selection = 0;
                             }
                             KeyCode::Right | KeyCode::Char('l') => {
-                                self.ui.tab_index = (self.ui.tab_index + 1) % 3;
+                                if !(matches!(self.ui.view, View::Settings)
+                                    && self.ui.settings_edit_mode)
+                                {
+                                    self.ui.tab_index = (self.ui.tab_index + 1) % 3;
+                                }
                                 self.ui.view = match self.ui.tab_index {
                                     0 => View::Dashboard,
                                     1 => View::Outdated,
@@ -331,11 +336,15 @@ impl App {
                                 };
                             }
                             KeyCode::Left | KeyCode::Char('h') => {
-                                self.ui.tab_index = if self.ui.tab_index == 0 {
-                                    2
-                                } else {
-                                    self.ui.tab_index - 1
-                                };
+                                if !(matches!(self.ui.view, View::Settings)
+                                    && self.ui.settings_edit_mode)
+                                {
+                                    self.ui.tab_index = if self.ui.tab_index == 0 {
+                                        2
+                                    } else {
+                                        self.ui.tab_index - 1
+                                    };
+                                }
                                 self.ui.view = match self.ui.tab_index {
                                     0 => View::Dashboard,
                                     1 => View::Outdated,
@@ -918,19 +927,19 @@ impl App {
                 self.detail.selection = self.detail.selection.saturating_add(1).min(n);
             }
             View::Settings => {
-                if self.ui.settings_edit_mode {
+                if self.ui.settings_edit_mode && self.ui.settings_selection == 5 {
+                    self.ui.settings_scanner_focus = self
+                        .ui
+                        .settings_scanner_focus
+                        .saturating_add(1)
+                        .min(ALL_SCANNERS.len().saturating_sub(1));
+                } else if self.ui.settings_edit_mode {
                     let opts_len = self.get_settings_options().len().saturating_sub(1);
                     self.ui.settings_edit_selection = self
                         .ui
                         .settings_edit_selection
                         .saturating_add(1)
                         .min(opts_len);
-                } else if self.ui.settings_selection == 5 {
-                    self.ui.settings_scanner_focus = self
-                        .ui
-                        .settings_scanner_focus
-                        .saturating_add(1)
-                        .min(ALL_SCANNERS.len().saturating_sub(1));
                 } else {
                     self.ui.settings_selection =
                         self.ui.settings_selection.saturating_add(1).min(8);
@@ -950,12 +959,12 @@ impl App {
             }
             View::Scanning => {}
             View::Settings => {
-                if self.ui.settings_edit_mode {
-                    self.ui.settings_edit_selection =
-                        self.ui.settings_edit_selection.saturating_sub(1);
-                } else if self.ui.settings_selection == 5 {
+                if self.ui.settings_edit_mode && self.ui.settings_selection == 5 {
                     self.ui.settings_scanner_focus =
                         self.ui.settings_scanner_focus.saturating_sub(1);
+                } else if self.ui.settings_edit_mode {
+                    self.ui.settings_edit_selection =
+                        self.ui.settings_edit_selection.saturating_sub(1);
                 } else {
                     self.ui.settings_selection = self.ui.settings_selection.saturating_sub(1);
                 }
@@ -1064,6 +1073,7 @@ impl App {
 
     pub fn enter_settings_edit_mode(&mut self) {
         if self.ui.settings_selection == 5 {
+            self.ui.settings_edit_mode = true;
             return;
         }
         let opts = self.get_settings_options();

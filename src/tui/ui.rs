@@ -1707,7 +1707,7 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
 
     frame.render_widget(table, area);
 
-    if app.ui.settings_selection == 5 {
+    if app.ui.settings_edit_mode && app.ui.settings_selection == 5 {
         let scanner_area = Rect {
             x: area.x + 2,
             y: area.y + 2,
