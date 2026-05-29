@@ -1831,6 +1831,12 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
                         "monokai" => "High-contrast dark theme",
                         "solarized-dark" => "Low-contrast dark theme",
                         "oceanic" => "Oceanic dark colors",
+                        "catppuccin-mocha" => "Warm dark theme with muted pastels",
+                        "catppuccin-latte" => "Warm light theme with soft pastels",
+                        "gruvbox-dark" => "Retro dark with warm orange tones",
+                        "gruvbox-light" => "Retro light with warm orange tones",
+                        "tokyo-night" => "Deep blue-heavy night theme",
+                        "rose-pine" => "Calm pine forest dark theme",
                         _ => "",
                     },
                     8 => match val.as_str() {
