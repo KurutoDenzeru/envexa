@@ -1,7 +1,8 @@
 [package]
 name = "envexa"
-version = "2.5.1"
+version = "2.5.2"
 edition = "2021"
+authors = ["Kurt Calacday <kurtcalacday15@gmail.com>"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

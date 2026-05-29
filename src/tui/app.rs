@@ -339,7 +339,9 @@ impl App {
                                     self.ui.tab_index = 0;
                                 }
                             }
-                            KeyCode::Char('s') | KeyCode::Char('S') => {
+                            KeyCode::Char('s') | KeyCode::Char('S')
+                                if !matches!(self.ui.view, View::Scanning | View::Updating) =>
+                            {
                                 self.ui.search_mode = false;
                                 self.ui.search_query.clear();
                                 self.do_scan(tx.clone())?;
