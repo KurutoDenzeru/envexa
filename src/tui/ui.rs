@@ -127,6 +127,21 @@ fn title_bar(frame: &mut Frame, area: Rect, app: &App) {
                 concat!("v", env!("CARGO_PKG_VERSION")),
                 Style::default().fg(app.theme().text_muted),
             ),
+            Span::raw("  "),
+            Span::styled(
+                app.config
+                    .project_path
+                    .clone()
+                    .map(|p| {
+                        if p == get_cwd_display() {
+                            String::new()
+                        } else {
+                            p
+                        }
+                    })
+                    .unwrap_or_default(),
+                Style::default().fg(app.theme().text_muted),
+            ),
         ]))
         .alignment(Alignment::Center)
         .block(
@@ -153,9 +168,22 @@ fn title_bar(frame: &mut Frame, area: Rect, app: &App) {
         .style(Style::default().fg(app.theme().primary));
     frame.render_widget(art, chunks[1]);
 
+    let path_label = app
+        .config
+        .project_path
+        .clone()
+        .map(|p| {
+            if p == get_cwd_display() {
+                p
+            } else {
+                format!("Project: {}", p)
+            }
+        })
+        .unwrap_or_else(get_cwd_display);
+
     frame.render_widget(
         Paragraph::new(Line::from(vec![Span::styled(
-            get_cwd_display(),
+            path_label,
             Style::default().fg(app.theme().text_muted),
         )]))
         .alignment(Alignment::Center),
