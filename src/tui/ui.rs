@@ -75,7 +75,9 @@ fn status_color(status: &str, theme: &Theme) -> Color {
 
 fn severity_style(severity: &str, theme: &Theme) -> Style {
     match severity.to_ascii_lowercase().as_str() {
-        "critical" => Style::default().fg(theme.error).add_modifier(Modifier::BOLD),
+        "critical" => Style::default()
+            .fg(theme.error)
+            .add_modifier(Modifier::BOLD),
         "high" => Style::default().fg(theme.error),
         "moderate" | "medium" => Style::default().fg(theme.warning),
         "low" => Style::default().fg(theme.secondary),
@@ -152,9 +154,10 @@ fn title_bar(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(art, chunks[1]);
 
     frame.render_widget(
-        Paragraph::new(Line::from(vec![
-            Span::styled(get_cwd_display(), Style::default().fg(app.theme().text_muted)),
-        ]))
+        Paragraph::new(Line::from(vec![Span::styled(
+            get_cwd_display(),
+            Style::default().fg(app.theme().text_muted),
+        )]))
         .alignment(Alignment::Center),
         chunks[2],
     );
@@ -194,7 +197,9 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
                     .fg(app.theme().success)
                     .add_modifier(Modifier::BOLD),
             )]),
-            Style::default().fg(app.theme().text_normal).bg(app.theme().background),
+            Style::default()
+                .fg(app.theme().text_normal)
+                .bg(app.theme().background),
         ),
         View::PackageDetail => {
             let msg = if !app.detail.message.is_empty() {
@@ -204,7 +209,10 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
             };
             let readonly_detail = matches!(app.detail.key.as_deref(), Some("audit"));
             let mut spans = vec![
-                Span::styled(" [\u{2191}\u{2193}]", Style::default().fg(app.theme().text_muted)),
+                Span::styled(
+                    " [\u{2191}\u{2193}]",
+                    Style::default().fg(app.theme().text_muted),
+                ),
                 Span::raw(" nav "),
             ];
             if app.detail.key.as_deref() == Some("security") {
@@ -227,7 +235,9 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
             ]);
             (
                 Line::from(spans),
-                Style::default().fg(app.theme().text_normal).bg(app.theme().background),
+                Style::default()
+                    .fg(app.theme().text_normal)
+                    .bg(app.theme().background),
             )
         }
         _ if app.ui.search_mode => {
@@ -256,23 +266,29 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
                 };
             let mut spans = vec![
                 Span::styled(" [S]", Style::default().fg(app.theme().success)),
-                    Span::raw("can "),
-                    Span::styled("[O]", Style::default().fg(app.theme().warning)),
-                    Span::raw("utdated "),
-                    Span::styled("[/]", Style::default().fg(app.theme().primary)),
-                    Span::raw("earch "),
-                    Span::styled("\u{2190}\u{2192}", Style::default().fg(app.theme().text_muted)),
-                    Span::raw(" tabs "),
-                    Span::styled("\u{2191}\u{2193}", Style::default().fg(app.theme().text_muted)),
-                    Span::raw(" nav "),
-                    Span::styled("[U]", Style::default().fg(app.theme().success)),
-                    Span::raw("pdate "),
-                    Span::styled("^C", Style::default().fg(app.theme().error)),
-                    Span::styled(" Exit", Style::default().fg(app.theme().error)),
-                    Span::raw("  "),
-                    Span::styled("[Q]", Style::default().fg(app.theme().text_muted)),
-                    Span::raw("uit"),
-                ];
+                Span::raw("can "),
+                Span::styled("[O]", Style::default().fg(app.theme().warning)),
+                Span::raw("utdated "),
+                Span::styled("[/]", Style::default().fg(app.theme().primary)),
+                Span::raw("earch "),
+                Span::styled(
+                    "\u{2190}\u{2192}",
+                    Style::default().fg(app.theme().text_muted),
+                ),
+                Span::raw(" tabs "),
+                Span::styled(
+                    "\u{2191}\u{2193}",
+                    Style::default().fg(app.theme().text_muted),
+                ),
+                Span::raw(" nav "),
+                Span::styled("[U]", Style::default().fg(app.theme().success)),
+                Span::raw("pdate "),
+                Span::styled("^C", Style::default().fg(app.theme().error)),
+                Span::styled(" Exit", Style::default().fg(app.theme().error)),
+                Span::raw("  "),
+                Span::styled("[Q]", Style::default().fg(app.theme().text_muted)),
+                Span::raw("uit"),
+            ];
             if matches!(app.ui.view, View::Settings) {
                 spans.extend([
                     Span::raw("  "),
@@ -280,10 +296,15 @@ fn status_bar(frame: &mut Frame, area: Rect, app: &App) {
                     Span::raw(" toggle"),
                 ]);
             }
-            spans.push(Span::styled(update_msg, Style::default().fg(app.theme().text_normal)));
+            spans.push(Span::styled(
+                update_msg,
+                Style::default().fg(app.theme().text_normal),
+            ));
             (
                 Line::from(spans),
-                Style::default().fg(app.theme().text_normal).bg(app.theme().background),
+                Style::default()
+                    .fg(app.theme().text_normal)
+                    .bg(app.theme().background),
             )
         }
     };
@@ -392,7 +413,10 @@ fn dashboard_stats_line(frame: &mut Frame, area: Rect, report: &crate::scanner::
             Style::default().fg(app.theme().warning),
         ),
         Span::raw(" "),
-        Span::styled(format!("\u{25CF} {fail} "), Style::default().fg(app.theme().error)),
+        Span::styled(
+            format!("\u{25CF} {fail} "),
+            Style::default().fg(app.theme().error),
+        ),
         Span::raw(" "),
         Span::styled(
             format!("\u{25CF} {skip} "),
@@ -513,7 +537,11 @@ fn render_overview_pie(
         slices.push(PieSlice::new(&fail_label, fail as f64, app.theme().error));
     }
     if skip > 0 {
-        slices.push(PieSlice::new(&skip_label, skip as f64, app.theme().text_muted));
+        slices.push(PieSlice::new(
+            &skip_label,
+            skip as f64,
+            app.theme().text_muted,
+        ));
     }
 
     if slices.is_empty() {
@@ -667,7 +695,11 @@ fn project_tooling_risk(
     score.min(100) as u64
 }
 
-fn dashboard_cells(tool: &str, res: &crate::toolchains::ScanResult, _app: &App) -> (String, String) {
+fn dashboard_cells(
+    tool: &str,
+    res: &crate::toolchains::ScanResult,
+    _app: &App,
+) -> (String, String) {
     match tool {
         "security" => {
             let n = res.vulnerabilities.len();
@@ -715,7 +747,11 @@ fn dashboard_cells(tool: &str, res: &crate::toolchains::ScanResult, _app: &App) 
     }
 }
 
-fn project_tooling_cells(tool: &str, res: &crate::toolchains::ScanResult, app: &App) -> (String, String) {
+fn project_tooling_cells(
+    tool: &str,
+    res: &crate::toolchains::ScanResult,
+    app: &App,
+) -> (String, String) {
     match tool {
         "project" => {
             let outdated = scanner::extract_outdated(res).len();
@@ -768,7 +804,12 @@ fn project_tooling_cells(tool: &str, res: &crate::toolchains::ScanResult, app: &
     }
 }
 
-fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::scanner::Report, app: &App) {
+fn render_project_tooling_panel(
+    frame: &mut Frame,
+    area: Rect,
+    report: &crate::scanner::Report,
+    app: &App,
+) {
     if area.width < 18 || area.height < 3 {
         render_minimal(frame, area, "Project Tooling", app);
         return;
@@ -839,7 +880,10 @@ fn render_project_tooling_panel(frame: &mut Frame, area: Rect, report: &crate::s
 
         let compact = Paragraph::new(Text::from(vec![
             Line::from(vec![
-                Span::styled("Ready ", Style::default().fg(app.theme().text_normal).bold()),
+                Span::styled(
+                    "Ready ",
+                    Style::default().fg(app.theme().text_normal).bold(),
+                ),
                 Span::styled(
                     format!("{:>3}% ", (readiness * 100.0).round() as u64),
                     Style::default().fg(readiness_color).bold(),
@@ -1014,7 +1058,12 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
 
     if area.width < 24 || area.height < 6 {
         let (pass, warn, fail, skip) = count_statuses(report);
-        render_minimal(frame, area, &format!("Envexa {pass}/{warn}/{fail}/{skip}"), app);
+        render_minimal(
+            frame,
+            area,
+            &format!("Envexa {pass}/{warn}/{fail}/{skip}"),
+            app,
+        );
         return;
     }
 
@@ -1157,7 +1206,11 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             .iter()
             .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD)),
         )
-        .style(Style::default().bg(app.theme().secondary).fg(app.theme().text_normal))
+        .style(
+            Style::default()
+                .bg(app.theme().secondary)
+                .fg(app.theme().text_normal),
+        )
         .height(1);
 
         let table = Table::new(rows, dashboard_table_constraints(table_area.width))
@@ -1196,11 +1249,14 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
                 frame.render_widget(table, cat_chunks[i]);
             }
         }
-        
+
         if let Some(footer_area) = cat_chunks.last() {
             if footer_area.height > 0 {
                 let footer = Paragraph::new(Line::from(vec![
-                    Span::styled("🚧 Envexa ", Style::default().fg(app.theme().primary).bold()),
+                    Span::styled(
+                        "🚧 Envexa ",
+                        Style::default().fg(app.theme().primary).bold(),
+                    ),
                     Span::styled(
                         concat!("v", env!("CARGO_PKG_VERSION")),
                         Style::default().fg(app.theme().text_normal).bold(),
@@ -1208,7 +1264,9 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
                     Span::styled("  •  ", Style::default().fg(app.theme().text_muted)),
                     Span::styled(
                         "Crafted by Kuruto Denzeru",
-                        Style::default().fg(app.theme().text_muted).add_modifier(Modifier::ITALIC),
+                        Style::default()
+                            .fg(app.theme().text_muted)
+                            .add_modifier(Modifier::ITALIC),
                     ),
                     Span::raw("  "),
                 ]))
@@ -1230,8 +1288,11 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         Some(r) => r,
         None => {
             frame.render_widget(
-                Paragraph::new("No scan data. Press S to scan first.")
-                    .block(Block::default().borders(Borders::ALL).bg(app.theme().background)),
+                Paragraph::new("No scan data. Press S to scan first.").block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .bg(app.theme().background),
+                ),
                 area,
             );
             return;
@@ -1250,7 +1311,11 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
     .iter()
     .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
-        .style(Style::default().bg(app.theme().secondary).fg(app.theme().text_normal))
+        .style(
+            Style::default()
+                .bg(app.theme().secondary)
+                .fg(app.theme().text_normal),
+        )
         .height(1);
 
     let q = app.ui.search_query.to_lowercase();
@@ -1284,7 +1349,10 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         };
         let text = Paragraph::new(Text::from(vec![
             Line::from(""),
-            Line::from(vec![Span::styled(msg, Style::default().fg(app.theme().success))]),
+            Line::from(vec![Span::styled(
+                msg,
+                Style::default().fg(app.theme().success),
+            )]),
         ]))
         .block(
             Block::default()
@@ -1397,16 +1465,16 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
                 .ratio(ratio);
             frame.render_widget(gauge, chunks[2]);
 
-            // Real-time scan logs and tips
-            let step = app.ui.progress_counter;
-            let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-            let spin_char = spinner_frames[step % spinner_frames.len()];
+            let step = app.ui.progress_counter % 60;
+            let spin_char = SPINNER_FRAMES[step % SPINNER_FRAMES.len()];
             let mut log_lines = vec![Line::from("")];
 
-            // Step 1: Project Environment (started at step 0)
             if step > 0 {
-                let sym = if step < 10 { spin_char } else { "✔" };
-                let color = if step < 10 { app.theme().primary } else { app.theme().success };
+                let (sym, color) = if step < 10 {
+                    (spin_char, app.theme().primary)
+                } else {
+                    ("\u{2714}", app.theme().success)
+                };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
                     Span::styled(
@@ -1416,10 +1484,12 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
                 ]));
             }
 
-            // Step 2: Homebrew (started at step 10)
             if step >= 10 {
-                let sym = if step < 22 { spin_char } else { "✔" };
-                let color = if step < 22 { app.theme().primary } else { app.theme().success };
+                let (sym, color) = if step < 22 {
+                    (spin_char, app.theme().primary)
+                } else {
+                    ("\u{2714}", app.theme().success)
+                };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
                     Span::styled(
@@ -1429,100 +1499,72 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
                 ]));
             }
 
-            // Step 3: Web Runtimes (started at step 22)
             if step >= 22 {
-                let sym = if step < 35 { spin_char } else { "✔" };
-                let color = if step < 35 { app.theme().primary } else { app.theme().success };
+                let (sym, color) = if step < 35 {
+                    (spin_char, app.theme().primary)
+                } else {
+                    ("\u{2714}", app.theme().success)
+                };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
                     Span::styled(
-                        "Scanning Web Development runtimes (npm, pnpm, Bun, Deno)...",
+                        "Scanning web development runtimes...",
                         Style::default().fg(app.theme().text_normal),
                     ),
                 ]));
             }
 
-            // Step 4: Cargo / pip / gem (started at step 35)
             if step >= 35 {
-                let sym = if step < 48 { spin_char } else { "✔" };
-                let color = if step < 48 { app.theme().primary } else { app.theme().success };
+                let (sym, color) = if step < 45 {
+                    (spin_char, app.theme().primary)
+                } else {
+                    ("\u{2714}", app.theme().success)
+                };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
                     Span::styled(
-                        "Checking compiler dependencies (cargo-outdated, pip, gem)...",
+                        "Auditing project security & dependencies...",
                         Style::default().fg(app.theme().text_normal),
                     ),
                 ]));
             }
 
-            // Step 5: Security Advisory (started at step 48)
-            if step >= 48 {
-                let sym = if step < 62 { spin_char } else { "✔" };
-                let color = if step < 62 { app.theme().primary } else { app.theme().success };
+            if step >= 45 {
+                let (sym, color) = if step < 55 {
+                    (spin_char, app.theme().primary)
+                } else {
+                    ("\u{2714}", app.theme().success)
+                };
                 log_lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
                     Span::styled(
-                        "Running security advisory audits (RustSec, npm audit, pip-audit)...",
+                        "Collecting cleanup candidates...",
                         Style::default().fg(app.theme().text_normal),
                     ),
                 ]));
             }
 
-            // Step 6: Docker / Cleanup (started at step 62)
-            if step >= 62 {
-                let sym = if step < 75 { spin_char } else { "✔" };
-                let color = if step < 75 { app.theme().primary } else { app.theme().success };
-                log_lines.push(Line::from(vec![
-                    Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
-                    Span::styled(
-                        "Checking Docker daemons & local cache reclaimables...",
-                        Style::default().fg(app.theme().text_normal),
-                    ),
-                ]));
+            if chunks[3].height > 0 {
+                let progress = Paragraph::new(log_lines).alignment(Alignment::Left);
+                frame.render_widget(progress, chunks[3]);
             }
-
-            // Step 7: Compiling results (started at step 75)
-            if step >= 75 {
-                log_lines.push(Line::from(vec![
-                    Span::styled(
-                        format!("  {} ", spin_char),
-                        Style::default().fg(app.theme().primary).bold(),
-                    ),
-                    Span::styled(
-                        "Compiling final health reports and consolidating cache...",
-                        Style::default().fg(app.theme().text_normal),
-                    ),
-                ]));
-            }
-
-            // Rotating tool tips
-            let tips = [
-                "💡 Tip: Press '/' to filter outdated packages by name or manager in real-time.",
-                "💡 Tip: Use the 'Space' key to select packages and 'U' to update them concurrently.",
-                "💡 Tip: Run 'envexa scan' in your terminal to get a clean Markdown report for your CI.",
-                "💡 Tip: Change your default target project directory in '~/.envexa/config.json'.",
-                "💡 Tip: Cleanup scanner checks docker, npm, and cargo local cache spaces.",
-                "💡 Tip: Outdated tab shows global as well as local project dependencies.",
-            ];
-            let tip_index = (step / 80) % tips.len();
-            let current_tip = tips[tip_index];
-
-            log_lines.push(Line::from(""));
-            log_lines.push(Line::from(vec![Span::styled(
-                format!("  {}", current_tip),
-                Style::default().fg(app.theme().text_muted),
-            )]));
-
-            frame.render_widget(Paragraph::new(log_lines), chunks[3]);
         } else {
             frame.render_stateful_widget(throbber, inner, &mut app.ui.throbber_state);
         }
     }
 }
 
+const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+const ALL_SCANNERS: &[&str] = &[
+    "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
+    "security", "audit", "ci", "git", "cleanup",
+];
+
 pub fn render(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
-    frame.render_widget(Block::default().bg(app.theme().background), area);
+    let theme = app.theme();
+    frame.render_widget(Block::default().bg(theme.background), area);
 
     if area.width < 16 || area.height < 4 {
         render_minimal(frame, area, "Envexa", app);
@@ -1582,6 +1624,35 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
             }
             .to_string(),
         ),
+        (
+            "Project Path",
+            app.config.project_path.clone().unwrap_or_else(|| {
+                std::env::current_dir()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_default()
+            }),
+        ),
+        ("Scan Timeout", format!("{}s", app.config.scan_timeout_secs)),
+        (
+            "Daemon Interval",
+            match app.config.daemon_interval_secs {
+                3600 => "1h",
+                14400 => "4h",
+                28800 => "8h",
+                86400 => "24h",
+                _ => "?",
+            }
+            .to_string(),
+        ),
+        ("Enabled Scanners", {
+            let enabled = app
+                .config
+                .enabled_scanners
+                .as_ref()
+                .map_or("All (16)".to_string(), |v| format!("{}/16", v.len()));
+            enabled
+        }),
+        ("Export Format", app.config.export_format.clone()),
         ("Theme", app.config.theme.clone()),
         (
             "Verbose Logs",
@@ -1592,8 +1663,16 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
     let mut rows = Vec::new();
     for (i, (label, val)) in items.iter().enumerate() {
         let sel = i == app.ui.settings_selection;
-        let bg = if sel { app.theme().text_muted } else { Color::Reset };
-        let fg = if sel { app.theme().text_normal } else { Color::Gray };
+        let bg = if sel {
+            app.theme().text_muted
+        } else {
+            Color::Reset
+        };
+        let fg = if sel {
+            app.theme().text_normal
+        } else {
+            Color::Gray
+        };
 
         let row = Row::new(vec![
             Cell::from(if sel { " \u{25B6} " } else { "   " }),
@@ -1628,17 +1707,87 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
 
     frame.render_widget(table, area);
 
-    if app.ui.settings_edit_mode {
+    if app.ui.settings_edit_mode && app.ui.settings_selection == 5 {
+        let scanner_area = Rect {
+            x: area.x + 2,
+            y: area.y + 2,
+            width: area.width.saturating_sub(4).min(50),
+            height: (ALL_SCANNERS.len() as u16 + 2).min(area.height.saturating_sub(4)),
+        };
+
+        let enabled = app.config.enabled_scanners.as_deref().unwrap_or(&[]);
+
+        let block = Block::default()
+            .title(" Enabled Scanners ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(app.theme().primary))
+            .bg(app.theme().background);
+
+        let inner = block.inner(scanner_area);
+        frame.render_widget(Clear, scanner_area);
+        frame.render_widget(block, scanner_area);
+
+        for (i, tool) in ALL_SCANNERS.iter().enumerate() {
+            if (i as u16) >= inner.height {
+                break;
+            }
+            let is_focused = i == app.ui.settings_scanner_focus;
+            let is_all = app.config.enabled_scanners.is_none();
+            let is_checked = is_all || enabled.iter().any(|e| e == tool);
+
+            let checkbox = if is_checked { "[x]" } else { "[ ]" };
+            let indicator = if is_focused { "\u{25B6}" } else { " " };
+
+            let display = crate::scanner::display_name(tool);
+
+            let line = Line::from(vec![
+                Span::styled(
+                    format!(" {} {} ", indicator, checkbox),
+                    Style::default().fg(if is_focused {
+                        app.theme().primary
+                    } else if is_checked {
+                        app.theme().success
+                    } else {
+                        app.theme().text_muted
+                    }),
+                ),
+                Span::styled(
+                    display,
+                    Style::default().fg(if is_focused {
+                        app.theme().text_normal
+                    } else {
+                        app.theme().text_muted
+                    }),
+                ),
+            ]);
+
+            let row_area = Rect {
+                x: inner.x,
+                y: inner.y + i as u16,
+                width: inner.width,
+                height: 1,
+            };
+            frame.render_widget(Paragraph::new(line), row_area);
+        }
+    } else if app.ui.settings_edit_mode {
         let opts = app.get_settings_options();
         let items: Vec<ListItem> = opts
             .iter()
             .enumerate()
             .map(|(i, val)| {
                 let is_selected = i == app.ui.settings_edit_selection;
-                let bg = if is_selected { app.theme().text_muted } else { Color::Reset };
-                let fg = if is_selected { app.theme().text_normal } else { Color::Gray };
+                let bg = if is_selected {
+                    app.theme().text_muted
+                } else {
+                    Color::Reset
+                };
+                let fg = if is_selected {
+                    app.theme().text_normal
+                } else {
+                    Color::Gray
+                };
                 let prefix = if is_selected { " \u{25B6} " } else { "   " };
-                
+
                 let desc = match app.ui.settings_selection {
                     0 => match val.as_str() {
                         "5m" => "Aggressive caching, frequent scans",
@@ -1652,7 +1801,28 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
                         "Off" => "Wait for manual scan command",
                         _ => "",
                     },
-                    2 => match val.as_str() {
+                    2 => "Root directory scanned by envexa",
+                    3 => match val.as_str() {
+                        "10s" => "Fast scans, may timeout on slow machines",
+                        "30s" => "Balanced timeout, recommended",
+                        "60s" => "Long timeout, for slow networks",
+                        "120s" => "Very long timeout, for CI/server environments",
+                        _ => "",
+                    },
+                    4 => match val.as_str() {
+                        "1h" => "Scan every hour",
+                        "4h" => "Scan every 4 hours, recommended",
+                        "8h" => "Scan every 8 hours, save resources",
+                        "24h" => "Scan once per day",
+                        _ => "",
+                    },
+                    6 => match val.as_str() {
+                        "markdown" => "Human-readable Markdown report",
+                        "sarif" => "Machine-readable SARIF for CI integration",
+                        "json" => "Raw JSON dump of all scan results",
+                        _ => "",
+                    },
+                    7 => match val.as_str() {
                         "default" => "Envexa standard colors",
                         "dark" => "Plain dark theme",
                         "light" => "Plain light theme",
@@ -1661,9 +1831,15 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
                         "monokai" => "High-contrast dark theme",
                         "solarized-dark" => "Low-contrast dark theme",
                         "oceanic" => "Oceanic dark colors",
+                        "catppuccin-mocha" => "Warm dark theme with muted pastels",
+                        "catppuccin-latte" => "Warm light theme with soft pastels",
+                        "gruvbox-dark" => "Retro dark with warm orange tones",
+                        "gruvbox-light" => "Retro light with warm orange tones",
+                        "tokyo-night" => "Deep blue-heavy night theme",
+                        "rose-pine" => "Calm pine forest dark theme",
                         _ => "",
                     },
-                    3 => match val.as_str() {
+                    8 => match val.as_str() {
                         "On" => "Show detailed background logs",
                         "Off" => "Hide detailed logs",
                         _ => "",
@@ -1671,15 +1847,21 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
                     _ => "",
                 };
 
-                let mut lines = vec![
-                    Line::from(vec![
-                        Span::styled(format!("{}{}", prefix, val), Style::default().add_modifier(Modifier::BOLD)),
-                    ]),
-                ];
+                let mut lines = vec![Line::from(vec![Span::styled(
+                    format!("{}{}", prefix, val),
+                    Style::default().add_modifier(Modifier::BOLD),
+                )])];
                 if !desc.is_empty() {
                     lines.push(Line::from(vec![
                         Span::raw("    "),
-                        Span::styled(desc, Style::default().fg(if is_selected { app.theme().text_normal } else { app.theme().text_muted })),
+                        Span::styled(
+                            desc,
+                            Style::default().fg(if is_selected {
+                                app.theme().text_normal
+                            } else {
+                                app.theme().text_muted
+                            }),
+                        ),
                     ]));
                 }
 
@@ -1691,22 +1873,26 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
         let title = match app.ui.settings_selection {
             0 => " Cache TTL ",
             1 => " Auto-Scan ",
-            2 => " Theme ",
-            3 => " Verbose Logs ",
+            2 => " Project Path ",
+            3 => " Scan Timeout ",
+            4 => " Daemon Interval ",
+            5 => " Enabled Scanners ",
+            6 => " Export Format ",
+            7 => " Theme ",
+            8 => " Verbose Logs ",
             _ => " Options ",
         };
 
-        let list = List::new(items)
-            .block(
-                Block::default()
-                    .title(title)
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(app.theme().primary))
-                    .bg(app.theme().background),
-            );
+        let list = List::new(items).block(
+            Block::default()
+                .title(title)
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(app.theme().primary))
+                .bg(app.theme().background),
+        );
 
         frame.render_widget(Clear, popup_area);
-        
+
         let mut state = ListState::default();
         state.select(Some(app.ui.settings_edit_selection));
         frame.render_stateful_widget(list, popup_area, &mut state);
@@ -1738,7 +1924,10 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         let text = Paragraph::new(Text::from(vec![
             Line::from(""),
             Line::from(vec![
-                Span::styled("  \u{2714} ", Style::default().fg(app.theme().success).bold()),
+                Span::styled(
+                    "  \u{2714} ",
+                    Style::default().fg(app.theme().success).bold(),
+                ),
                 Span::styled(
                     "All packages are completely up to date!",
                     Style::default().fg(app.theme().text_normal),
@@ -1754,7 +1943,11 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
-        .style(Style::default().bg(app.theme().secondary).fg(app.theme().text_normal))
+        .style(
+            Style::default()
+                .bg(app.theme().secondary)
+                .fg(app.theme().text_normal),
+        )
         .height(1);
 
     let rows: Vec<Row> = items
@@ -1821,7 +2014,10 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         let text = Paragraph::new(Text::from(vec![
             Line::from(""),
             Line::from(vec![
-                Span::styled("  \u{2714} ", Style::default().fg(app.theme().success).bold()),
+                Span::styled(
+                    "  \u{2714} ",
+                    Style::default().fg(app.theme().success).bold(),
+                ),
                 Span::styled(
                     "No security vulnerabilities detected!",
                     Style::default().fg(app.theme().text_normal),
@@ -1837,7 +2033,11 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
-        .style(Style::default().bg(app.theme().secondary).fg(app.theme().text_normal))
+        .style(
+            Style::default()
+                .bg(app.theme().secondary)
+                .fg(app.theme().text_normal),
+        )
         .height(1);
 
     let rows: Vec<Row> = items
@@ -1927,7 +2127,9 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             Span::styled("Critical: ", Style::default().fg(app.theme().text_muted)),
             Span::styled(
                 format!("{} ", crit),
-                Style::default().fg(app.theme().error).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(app.theme().error)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::styled(" High: ", Style::default().fg(app.theme().text_muted)),
             Span::styled(
@@ -2001,14 +2203,20 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
                 ]),
                 Line::from(vec![
                     Span::styled("Patched: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(&vuln.patched_version, Style::default().fg(app.theme().success)),
+                    Span::styled(
+                        &vuln.patched_version,
+                        Style::default().fg(app.theme().success),
+                    ),
                 ]),
                 Line::from(""),
                 Line::from(Span::styled(
                     "Title / Description:",
                     Style::default().fg(app.theme().text_muted),
                 )),
-                Line::from(Span::styled(&vuln.title, Style::default().fg(app.theme().text_normal))),
+                Line::from(Span::styled(
+                    &vuln.title,
+                    Style::default().fg(app.theme().text_normal),
+                )),
             ];
 
             let detail_card = Paragraph::new(lines)
@@ -2052,7 +2260,10 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         let text = Paragraph::new(Text::from(vec![
             Line::from(""),
             Line::from(vec![
-                Span::styled("  \u{2714} ", Style::default().fg(app.theme().success).bold()),
+                Span::styled(
+                    "  \u{2714} ",
+                    Style::default().fg(app.theme().success).bold(),
+                ),
                 Span::styled(
                     "System and toolchains are aligned! No issues flagged.",
                     Style::default().fg(app.theme().text_normal),
@@ -2068,7 +2279,11 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
-        .style(Style::default().bg(app.theme().secondary).fg(app.theme().text_normal))
+        .style(
+            Style::default()
+                .bg(app.theme().secondary)
+                .fg(app.theme().text_normal),
+        )
         .height(1);
 
     let rows: Vec<Row> = items
@@ -2163,7 +2378,10 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
                     ),
                 ]),
                 Line::from(vec![
-                    Span::styled("Current State: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(
+                        "Current State: ",
+                        Style::default().fg(app.theme().text_muted),
+                    ),
                     Span::styled(&audit.current, Style::default().fg(app.theme().warning)),
                 ]),
                 Line::from(""),
@@ -2171,7 +2389,10 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
                     "Recommendation / Note:",
                     Style::default().fg(app.theme().text_muted),
                 )),
-                Line::from(Span::styled(&audit.note, Style::default().fg(app.theme().text_normal))),
+                Line::from(Span::styled(
+                    &audit.note,
+                    Style::default().fg(app.theme().text_normal),
+                )),
             ];
 
             let detail_card = Paragraph::new(lines)
@@ -2277,7 +2498,10 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         let text = Paragraph::new(Text::from(vec![
             Line::from(""),
             Line::from(vec![
-                Span::styled("  \u{2714} ", Style::default().fg(app.theme().success).bold()),
+                Span::styled(
+                    "  \u{2714} ",
+                    Style::default().fg(app.theme().success).bold(),
+                ),
                 Span::styled(
                     "Your environment is fully clean! No cache cleanup needed.",
                     Style::default().fg(app.theme().text_normal),
@@ -2293,7 +2517,11 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         .iter()
         .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
     let header = Row::new(header_cells)
-        .style(Style::default().bg(app.theme().secondary).fg(app.theme().text_normal))
+        .style(
+            Style::default()
+                .bg(app.theme().secondary)
+                .fg(app.theme().text_normal),
+        )
         .height(1);
 
     let rows: Vec<Row> = items
@@ -2481,7 +2709,10 @@ fn render_updating(frame: &mut Frame, area: Rect, app: &mut App) {
 
                 if app.ui.update_downloaded_mb > 0.0 {
                     tip_lines.push(Line::from(vec![
-                        Span::styled("⤓ Progress: ", Style::default().fg(app.theme().primary).bold()),
+                        Span::styled(
+                            "⤓ Progress: ",
+                            Style::default().fg(app.theme().primary).bold(),
+                        ),
                         Span::styled(
                             format!(
                                 "{:.2} MB downloaded so far for {}",
@@ -2492,7 +2723,10 @@ fn render_updating(frame: &mut Frame, area: Rect, app: &mut App) {
                     ]));
                 } else if !app.ui.update_package_name.is_empty() {
                     tip_lines.push(Line::from(vec![
-                        Span::styled("⚡ Active: ", Style::default().fg(app.theme().primary).bold()),
+                        Span::styled(
+                            "⚡ Active: ",
+                            Style::default().fg(app.theme().primary).bold(),
+                        ),
                         Span::styled(
                             format!("Installing/updating {}...", app.ui.update_package_name),
                             Style::default().fg(app.theme().text_normal),

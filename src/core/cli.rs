@@ -136,9 +136,19 @@ async fn run_cmd(cmd: Commands) -> Result<(), anyhow::Error> {
 }
 
 async fn run_daemon(interval: u64) {
-    println!("Starting envexa daemon. Interval: {}s", interval);
+    println!("\x1b[36menvexa\x1b[0m v{}", VERSION);
+    println!("  Daemon mode — scanning every {}s\n", interval);
+
+    let scan_count = std::sync::atomic::AtomicUsize::new(0);
+
     loop {
-        let results = toolchains::scan_all().await;
+        let scan_num = scan_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+
+        let results = with_spinner(
+            &format!("Scan #{} — scanning toolchains...", scan_num),
+            toolchains::scan_all(),
+        )
+        .await;
 
         let mut warnings = 0;
         let mut errors = 0;
@@ -168,6 +178,8 @@ async fn run_daemon(interval: u64) {
             let msg = msgs.join(", ");
             let title = "Envexa Health Alert";
 
+            eprintln!("  \x1b[33m⚠\x1b[0m {}", msg);
+
             #[cfg(target_os = "macos")]
             {
                 let script = format!("display notification \"{}\" with title \"{}\"", msg, title);
@@ -182,9 +194,35 @@ async fn run_daemon(interval: u64) {
                     .args([title, &msg])
                     .status();
             }
+        } else {
+            eprintln!("  \x1b[32m✓\x1b[0m All clear");
         }
 
-        tokio::time::sleep(std::time::Duration::from_secs(interval)).await;
+        let next = std::time::Instant::now() + std::time::Duration::from_secs(interval);
+        let deadline = tokio::time::Instant::from_std(next);
+
+        let mut remaining = interval;
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(1));
+        tick.tick().await;
+
+        loop {
+            tokio::select! {
+                _ = tokio::time::sleep_until(deadline) => break,
+                _ = tick.tick() => {
+                    if remaining == 0 {
+                        break;
+                    }
+                    remaining -= 1;
+                    let h = remaining / 3600;
+                    let m = (remaining % 3600) / 60;
+                    let s = remaining % 60;
+                    eprint!("\r\x1b[2K  \x1b[90mNext scan in {:02}:{:02}:{:02}\x1b[0m", h, m, s);
+                    let _ = std::io::stderr().flush();
+                }
+            }
+        }
+        eprint!("\r\x1b[2K");
+        let _ = std::io::stderr().flush();
     }
 }
 

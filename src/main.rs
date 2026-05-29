@@ -9,12 +9,7 @@ pub fn main() -> anyhow::Result<()> {
         .block_on(async {
             let args: Vec<String> = std::env::args().collect();
 
-            if args.len() > 1
-                && args[1] != "--help"
-                && args[1] != "-h"
-                && args[1] != "-V"
-                && args[1] != "--version"
-            {
+            if args.len() > 1 && args[1] != "--help" && args[1] != "-h" {
                 envexa::core::cli::run().await
             } else if std::io::IsTerminal::is_terminal(&std::io::stdin()) {
                 envexa::tui::app::App::new()

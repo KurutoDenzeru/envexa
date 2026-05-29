@@ -31,7 +31,7 @@ impl Theme {
                 warning: Color::Rgb(241, 250, 140),     // Yellow
                 error: Color::Rgb(255, 85, 85),         // Red
                 info: Color::Rgb(139, 233, 253),        // Cyan
-                background: Color::Reset,               // Transparent
+                background: Color::Black,
             },
             "nord" => Theme {
                 primary: Color::Rgb(136, 192, 208),     // Frost Light Blue
@@ -42,7 +42,7 @@ impl Theme {
                 warning: Color::Rgb(235, 203, 139),     // Aurora Yellow
                 error: Color::Rgb(191, 97, 106),        // Aurora Red
                 info: Color::Rgb(143, 188, 187),        // Frost Cyan
-                background: Color::Reset,
+                background: Color::Rgb(46, 52, 64),     // Polar Night
             },
             "monokai" => Theme {
                 primary: Color::Rgb(253, 151, 31),      // Orange
@@ -53,7 +53,7 @@ impl Theme {
                 warning: Color::Rgb(230, 219, 116),     // Yellow
                 error: Color::Rgb(249, 38, 114),        // Pink/Red
                 info: Color::Rgb(174, 129, 255),        // Purple
-                background: Color::Reset,
+                background: Color::Rgb(39, 40, 34),     // Monokai bg
             },
             "solarized-dark" => Theme {
                 primary: Color::Rgb(38, 139, 210),      // Blue
@@ -64,7 +64,7 @@ impl Theme {
                 warning: Color::Rgb(181, 137, 0),       // Yellow
                 error: Color::Rgb(220, 50, 47),         // Red
                 info: Color::Rgb(108, 113, 196),        // Violet
-                background: Color::Reset,
+                background: Color::Rgb(0, 43, 54),      // Base03
             },
             "oceanic" => Theme {
                 primary: Color::Rgb(102, 153, 204),     // Blue
@@ -75,7 +75,73 @@ impl Theme {
                 warning: Color::Rgb(250, 200, 99),      // Yellow
                 error: Color::Rgb(236, 95, 103),        // Red
                 info: Color::Rgb(95, 187, 175),         // Cyan
-                background: Color::Reset,
+                background: Color::Rgb(40, 44, 52),     // Material bg
+            },
+            "catppuccin-mocha" => Theme {
+                primary: Color::Rgb(203, 166, 247),     // Mauve
+                secondary: Color::Rgb(245, 194, 231),   // Pink
+                text_normal: Color::Rgb(205, 214, 244), // Text
+                text_muted: Color::Rgb(147, 153, 178),  // Overlay0
+                success: Color::Rgb(166, 227, 161),     // Green
+                warning: Color::Rgb(249, 226, 175),     // Yellow
+                error: Color::Rgb(243, 139, 168),       // Red
+                info: Color::Rgb(137, 220, 235),        // Sky
+                background: Color::Rgb(30, 30, 46),     // Base
+            },
+            "catppuccin-latte" => Theme {
+                primary: Color::Rgb(136, 57, 239),     // Mauve
+                secondary: Color::Rgb(234, 118, 203),  // Pink
+                text_normal: Color::Rgb(76, 79, 105),  // Text
+                text_muted: Color::Rgb(156, 160, 176), // Overlay0
+                success: Color::Rgb(64, 160, 43),      // Green
+                warning: Color::Rgb(223, 142, 29),     // Yellow
+                error: Color::Rgb(210, 15, 57),        // Red
+                info: Color::Rgb(4, 165, 229),         // Sky
+                background: Color::Rgb(239, 241, 245), // Base
+            },
+            "gruvbox-dark" => Theme {
+                primary: Color::Rgb(214, 153, 77),      // Orange
+                secondary: Color::Rgb(177, 98, 134),    // Purple
+                text_normal: Color::Rgb(235, 219, 178), // Fg4
+                text_muted: Color::Rgb(146, 131, 116),  // Gray
+                success: Color::Rgb(184, 187, 38),      // Green
+                warning: Color::Rgb(215, 153, 33),      // Yellow
+                error: Color::Rgb(251, 73, 52),         // Red
+                info: Color::Rgb(104, 157, 106),        // Aqua
+                background: Color::Rgb(40, 40, 40),     // Bg0
+            },
+            "gruvbox-light" => Theme {
+                primary: Color::Rgb(214, 153, 77),     // Orange
+                secondary: Color::Rgb(177, 98, 134),   // Purple
+                text_normal: Color::Rgb(60, 56, 54),   // Fg
+                text_muted: Color::Rgb(146, 131, 116), // Gray
+                success: Color::Rgb(184, 187, 38),     // Green
+                warning: Color::Rgb(215, 153, 33),     // Yellow
+                error: Color::Rgb(251, 73, 52),        // Red
+                info: Color::Rgb(104, 157, 106),       // Aqua
+                background: Color::Rgb(251, 241, 199), // Bg0 light
+            },
+            "tokyo-night" => Theme {
+                primary: Color::Rgb(122, 162, 247),     // Blue
+                secondary: Color::Rgb(187, 154, 247),   // Purple
+                text_normal: Color::Rgb(169, 177, 214), // Foreground
+                text_muted: Color::Rgb(86, 95, 137),    // Comment
+                success: Color::Rgb(158, 206, 106),     // Green
+                warning: Color::Rgb(224, 175, 104),     // Yellow
+                error: Color::Rgb(247, 118, 142),       // Red
+                info: Color::Rgb(125, 207, 255),        // Cyan
+                background: Color::Rgb(26, 27, 38),     // Bg
+            },
+            "rose-pine" => Theme {
+                primary: Color::Rgb(196, 167, 231),     // Iris
+                secondary: Color::Rgb(235, 188, 186),   // Rose
+                text_normal: Color::Rgb(224, 222, 244), // Text
+                text_muted: Color::Rgb(110, 106, 134),  // Muted
+                success: Color::Rgb(156, 207, 216),     // Foam
+                warning: Color::Rgb(246, 193, 119),     // Gold
+                error: Color::Rgb(235, 111, 146),       // Love
+                info: Color::Rgb(49, 116, 143),         // Pine
+                background: Color::Rgb(25, 23, 36),     // Base
             },
             "light" => Theme {
                 primary: Color::Blue,
@@ -86,7 +152,7 @@ impl Theme {
                 warning: Color::Yellow,
                 error: Color::Red,
                 info: Color::Cyan,
-                background: Color::Reset,
+                background: Color::White,
             },
             "dark" => Theme {
                 primary: Color::Cyan,
@@ -97,7 +163,7 @@ impl Theme {
                 warning: Color::Yellow,
                 error: Color::Red,
                 info: Color::Blue,
-                background: Color::Reset,
+                background: Color::Black,
             },
             // Default
             _ => Theme {
@@ -109,7 +175,7 @@ impl Theme {
                 warning: Color::Yellow,
                 error: Color::Red,
                 info: Color::LightCyan,
-                background: Color::Reset,
+                background: Color::Black,
             },
         }
     }
