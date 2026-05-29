@@ -165,7 +165,7 @@ pub mod cleanup;
 pub mod deno;
 pub mod docker;
 pub mod gem;
-pub mod git;
+
 pub mod npm;
 pub mod pip;
 pub mod pnpm;
@@ -204,7 +204,6 @@ pub async fn scan_all_with(
         Box::pin(async { ("security", security::scan().await) }),
         Box::pin(async { ("audit", audit::scan().await) }),
         Box::pin(async { ("cleanup", cleanup::scan().await) }),
-        Box::pin(async { ("git", git::scan().await) }),
         Box::pin(async { ("ci", ci::scan().await) }),
     ];
 
@@ -280,7 +279,6 @@ pub async fn scan_one(name: &str) -> Option<ScanResult> {
         "security" => Some(security::scan().await),
         "audit" => Some(audit::scan().await),
         "cleanup" => Some(cleanup::scan().await),
-        "git" => Some(git::scan().await),
         "ci" => Some(ci::scan().await),
         _ => None,
     }

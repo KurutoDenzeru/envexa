@@ -1579,7 +1579,7 @@ const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦
 
 const ALL_SCANNERS: &[&str] = &[
     "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
-    "security", "audit", "ci", "git", "cleanup",
+    "security", "audit", "ci", "cleanup",
 ];
 
 pub fn render(frame: &mut Frame, app: &mut App) {
