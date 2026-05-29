@@ -178,7 +178,7 @@ pub async fn scan_all() -> HashMap<String, ScanResult> {
 }
 
 pub async fn scan_all_with(
-    _timeout_secs: u64,
+    timeout_secs: u64,
     enabled: Option<&[String]>,
 ) -> HashMap<String, ScanResult> {
     let project_dir = get_project_path();
@@ -211,45 +211,53 @@ pub async fn scan_all_with(
     let mut results = HashMap::new();
 
     let mut buffered = stream::iter(tasks).buffer_unordered(16);
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(timeout_secs);
 
-    while let Some((name, mut res)) = buffered.next().await {
-        if let Some(enabled_list) = enabled {
-            if !enabled_list.iter().any(|e| e == name) {
-                results.insert(
-                    name.to_string(),
-                    ScanResult::skipped("Disabled by user settings"),
-                );
-                continue;
+    loop {
+        let result = tokio::time::timeout_at(deadline, buffered.next()).await;
+        match result {
+            Ok(Some((name, mut res))) => {
+                if let Some(enabled_list) = enabled {
+                    if !enabled_list.iter().any(|e| e == name) {
+                        results.insert(
+                            name.to_string(),
+                            ScanResult::skipped("Disabled by user settings"),
+                        );
+                        continue;
+                    }
+                }
+
+                if ignore.should_ignore_tool(name) {
+                    results.insert(
+                        name.to_string(),
+                        ScanResult::skipped("Ignored by .envexaignore"),
+                    );
+                    continue;
+                }
+
+                res.outdated
+                    .retain(|p| !ignore.should_ignore_package(&p.name));
+                res.outdated_global
+                    .retain(|p| !ignore.should_ignore_package(&p.name));
+                res.outdated_formulae
+                    .retain(|p| !ignore.should_ignore_package(&p.name));
+                res.outdated_casks
+                    .retain(|p| !ignore.should_ignore_package(&p.name));
+
+                res.vulnerabilities.retain(|v| {
+                    !ignore.should_ignore_package(&v.package)
+                        && !ignore.should_ignore_vuln(&v.package)
+                        && v.cve
+                            .as_ref()
+                            .map(|cve| !ignore.should_ignore_vuln(cve))
+                            .unwrap_or(true)
+                });
+
+                results.insert(name.to_string(), res);
             }
+            Ok(None) => break,
+            Err(_) => break,
         }
-
-        if ignore.should_ignore_tool(name) {
-            results.insert(
-                name.to_string(),
-                ScanResult::skipped("Ignored by .envexaignore"),
-            );
-            continue;
-        }
-
-        res.outdated
-            .retain(|p| !ignore.should_ignore_package(&p.name));
-        res.outdated_global
-            .retain(|p| !ignore.should_ignore_package(&p.name));
-        res.outdated_formulae
-            .retain(|p| !ignore.should_ignore_package(&p.name));
-        res.outdated_casks
-            .retain(|p| !ignore.should_ignore_package(&p.name));
-
-        res.vulnerabilities.retain(|v| {
-            !ignore.should_ignore_package(&v.package)
-                && !ignore.should_ignore_vuln(&v.package)
-                && v.cve
-                    .as_ref()
-                    .map(|cve| !ignore.should_ignore_vuln(cve))
-                    .unwrap_or(true)
-        });
-
-        results.insert(name.to_string(), res);
     }
 
     results

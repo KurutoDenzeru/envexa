@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
 
@@ -1005,7 +1005,13 @@ impl App {
         let enabled = self.config.enabled_scanners.clone();
 
         tokio::spawn(async move {
-            let results = toolchains::scan_all_with(timeout, enabled.as_deref()).await;
+            let results = std::panic::AssertUnwindSafe(toolchains::scan_all_with(
+                timeout,
+                enabled.as_deref(),
+            ))
+            .catch_unwind()
+            .await
+            .unwrap_or_else(|_| HashMap::new());
             let _ = tx.send(AppEvent::ScanFinished(results));
         });
         Ok(())
