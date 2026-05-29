@@ -58,6 +58,8 @@ pub struct UiState {
     pub settings_edit_mode: bool,
     pub settings_edit_selection: usize,
     pub settings_scanner_focus: usize,
+    pub input_mode: bool,
+    pub input_buffer: String,
     pub search_mode: bool,
     pub search_query: String,
     pub throbber_state: ThrobberState,
@@ -112,6 +114,8 @@ impl App {
                 settings_edit_mode: false,
                 settings_edit_selection: 0,
                 settings_scanner_focus: 0,
+                input_mode: false,
+                input_buffer: String::new(),
                 search_mode: false,
                 search_query: String::new(),
                 throbber_state: ThrobberState::default(),
@@ -207,6 +211,37 @@ impl App {
                                 KeyCode::Char(c) if !c.is_control() => {
                                     self.ui.search_query.push(c);
                                     self.clamp_selection();
+                                }
+                                _ => {}
+                            }
+                            continue;
+                        }
+
+                        if self.ui.input_mode {
+                            match key.code {
+                                KeyCode::Esc => {
+                                    self.ui.input_mode = false;
+                                    self.ui.input_buffer.clear();
+                                }
+                                KeyCode::Enter => {
+                                    let path = self.ui.input_buffer.trim().to_string();
+                                    if !path.is_empty() {
+                                        let p = std::path::Path::new(&path);
+                                        if p.is_dir() {
+                                            self.config.project_path = Some(path);
+                                            let _ = config::save_config(&self.config);
+                                            self.ui.input_mode = false;
+                                            self.ui.input_buffer.clear();
+                                            self.ui.settings_edit_mode = false;
+                                            self.do_scan(tx.clone())?;
+                                        }
+                                    }
+                                }
+                                KeyCode::Backspace => {
+                                    self.ui.input_buffer.pop();
+                                }
+                                KeyCode::Char(c) if !c.is_control() => {
+                                    self.ui.input_buffer.push(c);
                                 }
                                 _ => {}
                             }
@@ -989,7 +1024,11 @@ impl App {
                 let cwd = std::env::current_dir()
                     .map(|p| p.display().to_string())
                     .unwrap_or_default();
-                vec![cwd, "~/.envexa/project".to_string()]
+                vec![
+                    cwd,
+                    "~/.envexa/project".to_string(),
+                    "Custom path...".to_string(),
+                ]
             }
             3 => vec![
                 "10s".to_string(),
@@ -1046,6 +1085,11 @@ impl App {
                 self.config.auto_scan_on_startup = val == "On";
             }
             2 => {
+                if val == "Custom path..." {
+                    self.ui.input_mode = true;
+                    self.ui.input_buffer = self.config.project_path.clone().unwrap_or_default();
+                    return;
+                }
                 self.config.project_path = Some(val.clone());
             }
             3 => {
@@ -1117,7 +1161,20 @@ impl App {
             }
             _ => String::new(),
         };
-        self.ui.settings_edit_selection = opts.iter().position(|o| o == &current_val).unwrap_or(0);
+        let selection = opts.iter().position(|o| {
+            if self.ui.settings_selection == 2 {
+                o == &current_val
+                    || (current_val
+                        != std::env::current_dir()
+                            .map(|p| p.display().to_string())
+                            .unwrap_or_default()
+                        && current_val != "~/.envexa/project"
+                        && o == "Custom path...")
+            } else {
+                o == &current_val
+            }
+        });
+        self.ui.settings_edit_selection = selection.unwrap_or(0);
         self.ui.settings_edit_mode = true;
     }
 

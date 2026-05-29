@@ -85,14 +85,46 @@ async fn bun_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
     if !which("bun") {
         return vulns;
     }
+
+    if let Ok(out) = run_cmd_in(project_path, "bun", &["audit", "--json"], None).await {
+        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&out) {
+            if let Some(packages) = data.get("packages").and_then(|v| v.as_array()) {
+                for pkg in packages {
+                    vulns.push(VulnerabilityInfo {
+                        package: pkg["name"].as_str().unwrap_or("?").to_string(),
+                        severity: pkg["severity"].as_str().unwrap_or("unknown").to_uppercase(),
+                        title: pkg["title"].as_str().unwrap_or("?").to_string(),
+                        cve: None,
+                        patched_version: String::new(),
+                    });
+                }
+                return vulns;
+            }
+        }
+    }
+
     if let Ok(out) = run_cmd_in(project_path, "bun", &["audit"], None).await {
+        let mut in_section = false;
         for line in out.lines() {
-            let parts: Vec<&str> = line.splitn(4, ' ').collect();
+            if !in_section {
+                if line.contains("Package") && line.contains("Severity") {
+                    in_section = true;
+                }
+                continue;
+            }
+            if line.contains("└") || line.is_empty() {
+                continue;
+            }
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let parts: Vec<&str> = trimmed.splitn(4, ' ').collect();
             if parts.len() >= 3 {
                 let name = parts[0].trim();
                 let severity = parts.get(1).unwrap_or(&"unknown").trim().to_uppercase();
                 let remainder = parts[2..].join(" ");
-                if !name.is_empty() && !severity.is_empty() {
+                if !name.is_empty() {
                     vulns.push(VulnerabilityInfo {
                         package: name.to_string(),
                         severity,

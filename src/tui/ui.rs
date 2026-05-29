@@ -1897,6 +1897,58 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
         state.select(Some(app.ui.settings_edit_selection));
         frame.render_stateful_widget(list, popup_area, &mut state);
     }
+
+    if app.ui.input_mode {
+        let popup_area = centered_rect(60, 30, area);
+        let valid = !app.ui.input_buffer.is_empty()
+            && std::path::Path::new(app.ui.input_buffer.trim()).is_dir();
+
+        let body = if app.ui.input_buffer.is_empty() {
+            "Enter an absolute path, e.g. /Users/me/my-project".to_string()
+        } else if valid {
+            format!(" \u{2713} Directory exists: {}", app.ui.input_buffer.trim())
+        } else {
+            format!(" \u{2717} Path not found: {}", app.ui.input_buffer.trim())
+        };
+
+        let status_color = if valid {
+            app.theme().success
+        } else {
+            app.theme().error
+        };
+
+        let lines = vec![
+            Line::from(Span::styled(
+                " Enter project path:",
+                Style::default()
+                    .fg(app.theme().text_normal)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(Span::raw("")),
+            Line::from(Span::styled(
+                format!("   {}|", app.ui.input_buffer),
+                Style::default().fg(app.theme().text_normal),
+            )),
+            Line::from(Span::raw("")),
+            Line::from(Span::styled(body, Style::default().fg(status_color))),
+            Line::from(Span::raw("")),
+            Line::from(Span::styled(
+                " Enter: confirm   Esc: cancel",
+                Style::default().fg(app.theme().text_muted),
+            )),
+        ];
+
+        let block = Block::default()
+            .title(" Project Path ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(app.theme().primary))
+            .bg(app.theme().background);
+
+        let paragraph = Paragraph::new(Text::from(lines)).block(block);
+
+        frame.render_widget(Clear, popup_area);
+        frame.render_widget(paragraph, popup_area);
+    }
 }
 
 fn render_package_detail(frame: &mut Frame, area: Rect, app: &App) {
