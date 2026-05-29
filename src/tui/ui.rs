@@ -172,13 +172,6 @@ fn title_bar(frame: &mut Frame, area: Rect, app: &App) {
         .config
         .project_path
         .clone()
-        .map(|p| {
-            if p == get_cwd_display() {
-                p
-            } else {
-                format!("Project: {}", p)
-            }
-        })
         .unwrap_or_else(get_cwd_display);
 
     frame.render_widget(
