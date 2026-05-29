@@ -127,6 +127,21 @@ fn title_bar(frame: &mut Frame, area: Rect, app: &App) {
                 concat!("v", env!("CARGO_PKG_VERSION")),
                 Style::default().fg(app.theme().text_muted),
             ),
+            Span::raw("  "),
+            Span::styled(
+                app.config
+                    .project_path
+                    .clone()
+                    .map(|p| {
+                        if p == get_cwd_display() {
+                            String::new()
+                        } else {
+                            p
+                        }
+                    })
+                    .unwrap_or_default(),
+                Style::default().fg(app.theme().text_muted),
+            ),
         ]))
         .alignment(Alignment::Center)
         .block(
@@ -153,9 +168,15 @@ fn title_bar(frame: &mut Frame, area: Rect, app: &App) {
         .style(Style::default().fg(app.theme().primary));
     frame.render_widget(art, chunks[1]);
 
+    let path_label = app
+        .config
+        .project_path
+        .clone()
+        .unwrap_or_else(get_cwd_display);
+
     frame.render_widget(
         Paragraph::new(Line::from(vec![Span::styled(
-            get_cwd_display(),
+            path_label,
             Style::default().fg(app.theme().text_muted),
         )]))
         .alignment(Alignment::Center),
@@ -1896,6 +1917,98 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
         let mut state = ListState::default();
         state.select(Some(app.ui.settings_edit_selection));
         frame.render_stateful_widget(list, popup_area, &mut state);
+    }
+
+    if app.ui.input_mode {
+        let n_completions = app.ui.input_completions.len();
+        let completion_rows = n_completions.min(8) as u16;
+        let popup_height = (30 + completion_rows * 2).min(70);
+        let popup_area = centered_rect(60, popup_height, area);
+        let valid = !app.ui.input_buffer.is_empty()
+            && std::path::Path::new(app.ui.input_buffer.trim()).is_dir();
+
+        let body = if app.ui.input_buffer.is_empty() {
+            "Enter an absolute path, e.g. /Users/me/my-project".to_string()
+        } else if valid {
+            let p = std::path::Path::new(app.ui.input_buffer.trim());
+            let file_count = std::fs::read_dir(p).map(|e| e.count()).unwrap_or(0);
+            format!(
+                " \u{2713} {file_count} items  {}",
+                app.ui.input_buffer.trim()
+            )
+        } else {
+            format!(" \u{2717} Path not found: {}", app.ui.input_buffer.trim())
+        };
+
+        let status_color = if valid {
+            app.theme().success
+        } else {
+            app.theme().error
+        };
+
+        let mut lines = vec![
+            Line::from(Span::styled(
+                " Enter project path:",
+                Style::default()
+                    .fg(app.theme().text_normal)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(Span::raw("")),
+            Line::from(Span::styled(
+                format!("   {}|", app.ui.input_buffer),
+                Style::default().fg(app.theme().text_normal),
+            )),
+            Line::from(Span::raw("")),
+            Line::from(Span::styled(body, Style::default().fg(status_color))),
+            Line::from(Span::raw("")),
+        ];
+
+        if !app.ui.input_completions.is_empty() {
+            lines.push(Line::from(Span::styled(
+                " Suggestions:",
+                Style::default()
+                    .fg(app.theme().text_muted)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            let max_show = app.ui.input_completions.len().min(8);
+            for i in 0..max_show {
+                let is_selected = i == app.ui.input_completion_index;
+                let marker = if is_selected { " \u{25B6} " } else { "   " };
+                let fg = if is_selected {
+                    app.theme().text_normal
+                } else {
+                    app.theme().text_muted
+                };
+                lines.push(Line::from(Span::styled(
+                    format!("{}{}", marker, app.ui.input_completions[i]),
+                    Style::default().fg(fg),
+                )));
+            }
+            lines.push(Line::from(Span::raw("")));
+            if n_completions > 8 {
+                lines.push(Line::from(Span::styled(
+                    format!("   ... and {} more", n_completions - 8),
+                    Style::default().fg(app.theme().text_muted),
+                )));
+                lines.push(Line::from(Span::raw("")));
+            }
+        }
+
+        lines.push(Line::from(Span::styled(
+            " Tab: autocomplete   \u{2191}\u{2193}: navigate   Enter: confirm   Esc: cancel",
+            Style::default().fg(app.theme().text_muted),
+        )));
+
+        let block = Block::default()
+            .title(" Project Path ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(app.theme().primary))
+            .bg(app.theme().background);
+
+        let paragraph = Paragraph::new(Text::from(lines)).block(block);
+
+        frame.render_widget(Clear, popup_area);
+        frame.render_widget(paragraph, popup_area);
     }
 }
 

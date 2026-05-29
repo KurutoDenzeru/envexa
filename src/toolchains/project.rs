@@ -11,6 +11,8 @@ fn detect_project_type(dir: &Path) -> Option<&'static str> {
         Some("bun")
     } else if dir.join("deno.json").exists() || dir.join("deno.jsonc").exists() {
         Some("deno")
+    } else if dir.join("package.json").exists() {
+        Some("npm")
     } else if dir.join("Cargo.toml").exists() {
         Some("cargo")
     } else if dir.join("poetry.lock").exists() {
@@ -19,8 +21,6 @@ fn detect_project_type(dir: &Path) -> Option<&'static str> {
         Some("pipenv")
     } else if dir.join("requirements.txt").exists() {
         Some("requirements")
-    } else if dir.join("package.json").exists() {
-        Some("npm")
     } else if dir.join("go.mod").exists() {
         Some("go")
     } else if dir.join("build.gradle").exists() || dir.join("build.gradle.kts").exists() {

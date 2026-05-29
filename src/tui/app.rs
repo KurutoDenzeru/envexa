@@ -58,6 +58,10 @@ pub struct UiState {
     pub settings_edit_mode: bool,
     pub settings_edit_selection: usize,
     pub settings_scanner_focus: usize,
+    pub input_mode: bool,
+    pub input_buffer: String,
+    pub input_completions: Vec<String>,
+    pub input_completion_index: usize,
     pub search_mode: bool,
     pub search_query: String,
     pub throbber_state: ThrobberState,
@@ -112,6 +116,10 @@ impl App {
                 settings_edit_mode: false,
                 settings_edit_selection: 0,
                 settings_scanner_focus: 0,
+                input_mode: false,
+                input_buffer: String::new(),
+                input_completions: Vec::new(),
+                input_completion_index: 0,
                 search_mode: false,
                 search_query: String::new(),
                 throbber_state: ThrobberState::default(),
@@ -207,6 +215,61 @@ impl App {
                                 KeyCode::Char(c) if !c.is_control() => {
                                     self.ui.search_query.push(c);
                                     self.clamp_selection();
+                                }
+                                _ => {}
+                            }
+                            continue;
+                        }
+
+                        if self.ui.input_mode {
+                            match key.code {
+                                KeyCode::Esc => {
+                                    self.ui.input_mode = false;
+                                    self.ui.input_buffer.clear();
+                                    self.ui.input_completions.clear();
+                                }
+                                KeyCode::Enter => {
+                                    let path = self.ui.input_buffer.trim().to_string();
+                                    if !path.is_empty() {
+                                        let p = std::path::Path::new(&path);
+                                        if p.is_dir() {
+                                            self.config.project_path = Some(path);
+                                            let _ = config::save_config(&self.config);
+                                            self.ui.input_mode = false;
+                                            self.ui.input_buffer.clear();
+                                            self.ui.input_completions.clear();
+                                            self.ui.settings_edit_mode = false;
+                                            self.do_scan(tx.clone())?;
+                                        }
+                                    }
+                                }
+                                KeyCode::Tab | KeyCode::Right => {
+                                    let completions = self.ui.input_completions.clone();
+                                    if completions.is_empty() {
+                                        self.refresh_completions();
+                                    } else if self.ui.input_completion_index < completions.len() {
+                                        let sel =
+                                            completions[self.ui.input_completion_index].clone();
+                                        self.ui.input_buffer = format!("{}/", sel);
+                                        self.refresh_completions();
+                                    }
+                                }
+                                KeyCode::Down | KeyCode::Char('j') => {
+                                    let n = self.ui.input_completions.len().saturating_sub(1);
+                                    self.ui.input_completion_index =
+                                        self.ui.input_completion_index.saturating_add(1).min(n);
+                                }
+                                KeyCode::Up | KeyCode::Char('k') => {
+                                    self.ui.input_completion_index =
+                                        self.ui.input_completion_index.saturating_sub(1);
+                                }
+                                KeyCode::Backspace => {
+                                    self.ui.input_buffer.pop();
+                                    self.refresh_completions();
+                                }
+                                KeyCode::Char(c) if !c.is_control() => {
+                                    self.ui.input_buffer.push(c);
+                                    self.refresh_completions();
                                 }
                                 _ => {}
                             }
@@ -866,6 +929,48 @@ impl App {
         }
     }
 
+    fn refresh_completions(&mut self) {
+        let input = self.ui.input_buffer.trim();
+        let (parent, prefix) = if input.is_empty() {
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/".to_string());
+            (std::path::PathBuf::from(home), String::new())
+        } else {
+            let p = std::path::Path::new(input);
+            let parent = p
+                .parent()
+                .map(|p| {
+                    if p.to_string_lossy().is_empty() {
+                        std::path::PathBuf::from("/")
+                    } else {
+                        p.to_path_buf()
+                    }
+                })
+                .unwrap_or_else(|| std::path::PathBuf::from("/"));
+            let prefix = p
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string();
+            (parent, prefix)
+        };
+
+        let mut completions = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(&parent) {
+            for entry in entries.flatten() {
+                if entry.path().is_dir() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if name.starts_with(&prefix) && !name.starts_with('.') {
+                        let full = parent.join(&name).display().to_string();
+                        completions.push(full);
+                    }
+                }
+            }
+        }
+        completions.sort();
+        self.ui.input_completions = completions;
+        self.ui.input_completion_index = 0;
+    }
+
     fn count_filtered_tools(&self) -> usize {
         let report = match &self.report {
             Some(r) => r,
@@ -989,7 +1094,11 @@ impl App {
                 let cwd = std::env::current_dir()
                     .map(|p| p.display().to_string())
                     .unwrap_or_default();
-                vec![cwd, "~/.envexa/project".to_string()]
+                vec![
+                    cwd,
+                    "~/.envexa/project".to_string(),
+                    "Custom path...".to_string(),
+                ]
             }
             3 => vec![
                 "10s".to_string(),
@@ -1046,6 +1155,11 @@ impl App {
                 self.config.auto_scan_on_startup = val == "On";
             }
             2 => {
+                if val == "Custom path..." {
+                    self.ui.input_mode = true;
+                    self.ui.input_buffer = self.config.project_path.clone().unwrap_or_default();
+                    return;
+                }
                 self.config.project_path = Some(val.clone());
             }
             3 => {
@@ -1117,7 +1231,20 @@ impl App {
             }
             _ => String::new(),
         };
-        self.ui.settings_edit_selection = opts.iter().position(|o| o == &current_val).unwrap_or(0);
+        let selection = opts.iter().position(|o| {
+            if self.ui.settings_selection == 2 {
+                o == &current_val
+                    || (current_val
+                        != std::env::current_dir()
+                            .map(|p| p.display().to_string())
+                            .unwrap_or_default()
+                        && current_val != "~/.envexa/project"
+                        && o == "Custom path...")
+            } else {
+                o == &current_val
+            }
+        });
+        self.ui.settings_edit_selection = selection.unwrap_or(0);
         self.ui.settings_edit_mode = true;
     }
 
