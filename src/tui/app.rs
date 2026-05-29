@@ -268,7 +268,7 @@ impl App {
                         }
 
                         match key.code {
-                            KeyCode::Esc | KeyCode::Char('h') => {
+                            KeyCode::Esc => {
                                 if self.ui.settings_edit_mode {
                                     self.ui.settings_edit_mode = false;
                                 } else {
@@ -330,7 +330,7 @@ impl App {
                                     _ => View::Settings,
                                 };
                             }
-                            KeyCode::Left | KeyCode::Char('j') => {
+                            KeyCode::Left | KeyCode::Char('h') => {
                                 self.ui.tab_index = if self.ui.tab_index == 0 {
                                     2
                                 } else {
@@ -342,8 +342,12 @@ impl App {
                                     _ => View::Settings,
                                 };
                             }
-                            KeyCode::Down | KeyCode::Char('n') => self.next_item(),
-                            KeyCode::Up | KeyCode::Char('p') => self.prev_item(),
+                            KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('n') => {
+                                self.next_item()
+                            }
+                            KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('p') => {
+                                self.prev_item()
+                            }
                             KeyCode::Enter => {
                                 if matches!(self.ui.view, View::Dashboard) {
                                     self.open_detail();
