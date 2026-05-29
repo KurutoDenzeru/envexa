@@ -1899,14 +1899,22 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
     }
 
     if app.ui.input_mode {
-        let popup_area = centered_rect(60, 30, area);
+        let n_completions = app.ui.input_completions.len();
+        let completion_rows = n_completions.min(8) as u16;
+        let popup_height = (30 + completion_rows * 2).min(70);
+        let popup_area = centered_rect(60, popup_height, area);
         let valid = !app.ui.input_buffer.is_empty()
             && std::path::Path::new(app.ui.input_buffer.trim()).is_dir();
 
         let body = if app.ui.input_buffer.is_empty() {
             "Enter an absolute path, e.g. /Users/me/my-project".to_string()
         } else if valid {
-            format!(" \u{2713} Directory exists: {}", app.ui.input_buffer.trim())
+            let p = std::path::Path::new(app.ui.input_buffer.trim());
+            let file_count = std::fs::read_dir(p).map(|e| e.count()).unwrap_or(0);
+            format!(
+                " \u{2713} {file_count} items  {}",
+                app.ui.input_buffer.trim()
+            )
         } else {
             format!(" \u{2717} Path not found: {}", app.ui.input_buffer.trim())
         };
@@ -1917,7 +1925,7 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
             app.theme().error
         };
 
-        let lines = vec![
+        let mut lines = vec![
             Line::from(Span::styled(
                 " Enter project path:",
                 Style::default()
@@ -1932,11 +1940,43 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
             Line::from(Span::raw("")),
             Line::from(Span::styled(body, Style::default().fg(status_color))),
             Line::from(Span::raw("")),
-            Line::from(Span::styled(
-                " Enter: confirm   Esc: cancel",
-                Style::default().fg(app.theme().text_muted),
-            )),
         ];
+
+        if !app.ui.input_completions.is_empty() {
+            lines.push(Line::from(Span::styled(
+                " Suggestions:",
+                Style::default()
+                    .fg(app.theme().text_muted)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            let max_show = app.ui.input_completions.len().min(8);
+            for i in 0..max_show {
+                let is_selected = i == app.ui.input_completion_index;
+                let marker = if is_selected { " \u{25B6} " } else { "   " };
+                let fg = if is_selected {
+                    app.theme().text_normal
+                } else {
+                    app.theme().text_muted
+                };
+                lines.push(Line::from(Span::styled(
+                    format!("{}{}", marker, app.ui.input_completions[i]),
+                    Style::default().fg(fg),
+                )));
+            }
+            lines.push(Line::from(Span::raw("")));
+            if n_completions > 8 {
+                lines.push(Line::from(Span::styled(
+                    format!("   ... and {} more", n_completions - 8),
+                    Style::default().fg(app.theme().text_muted),
+                )));
+                lines.push(Line::from(Span::raw("")));
+            }
+        }
+
+        lines.push(Line::from(Span::styled(
+            " Tab: autocomplete   \u{2191}\u{2193}: navigate   Enter: confirm   Esc: cancel",
+            Style::default().fg(app.theme().text_muted),
+        )));
 
         let block = Block::default()
             .title(" Project Path ")
