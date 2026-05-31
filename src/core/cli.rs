@@ -28,6 +28,8 @@ enum Commands {
         ttl: u64,
         #[arg(long, default_value = "markdown")]
         format: String,
+        #[arg(long, short, help = "Show per-toolchain progress during scan")]
+        verbose: bool,
     },
     #[command(about = "Self-update to latest release")]
     Update,
@@ -86,7 +88,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 async fn run_cmd(cmd: Commands) -> Result<(), anyhow::Error> {
     match cmd {
-        Commands::Scan { ttl, format } => {
+        Commands::Scan {
+            ttl,
+            format,
+            verbose,
+        } => {
             let mut report_opt = None;
             if let Some(entry) = config::read_cache() {
                 if !config::cache_expired(&entry) {
@@ -97,7 +103,14 @@ async fn run_cmd(cmd: Commands) -> Result<(), anyhow::Error> {
             let report = if let Some(r) = report_opt {
                 r
             } else {
-                let results = with_spinner("Scanning toolchains...", toolchains::scan_all()).await;
+                if verbose {
+                    eprintln!("Scanning toolchains...");
+                }
+                let results = if verbose {
+                    toolchains::scan_all_with(15, None, true).await
+                } else {
+                    with_spinner("Scanning toolchains...", toolchains::scan_all()).await
+                };
                 let r = Report {
                     timestamp: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
                     results,

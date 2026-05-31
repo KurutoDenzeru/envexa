@@ -116,7 +116,7 @@ impl ScanResult {
     }
 }
 
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub fn which(cmd: &str) -> bool {
     std::env::var("PATH")
@@ -174,12 +174,13 @@ pub mod security;
 pub mod yarn;
 
 pub async fn scan_all() -> HashMap<String, ScanResult> {
-    scan_all_with(30, None).await
+    scan_all_with(15, None, false).await
 }
 
 pub async fn scan_all_with(
     timeout_secs: u64,
     enabled: Option<&[String]>,
+    verbose: bool,
 ) -> HashMap<String, ScanResult> {
     let project_dir = get_project_path();
     let ignore = crate::core::config::EnvexaIgnore::load(&project_dir);
@@ -211,11 +212,24 @@ pub async fn scan_all_with(
 
     let mut buffered = stream::iter(tasks).buffer_unordered(16);
     let deadline = tokio::time::Instant::now() + Duration::from_secs(timeout_secs);
+    let scan_start = std::time::Instant::now();
 
     loop {
         let result = tokio::time::timeout_at(deadline, buffered.next()).await;
         match result {
             Ok(Some((name, mut res))) => {
+                if verbose {
+                    let elapsed = scan_start.elapsed();
+                    let status_icon = match res.status.as_str() {
+                        "ok" => "\x1b[32m✓\x1b[0m",
+                        "skipped" => "\x1b[90m-\x1b[0m",
+                        "warning" => "\x1b[33m!\x1b[0m",
+                        "error" => "\x1b[31m✗\x1b[0m",
+                        _ => "?",
+                    };
+                    eprintln!("  {} {} ({:.1}s)", status_icon, name, elapsed.as_secs_f64());
+                }
+
                 if let Some(enabled_list) = enabled {
                     if !enabled_list.iter().any(|e| e == name) {
                         results.insert(

@@ -22,7 +22,11 @@ pub async fn scan() -> ScanResult {
 
     let (ver_res, outdated_res, list_res) = tokio::join!(
         run_cmd("brew", &["--version"], None),
-        run_cmd("brew", &["outdated", "--greedy", "--json"], None),
+        run_cmd(
+            "brew",
+            &["outdated", "--greedy", "--json"],
+            Some(Duration::from_secs(10))
+        ),
         run_cmd("brew", &["list", "--formula", "--versions"], None)
     );
 

@@ -1010,6 +1010,7 @@ impl App {
             let results = std::panic::AssertUnwindSafe(toolchains::scan_all_with(
                 timeout,
                 enabled.as_deref(),
+                false,
             ))
             .catch_unwind()
             .await

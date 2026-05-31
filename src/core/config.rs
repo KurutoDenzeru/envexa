@@ -65,7 +65,7 @@ fn default_theme() -> String {
 }
 
 fn default_scan_timeout() -> u64 {
-    30
+    15
 }
 
 fn default_daemon_interval() -> u64 {

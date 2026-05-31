@@ -13,7 +13,7 @@ pub async fn scan() -> ScanResult {
 
     let (ver_res, info_res) = tokio::join!(
         run_cmd("docker", &["--version"], None),
-        tokio::time::timeout(Duration::from_secs(10), info_cmd)
+        tokio::time::timeout(Duration::from_secs(3), info_cmd)
     );
 
     if let Ok(ver) = ver_res {
