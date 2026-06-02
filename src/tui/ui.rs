@@ -12,7 +12,7 @@ use ratatui::{
 use tui_piechart::{LegendAlignment, LegendLayout, LegendPosition, PieChart, PieSlice, Resolution};
 
 use crate::scanner;
-use crate::tui::app::{App, View};
+use crate::tui::app::{App, View, ALL_SCANNERS};
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()
@@ -714,6 +714,49 @@ fn project_tooling_risk(
         + audit_items * 8
         + project_outdated.min(10) * 2;
     score.min(100) as u64
+}
+
+/// Shared helper: renders a stateful table with header, selection highlight,
+/// and responsive constraints. Used by all four detail render functions.
+#[allow(clippy::too_many_arguments)]
+fn render_item_table(
+    frame: &mut Frame,
+    area: Rect,
+    app: &App,
+    title: String,
+    border_style: Style,
+    header_cells: &[&str],
+    rows: &[Row],
+    kind: &str,
+    title_bottom: Option<&str>,
+) {
+    let header = Row::new(
+        header_cells
+            .iter()
+            .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD)),
+    )
+    .style(
+        Style::default()
+            .bg(app.theme().secondary)
+            .fg(app.theme().text_normal),
+    )
+    .height(1);
+
+    let mut block = Block::default()
+        .borders(Borders::ALL)
+        .title(title)
+        .border_style(border_style);
+    if let Some(msg) = title_bottom {
+        block = block.title_bottom(msg);
+    }
+
+    let table = Table::new(rows.to_vec(), detail_table_constraints(area.width, kind))
+        .header(header)
+        .block(block)
+        .column_spacing(1);
+    let mut state = TableState::default();
+    state.select(Some(app.detail.selection));
+    frame.render_stateful_widget(table, area, &mut state);
 }
 
 fn dashboard_cells(
@@ -1577,11 +1620,6 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
 
 const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
-const ALL_SCANNERS: &[&str] = &[
-    "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
-    "security", "audit", "ci", "git", "cleanup",
-];
-
 pub fn render(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
     let theme = app.theme();
@@ -2052,17 +2090,6 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         return;
     }
 
-    let header_cells = ["", "Package ", "Source ", "Current ", "Latest ", "Size "]
-        .iter()
-        .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
-    let header = Row::new(header_cells)
-        .style(
-            Style::default()
-                .bg(app.theme().secondary)
-                .fg(app.theme().text_normal),
-        )
-        .height(1);
-
     let rows: Vec<Row> = items
         .iter()
         .enumerate()
@@ -2095,25 +2122,22 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         .collect();
 
     let sub = if !app.detail.message.is_empty() {
-        format!("  {}", app.detail.message)
+        Some(format!("  {}", app.detail.message))
     } else {
-        String::new()
+        None
     };
 
-    let table = Table::new(rows, detail_table_constraints(area.width, "outdated"))
-        .header(header)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!(" {tool} — Outdated Packages ({}) ", items.len()))
-                .title_bottom(sub)
-                .border_style(Style::default().fg(app.theme().primary)),
-        )
-        .column_spacing(1);
-
-    let mut state = TableState::default();
-    state.select(Some(app.detail.selection));
-    frame.render_stateful_widget(table, area, &mut state);
+    render_item_table(
+        frame,
+        area,
+        app,
+        format!(" {tool} — Outdated Packages ({}) ", items.len()),
+        Style::default().fg(app.theme().primary),
+        &["", "Package ", "Source ", "Current ", "Latest ", "Size "],
+        &rows,
+        "outdated",
+        sub.as_deref(),
+    );
 }
 
 fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
@@ -2142,16 +2166,14 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         return;
     }
 
-    let header_cells = ["Package ", "Severity ", "CVE ", "Title ", "Patched In "]
-        .iter()
-        .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
-    let header = Row::new(header_cells)
-        .style(
-            Style::default()
-                .bg(app.theme().secondary)
-                .fg(app.theme().text_normal),
-        )
-        .height(1);
+    let bottom_msg = if !app.detail.message.is_empty() {
+        Some(format!(
+            "  {}  |  [E] Export Report  [Esc] Back ",
+            app.detail.message
+        ))
+    } else {
+        Some("  [E] Export Report  |  [Esc] Back ".to_string())
+    };
 
     let rows: Vec<Row> = items
         .iter()
@@ -2177,21 +2199,6 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         })
         .collect();
 
-    let bottom_msg = if !app.detail.message.is_empty() {
-        format!(
-            "  {}  |  [E] Export Report  [Esc] Back ",
-            app.detail.message
-        )
-    } else {
-        "  [E] Export Report  |  [Esc] Back ".to_string()
-    };
-
-    let table_block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" {tool} — Vulnerabilities ({}) ", items.len()))
-        .title_bottom(bottom_msg)
-        .border_style(Style::default().fg(app.theme().error));
-
     // Responsive 2-column layout
     if area.width >= 100 && area.height >= 8 {
         let chunks = Layout::default()
@@ -2203,13 +2210,17 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         let right_area = chunks[1];
 
         // Draw Left Table
-        let table = Table::new(rows, detail_table_constraints(left_area.width, "security"))
-            .header(header)
-            .block(table_block)
-            .column_spacing(1);
-        let mut state = TableState::default();
-        state.select(Some(app.detail.selection));
-        frame.render_stateful_widget(table, left_area, &mut state);
+        render_item_table(
+            frame,
+            left_area,
+            app,
+            format!(" {tool} — Vulnerabilities ({}) ", items.len()),
+            Style::default().fg(app.theme().error),
+            &["Package ", "Severity ", "CVE ", "Title ", "Patched In "],
+            &rows,
+            "security",
+            bottom_msg.as_deref(),
+        );
 
         // Draw Right Stats and Detail Panel
         let right_chunks = Layout::default()
@@ -2350,15 +2361,18 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             );
             frame.render_widget(empty_card, right_chunks[1]);
         }
-    } else {
         // Fallback layout (narrow terminal)
-        let table = Table::new(rows, detail_table_constraints(area.width, "security"))
-            .header(header)
-            .block(table_block)
-            .column_spacing(1);
-        let mut state = TableState::default();
-        state.select(Some(app.detail.selection));
-        frame.render_stateful_widget(table, area, &mut state);
+        render_item_table(
+            frame,
+            area,
+            app,
+            format!(" {tool} — Vulnerabilities ({}) ", items.len()),
+            Style::default().fg(app.theme().error),
+            &["Package ", "Severity ", "CVE ", "Title ", "Patched In "],
+            &rows,
+            "security",
+            bottom_msg.as_deref(),
+        );
     }
 }
 
@@ -2388,17 +2402,6 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         return;
     }
 
-    let header_cells = ["Name ", "Current ", "Note "]
-        .iter()
-        .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
-    let header = Row::new(header_cells)
-        .style(
-            Style::default()
-                .bg(app.theme().secondary)
-                .fg(app.theme().text_normal),
-        )
-        .height(1);
-
     let rows: Vec<Row> = items
         .iter()
         .enumerate()
@@ -2421,19 +2424,13 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         .collect();
 
     let bottom_msg = if !app.detail.message.is_empty() {
-        format!(
+        Some(format!(
             "  {}  |  [E] Export Report  [Esc] Back ",
             app.detail.message
-        )
+        ))
     } else {
-        "  [E] Export Report  |  [Esc] Back ".to_string()
+        Some("  [E] Export Report  |  [Esc] Back ".to_string())
     };
-
-    let table_block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" {tool} — Audit Items ({}) ", items.len()))
-        .title_bottom(bottom_msg)
-        .border_style(Style::default().fg(app.theme().warning));
 
     // Responsive 2-column layout
     if area.width >= 100 && area.height >= 8 {
@@ -2446,13 +2443,17 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         let right_area = chunks[1];
 
         // Draw Left Table
-        let table = Table::new(rows, detail_table_constraints(left_area.width, "audit"))
-            .header(header)
-            .block(table_block)
-            .column_spacing(1);
-        let mut state = TableState::default();
-        state.select(Some(app.detail.selection));
-        frame.render_stateful_widget(table, left_area, &mut state);
+        render_item_table(
+            frame,
+            left_area,
+            app,
+            format!(" {tool} — Audit Items ({}) ", items.len()),
+            Style::default().fg(app.theme().warning),
+            &["Name ", "Current ", "Note "],
+            &rows,
+            "audit",
+            bottom_msg.as_deref(),
+        );
 
         // Draw Right Stats and Detail Panel
         let right_chunks = Layout::default()
@@ -2526,15 +2527,18 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
             );
             frame.render_widget(empty_card, right_chunks[1]);
         }
-    } else {
         // Fallback layout (narrow terminal)
-        let table = Table::new(rows, detail_table_constraints(area.width, "audit"))
-            .header(header)
-            .block(table_block)
-            .column_spacing(1);
-        let mut state = TableState::default();
-        state.select(Some(app.detail.selection));
-        frame.render_stateful_widget(table, area, &mut state);
+        render_item_table(
+            frame,
+            area,
+            app,
+            format!(" {tool} — Audit Items ({}) ", items.len()),
+            Style::default().fg(app.theme().warning),
+            &["Name ", "Current ", "Note "],
+            &rows,
+            "audit",
+            bottom_msg.as_deref(),
+        );
     }
 }
 
@@ -2625,17 +2629,6 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         frame.render_widget(text, area);
         return;
     }
-
-    let header_cells = ["", "Category ", "Description ", "Size ", "Command "]
-        .iter()
-        .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
-    let header = Row::new(header_cells)
-        .style(
-            Style::default()
-                .bg(app.theme().secondary)
-                .fg(app.theme().text_normal),
-        )
-        .height(1);
 
     let rows: Vec<Row> = items
         .iter()
@@ -2735,21 +2728,40 @@ fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
                     .border_style(Style::default().fg(app.theme().primary)),
             );
         frame.render_widget(piechart, chunks[0]);
+        // Draw Right Table
+        let c_header = Row::new(
+            ["", "Category ", "Description ", "Size ", "Command "]
+                .iter()
+                .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD)),
+        )
+        .style(
+            Style::default()
+                .bg(app.theme().secondary)
+                .fg(app.theme().text_normal),
+        )
+        .height(1);
 
-        let table = Table::new(rows, detail_table_constraints(chunks[1].width, "cleanup"))
-            .header(header)
-            .column_spacing(1);
+        let table = Table::new(
+            rows.clone(),
+            detail_table_constraints(chunks[1].width, "cleanup"),
+        )
+        .header(c_header)
+        .column_spacing(1);
         let mut state = TableState::default();
         state.select(Some(app.detail.selection));
         frame.render_stateful_widget(table, chunks[1], &mut state);
     } else {
-        let table = Table::new(rows, detail_table_constraints(area.width, "cleanup"))
-            .header(header)
-            .block(block)
-            .column_spacing(1);
-        let mut state = TableState::default();
-        state.select(Some(app.detail.selection));
-        frame.render_stateful_widget(table, area, &mut state);
+        render_item_table(
+            frame,
+            area,
+            app,
+            format!(" {tool} — Cleanup ({}) ", items.len()),
+            Style::default().fg(app.theme().success),
+            &["", "Category ", "Description ", "Size ", "Command "],
+            &rows,
+            "cleanup",
+            None,
+        );
     }
 }
 

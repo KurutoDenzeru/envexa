@@ -95,16 +95,16 @@ impl ScanResult {
             bun_version: None,
             deno_version: None,
             installed_count: None,
-            outdated_formulae: vec![],
-            outdated_casks: vec![],
-            outdated: vec![],
-            outdated_global: vec![],
-            issues: vec![],
+            outdated_formulae: Vec::with_capacity(4),
+            outdated_casks: Vec::with_capacity(4),
+            outdated: Vec::with_capacity(8),
+            outdated_global: Vec::with_capacity(8),
+            issues: Vec::with_capacity(2),
             disk_usage: None,
             project_type: None,
-            vulnerabilities: vec![],
-            audit_items: vec![],
-            cleanup_items: vec![],
+            vulnerabilities: Vec::with_capacity(4),
+            audit_items: Vec::with_capacity(4),
+            cleanup_items: Vec::with_capacity(4),
         }
     }
 
@@ -118,11 +118,25 @@ impl ScanResult {
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
+use std::collections::HashMap as StdHashMap;
+use std::sync::{LazyLock, Mutex};
+
+static WHICH_CACHE: LazyLock<Mutex<StdHashMap<String, bool>>> =
+    LazyLock::new(|| Mutex::new(StdHashMap::new()));
+
 pub fn which(cmd: &str) -> bool {
-    std::env::var("PATH")
+    {
+        let cache = WHICH_CACHE.lock().unwrap();
+        if let Some(&found) = cache.get(cmd) {
+            return found;
+        }
+    }
+    let found = std::env::var("PATH")
         .unwrap_or_default()
         .split(':')
-        .any(|d| std::path::Path::new(d).join(cmd).exists())
+        .any(|d| std::path::Path::new(d).join(cmd).exists());
+    WHICH_CACHE.lock().unwrap().insert(cmd.to_string(), found);
+    found
 }
 
 pub async fn run_cmd(
@@ -133,7 +147,9 @@ pub async fn run_cmd(
     let cmd = Command::new(program).args(args).output();
     let to_wait = timeout.unwrap_or(DEFAULT_TIMEOUT);
     let output = tokio::time::timeout(to_wait, cmd).await??;
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    let stdout = String::from_utf8(output.stdout)
+        .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).into_owned());
+    Ok(stdout.trim().to_string())
 }
 
 pub async fn run_cmd_in(
@@ -145,7 +161,9 @@ pub async fn run_cmd_in(
     let cmd = Command::new(program).args(args).current_dir(dir).output();
     let to_wait = timeout.unwrap_or(DEFAULT_TIMEOUT);
     let output = tokio::time::timeout(to_wait, cmd).await??;
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    let stdout = String::from_utf8(output.stdout)
+        .unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).into_owned());
+    Ok(stdout.trim().to_string())
 }
 
 pub fn get_project_path() -> std::path::PathBuf {
@@ -186,26 +204,32 @@ pub async fn scan_all_with(
 
     use futures::stream::{self, StreamExt};
 
+    macro_rules! scanner_task {
+        ($name:ident) => {
+            Box::pin(async { (stringify!($name), $name::scan().await) })
+        };
+    }
+
     #[allow(clippy::type_complexity)]
     let tasks: Vec<
         std::pin::Pin<Box<dyn std::future::Future<Output = (&'static str, ScanResult)> + Send>>,
     > = vec![
-        Box::pin(async { ("brew", brew::scan().await) }),
-        Box::pin(async { ("npm", npm::scan().await) }),
-        Box::pin(async { ("pnpm", pnpm::scan().await) }),
-        Box::pin(async { ("yarn", yarn::scan().await) }),
-        Box::pin(async { ("bun", bun::scan().await) }),
-        Box::pin(async { ("deno", deno::scan().await) }),
-        Box::pin(async { ("pip", pip::scan().await) }),
-        Box::pin(async { ("gem", gem::scan().await) }),
-        Box::pin(async { ("cargo", cargo::scan().await) }),
-        Box::pin(async { ("docker", docker::scan().await) }),
-        Box::pin(async { ("project", project::scan().await) }),
-        Box::pin(async { ("security", security::scan().await) }),
-        Box::pin(async { ("audit", audit::scan().await) }),
-        Box::pin(async { ("cleanup", cleanup::scan().await) }),
-        Box::pin(async { ("git", git::scan().await) }),
-        Box::pin(async { ("ci", ci::scan().await) }),
+        scanner_task!(brew),
+        scanner_task!(npm),
+        scanner_task!(pnpm),
+        scanner_task!(yarn),
+        scanner_task!(bun),
+        scanner_task!(deno),
+        scanner_task!(pip),
+        scanner_task!(gem),
+        scanner_task!(cargo),
+        scanner_task!(docker),
+        scanner_task!(project),
+        scanner_task!(security),
+        scanner_task!(audit),
+        scanner_task!(cleanup),
+        scanner_task!(git),
+        scanner_task!(ci),
     ];
 
     let mut results = HashMap::new();
@@ -263,7 +287,6 @@ pub async fn scan_all_with(
     results
 }
 
-#[allow(dead_code)]
 pub async fn scan_one(name: &str) -> Option<ScanResult> {
     match name {
         "brew" => Some(brew::scan().await),

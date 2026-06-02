@@ -13,7 +13,7 @@ use crate::scanner::{self, OutdatedItem, Report};
 use crate::toolchains;
 use crate::toolchains::{AuditItem, CleanupItem, VulnerabilityInfo};
 
-const ALL_SCANNERS: &[&str] = &[
+pub const ALL_SCANNERS: &[&str] = &[
     "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
     "security", "audit", "ci", "git", "cleanup",
 ];
@@ -628,38 +628,7 @@ impl App {
         self.ui.update_downloaded_mb = 0.0;
         let _count = work.len();
 
-        tokio::spawn(async move {
-            let mut updated = 0usize;
-            let mut failed = 0usize;
-            let mut errors = vec![];
-            let mut successful_updates = vec![];
-            for (tk, td, item) in &work {
-                match run_update(td, item, tx.clone()).await {
-                    Ok(_) => {
-                        updated += 1;
-                        successful_updates.push((
-                            tk.clone(),
-                            item.name.clone(),
-                            item.source.clone(),
-                        ));
-                    }
-                    Err(e) => {
-                        failed += 1;
-                        errors.push(format!("{}: {}", item.name, e));
-                    }
-                }
-            }
-            let result_msg = if errors.is_empty() {
-                format!("\u{2714} Updated {updated} package(s)")
-            } else {
-                let e = errors.join("; ");
-                format!("\u{2714} Updated {updated} | \u{2716} Failed {failed}: {e}")
-            };
-            let _ = tx.send(AppEvent::UpdateFinished {
-                result_msg,
-                updated_packages: successful_updates,
-            });
-        });
+        tokio::spawn(run_updates(work, tx));
         Ok(())
     }
 
@@ -827,38 +796,7 @@ impl App {
         self.ui.update_downloaded_mb = 0.0;
         let _count = work.len();
 
-        tokio::spawn(async move {
-            let mut updated = 0usize;
-            let mut failed = 0usize;
-            let mut errors = vec![];
-            let mut successful_updates = vec![];
-            for (tk, td, item) in &work {
-                match run_update(td, item, tx.clone()).await {
-                    Ok(_) => {
-                        updated += 1;
-                        successful_updates.push((
-                            tk.clone(),
-                            item.name.clone(),
-                            item.source.clone(),
-                        ));
-                    }
-                    Err(e) => {
-                        failed += 1;
-                        errors.push(format!("{}: {}", item.name, e));
-                    }
-                }
-            }
-            let result_msg = if errors.is_empty() {
-                format!("\u{2714} Updated {updated} package(s)")
-            } else {
-                let e = errors.join("; ");
-                format!("\u{2714} Updated {updated} | \u{2716} Failed {failed}: {e}")
-            };
-            let _ = tx.send(AppEvent::UpdateFinished {
-                result_msg,
-                updated_packages: successful_updates,
-            });
-        });
+        tokio::spawn(run_updates(work, tx));
         Ok(())
     }
 
@@ -888,7 +826,7 @@ impl App {
     fn clamp_selection(&mut self) {
         match self.ui.view {
             View::Dashboard => {
-                let n = self.count_filtered_tools().saturating_sub(1);
+                let n = self.filtered_tools().len().saturating_sub(1);
                 self.ui.dashboard_selection = self.ui.dashboard_selection.min(n);
             }
             View::Outdated => {
@@ -973,29 +911,6 @@ impl App {
         self.ui.input_completion_index = 0;
     }
 
-    fn count_filtered_tools(&self) -> usize {
-        let report = match &self.report {
-            Some(r) => r,
-            None => return 0,
-        };
-        let q = self.ui.search_query.to_lowercase();
-        let mut count = 0;
-        for cat in scanner::tool_categories() {
-            for tool in cat.tools {
-                let matches_search = if q.is_empty() || !self.ui.search_mode {
-                    true
-                } else {
-                    let name = scanner::display_name(tool).to_lowercase();
-                    name.contains(&q) || tool.contains(&q)
-                };
-                if matches_search && report.results.contains_key(*tool) {
-                    count += 1;
-                }
-            }
-        }
-        count
-    }
-
     fn do_scan(
         &mut self,
         tx: mpsc::UnboundedSender<AppEvent>,
@@ -1022,7 +937,7 @@ impl App {
     fn next_item(&mut self) {
         match self.ui.view {
             View::Dashboard => {
-                let n = self.count_filtered_tools().saturating_sub(1);
+                let n = self.filtered_tools().len().saturating_sub(1);
                 self.ui.dashboard_selection = self.ui.dashboard_selection.saturating_add(1).min(n);
             }
             View::Outdated => {
@@ -1505,12 +1420,14 @@ async fn run_update(
     let mut total_downloaded_mb = 0.0;
     let mut stderr_accum = String::new();
     let mut stdout_accum = String::new();
+    let mut stdout_done = false;
+    let mut stderr_done = false;
 
     let name_clone = item.name.clone();
 
     loop {
         tokio::select! {
-            res = stdout_reader.next_line() => {
+            res = stdout_reader.next_line(), if !stdout_done => {
                 match res {
                     Ok(Some(line)) => {
                         if let Some(mb) = parse_downloaded_mb(&line) {
@@ -1533,11 +1450,11 @@ async fn run_update(
                             stdout_accum.push_str(&line);
                         }
                     }
-                    Ok(None) => {},
-                    Err(_) => {}
+                    Ok(None) => stdout_done = true,
+                    Err(_) => stdout_done = true,
                 }
             }
-            res = stderr_reader.next_line() => {
+            res = stderr_reader.next_line(), if !stderr_done => {
                 match res {
                     Ok(Some(line)) => {
                         if let Some(mb) = parse_downloaded_mb(&line) {
@@ -1560,8 +1477,8 @@ async fn run_update(
                             stderr_accum.push_str(&line);
                         }
                     }
-                    Ok(None) => {},
-                    Err(_) => {}
+                    Ok(None) => stderr_done = true,
+                    Err(_) => stderr_done = true,
                 }
             }
             status = child.wait() => {
@@ -1582,6 +1499,38 @@ async fn run_update(
             }
         }
     }
+}
+
+async fn run_updates(
+    work: Vec<(String, String, OutdatedItem)>,
+    tx: mpsc::UnboundedSender<AppEvent>,
+) {
+    let mut updated = 0usize;
+    let mut failed = 0usize;
+    let mut errors = vec![];
+    let mut successful_updates = vec![];
+    for (tk, td, item) in &work {
+        match run_update(td, item, tx.clone()).await {
+            Ok(_) => {
+                updated += 1;
+                successful_updates.push((tk.clone(), item.name.clone(), item.source.clone()));
+            }
+            Err(e) => {
+                failed += 1;
+                errors.push(format!("{}: {}", item.name, e));
+            }
+        }
+    }
+    let result_msg = if errors.is_empty() {
+        format!("\u{2714} Updated {updated} package(s)")
+    } else {
+        let e = errors.join("; ");
+        format!("\u{2714} Updated {updated} | \u{2716} Failed {failed}: {e}")
+    };
+    let _ = tx.send(AppEvent::UpdateFinished {
+        result_msg,
+        updated_packages: successful_updates,
+    });
 }
 
 fn parse_downloaded_mb(line: &str) -> Option<f64> {
