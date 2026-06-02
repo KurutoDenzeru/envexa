@@ -2,6 +2,15 @@ use std::collections::HashMap;
 
 pub mod sarif;
 
+pub enum Block {
+    Heading(usize, String),
+    Paragraph(String),
+    List(Vec<String>),
+    Table(Table),
+    KeyValue(Vec<(String, String)>),
+    Blank,
+}
+
 use crate::toolchains::{AuditItem, CleanupItem, ScanResult, VulnerabilityInfo};
 
 fn visible_len(s: &str) -> usize {
@@ -21,7 +30,24 @@ fn visible_len(s: &str) -> usize {
     len
 }
 
-struct Table {
+fn strip_ansi_codes(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut in_ansi = false;
+    for c in s.chars() {
+        if c == '\x1b' {
+            in_ansi = true;
+        } else if in_ansi {
+            if c == 'm' {
+                in_ansi = false;
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+pub struct Table {
     headers: Vec<String>,
     rows: Vec<Vec<String>>,
 }
@@ -42,7 +68,7 @@ impl Table {
         self.rows.push(cols.iter().map(|c| c.to_string()).collect());
     }
 
-    fn render(&self) -> String {
+    fn render(&self, strip_ansi: bool) -> String {
         let ncols = self.headers.len();
         if ncols == 0 {
             return String::new();
@@ -73,9 +99,14 @@ impl Table {
             let mut s = String::from("│");
             for (i, cell) in cells.iter().enumerate() {
                 if let Some(&w) = widths.get(i) {
-                    let vlen = visible_len(cell);
+                    let display = if strip_ansi {
+                        strip_ansi_codes(cell)
+                    } else {
+                        cell.clone()
+                    };
+                    let vlen = visible_len(&display);
                     let padding = w.saturating_sub(vlen);
-                    s.push_str(&format!(" {}{} │", cell, " ".repeat(padding)));
+                    s.push_str(&format!(" {}{} │", display, " ".repeat(padding)));
                 } else {
                     s.push_str(&format!(" {} │", cell));
                 }
@@ -357,6 +388,131 @@ pub fn cli_severity(sev: &str) -> String {
     }
 }
 
+fn render_heading_md(level: usize, text: &str) -> String {
+    format!("{} {text}", "#".repeat(level))
+}
+
+fn render_heading_tty(level: usize, text: &str) -> String {
+    let styled = match level {
+        1 => format!("\x1b[1;4;36m{text}\x1b[0m"),
+        2 => format!("\x1b[1;36m{text}\x1b[0m"),
+        _ => format!("\x1b[1m{text}\x1b[0m"),
+    };
+    // Colorize status labels like [PASS], [WARN], [SKIP], [FAIL]
+    if text.starts_with('[') {
+        if let Some(end) = text.find(']') {
+            let label = &text[1..end];
+            let rest = &text[end + 1..];
+            let colored_label = cli_status_label(label);
+            return format!("\x1b[1m[{colored_label}]{rest}\x1b[0m");
+        }
+    }
+    styled
+}
+
+fn render_inline_tty(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        match c {
+            '*' if text[i + 1..].starts_with('*') => {
+                // **bold**
+                if let Some(end) = text[i + 2..].find("**") {
+                    let inner = &text[i + 2..i + 2 + end];
+                    out.push_str(&format!("\x1b[1m{inner}\x1b[0m"));
+                    // skip past the closing **
+                    for _ in 0..end + 2 {
+                        chars.next();
+                    }
+                } else {
+                    out.push(c);
+                }
+            }
+            '*' => {
+                // *italic*
+                if let Some(end) = text[i + 1..].find('*') {
+                    let inner = &text[i + 1..i + 1 + end];
+                    out.push_str(&format!("\x1b[3m{inner}\x1b[0m"));
+                    for _ in 0..end + 1 {
+                        chars.next();
+                    }
+                } else {
+                    out.push(c);
+                }
+            }
+            '`' => {
+                if let Some(end) = text[i + 1..].find('`') {
+                    let inner = &text[i + 1..i + 1 + end];
+                    out.push_str(&format!("\x1b[33m{inner}\x1b[0m"));
+                    for _ in 0..end + 1 {
+                        chars.next();
+                    }
+                } else {
+                    out.push(c);
+                }
+            }
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+pub fn format_markdown(blocks: &[Block]) -> String {
+    render_markdown(blocks)
+}
+
+pub fn render_markdown(blocks: &[Block]) -> String {
+    let mut out = String::new();
+    for block in blocks {
+        match block {
+            Block::Heading(level, text) => out.push_str(&render_heading_md(*level, text)),
+            Block::Paragraph(text) => out.push_str(text),
+            Block::List(items) => {
+                for item in items {
+                    out.push_str(&format!("- {item}"));
+                    out.push('\n');
+                }
+            }
+            Block::Table(table) => out.push_str(&table.render(true)),
+            Block::KeyValue(pairs) => {
+                let parts: Vec<String> =
+                    pairs.iter().map(|(k, v)| format!("**{k}:** {v}")).collect();
+                out.push_str(&parts.join(" | "));
+            }
+            Block::Blank => {}
+        }
+        out.push('\n');
+    }
+    out
+}
+
+pub fn render_tty(blocks: &[Block]) -> String {
+    let mut out = String::new();
+    for block in blocks {
+        match block {
+            Block::Heading(level, text) => out.push_str(&render_heading_tty(*level, text)),
+            Block::Paragraph(text) => out.push_str(&render_inline_tty(text)),
+            Block::List(items) => {
+                for item in items {
+                    out.push_str(&format!("  • {}", render_inline_tty(item)));
+                    out.push('\n');
+                }
+            }
+            Block::Table(table) => out.push_str(&table.render(false)),
+            Block::KeyValue(pairs) => {
+                let parts: Vec<String> = pairs
+                    .iter()
+                    .map(|(k, v)| format!("\x1b[1m{k}:\x1b[0m {v}"))
+                    .collect();
+                out.push_str(&parts.join(" | "));
+            }
+            Block::Blank => {}
+        }
+        out.push('\n');
+    }
+    out
+}
+
 pub fn cli_green(s: &str) -> String {
     format!("\x1b[32m{}\x1b[0m", s)
 }
@@ -365,12 +521,22 @@ pub fn cli_yellow(s: &str) -> String {
     format!("\x1b[33m{}\x1b[0m", s)
 }
 
-pub fn format_report(report: &Report) -> String {
+fn scope_label(display: &str, source: &str) -> String {
+    if source == "global" {
+        format!("{display} (global)")
+    } else {
+        display.to_string()
+    }
+}
+
+pub fn build_blocks(report: &Report) -> Vec<Block> {
     let results = &report.results;
-    let mut lines = vec![];
-    lines.push("# Envexa Health Report".into());
-    lines.push(format!("**Generated:** {}", report.timestamp));
-    lines.push(String::new());
+    let mut blocks = vec![Block::Heading(1, "Envexa Health Report".into())];
+    blocks.push(Block::Paragraph(format!(
+        "**Generated:** {}",
+        report.timestamp
+    )));
+    blocks.push(Block::Blank);
 
     let mut outdated_all: HashMap<&str, Vec<OutdatedItem>> = HashMap::new();
     let mut vuln_all: HashMap<&str, Vec<VulnerabilityInfo>> = HashMap::new();
@@ -395,7 +561,7 @@ pub fn format_report(report: &Report) -> String {
         }
     }
 
-    lines.push("## Dashboard".into());
+    blocks.push(Block::Heading(2, "Dashboard".into()));
     let mut dt = Table::new();
     dt.header(&["Toolchain", "Status", "Version"]);
     for tool in &tool_order() {
@@ -406,11 +572,11 @@ pub fn format_report(report: &Report) -> String {
             dt.add_row(&[display, &label, &ver]);
         }
     }
-    lines.push(dt.render());
-    lines.push(String::new());
+    blocks.push(Block::Table(dt));
+    blocks.push(Block::Blank);
 
     if !outdated_all.is_empty() {
-        lines.push("## Outdated Packages".into());
+        blocks.push(Block::Heading(2, "Outdated Packages".into()));
         let mut ot = Table::new();
         ot.header(&["Toolchain", "Package", "Current", "Latest"]);
         for tool in &tool_order() {
@@ -419,16 +585,17 @@ pub fn format_report(report: &Report) -> String {
                 for item in items {
                     let cur = cli_yellow(&item.current);
                     let lat = cli_green(&item.latest);
-                    ot.add_row(&[display, &item.name, &cur, &lat]);
+                    let scoped = scope_label(display, &item.source);
+                    ot.add_row(&[&scoped, &item.name, &cur, &lat]);
                 }
             }
         }
-        lines.push(ot.render());
-        lines.push(String::new());
+        blocks.push(Block::Table(ot));
+        blocks.push(Block::Blank);
     }
 
     if !vuln_all.is_empty() {
-        lines.push("## Vulnerabilities".into());
+        blocks.push(Block::Heading(2, "Vulnerabilities".into()));
         let mut vt = Table::new();
         vt.header(&["Toolchain", "Package", "Severity", "Patched"]);
         for tool in &tool_order() {
@@ -441,12 +608,12 @@ pub fn format_report(report: &Report) -> String {
                 }
             }
         }
-        lines.push(vt.render());
-        lines.push(String::new());
+        blocks.push(Block::Table(vt));
+        blocks.push(Block::Blank);
     }
 
     if !audit_all.is_empty() {
-        lines.push("## Audit".into());
+        blocks.push(Block::Heading(2, "Audit".into()));
         let mut at = Table::new();
         at.header(&["Toolchain", "Name", "Current", "Note"]);
         for tool in &tool_order() {
@@ -458,43 +625,46 @@ pub fn format_report(report: &Report) -> String {
                 }
             }
         }
-        lines.push(at.render());
-        lines.push(String::new());
+        blocks.push(Block::Table(at));
+        blocks.push(Block::Blank);
     }
 
     if !cleanup_all.is_empty() {
-        lines.push("## Cleanup".into());
+        blocks.push(Block::Heading(2, "Cleanup".into()));
         for tool in &tool_order() {
             if let Some(items) = cleanup_all.get(tool) {
                 let display = display_name(tool);
                 for c in items {
-                    lines.push(format!(
-                        "- **[{display}]** {} — {}",
+                    let mut items = vec![format!(
+                        "**[{display}]** {} — {}",
                         c.description,
                         c.size.as_deref().unwrap_or("?")
-                    ));
+                    )];
                     if let Some(ref cmd) = c.command {
-                        lines.push(format!("  `{cmd}`"));
+                        items.push(format!("`{cmd}`"));
                     }
+                    blocks.push(Block::List(items));
                 }
             }
         }
-        lines.push(String::new());
+        blocks.push(Block::Blank);
     }
 
-    lines.push("## Per-Toolchain Details".into());
-    lines.push(String::new());
+    blocks.push(Block::Heading(2, "Per-Toolchain Details".into()));
+    blocks.push(Block::Blank);
 
     for tool in &tool_order() {
         if let Some(res) = results.get(*tool) {
-            let label = cli_status_label(&res.status);
             let display = display_name(tool);
-            lines.push(format!("### [{label}] {display}"));
+            blocks.push(Block::Heading(
+                3,
+                format!("[{}] {display}", status_label(&res.status)),
+            ));
 
             if res.status == "skipped" {
                 let reason = res.issues.first().map(|s| s.as_str()).unwrap_or("Skipped");
-                lines.push(format!("> {reason}"));
-                lines.push(String::new());
+                blocks.push(Block::Paragraph(format!("> {reason}")));
+                blocks.push(Block::Blank);
                 continue;
             }
 
@@ -509,11 +679,11 @@ pub fn format_report(report: &Report) -> String {
                 ("bun_version", &res.bun_version),
                 ("deno_version", &res.deno_version),
             ];
-            let ver_parts: Vec<String> = version_labels
+            let kv: Vec<(String, String)> = version_labels
                 .iter()
                 .filter_map(|(key, val)| {
                     val.as_ref().map(|v| {
-                        let label = match *key {
+                        let k = match *key {
                             "version" => "Version",
                             "node_version" => "Node",
                             "python_version" => "Python",
@@ -525,27 +695,36 @@ pub fn format_report(report: &Report) -> String {
                             "deno_version" => "Deno",
                             _ => key,
                         };
-                        format!("**{label}:** {v}")
+                        (k.to_string(), v.clone())
                     })
                 })
                 .collect();
-            if !ver_parts.is_empty() {
-                lines.push(ver_parts.join(" | "));
+            if !kv.is_empty() {
+                blocks.push(Block::KeyValue(kv));
             }
 
             if let Some(count) = res.installed_count {
-                lines.push(format!("**Formulae:** {count}"));
+                blocks.push(Block::KeyValue(vec![(
+                    "Formulae".into(),
+                    count.to_string(),
+                )]));
             }
 
             if let Some(ref pt) = res.project_type {
-                lines.push(format!("**Project type:** {pt}"));
+                blocks.push(Block::KeyValue(vec![("Project type".into(), pt.clone())]));
             }
 
             if let Some(ref disk) = res.disk_usage {
                 if let Some(obj) = disk.as_object() {
-                    for (typ, info) in obj {
-                        let size = info.get("size").and_then(|v| v.as_str()).unwrap_or("?");
-                        lines.push(format!("- **{typ}:** {size}"));
+                    let disk_items: Vec<String> = obj
+                        .iter()
+                        .map(|(typ, info)| {
+                            let size = info.get("size").and_then(|v| v.as_str()).unwrap_or("?");
+                            format!("**{typ}:** {size}")
+                        })
+                        .collect();
+                    if !disk_items.is_empty() {
+                        blocks.push(Block::List(disk_items));
                     }
                 }
             }
@@ -559,11 +738,11 @@ pub fn format_report(report: &Report) -> String {
                     let lat = cli_green(&item.latest);
                     pt.add_row(&[&item.name, &cur, &lat]);
                 }
-                lines.push(pt.render());
+                blocks.push(Block::Table(pt));
             }
 
             if !res.vulnerabilities.is_empty() {
-                lines.push("Vulnerabilities:".into());
+                blocks.push(Block::Paragraph("Vulnerabilities:".into()));
                 let mut vt = Table::new();
                 vt.header(&["Package", "Severity", "Patched"]);
                 for v in &res.vulnerabilities {
@@ -571,36 +750,42 @@ pub fn format_report(report: &Report) -> String {
                     let patched = cli_green(&v.patched_version);
                     vt.add_row(&[&v.package, &sev, &patched]);
                 }
-                lines.push(vt.render());
+                blocks.push(Block::Table(vt));
             }
 
             if !res.audit_items.is_empty() {
-                lines.push("Audit items:".into());
-                for a in &res.audit_items {
-                    lines.push(format!("- **{}:** {} ({})", a.name, a.note, a.current));
-                }
+                blocks.push(Block::Paragraph("Audit items:".into()));
+                let audit_items: Vec<String> = res
+                    .audit_items
+                    .iter()
+                    .map(|a| format!("- **{}:** {} ({})", a.name, a.note, a.current))
+                    .collect();
+                blocks.push(Block::List(audit_items));
             }
 
             if !res.cleanup_items.is_empty() {
-                lines.push("Cleanup:".into());
-                for c in &res.cleanup_items {
-                    lines.push(format!(
-                        "- {} — {}",
-                        c.description,
-                        c.size.as_deref().unwrap_or("?")
-                    ));
-                }
+                blocks.push(Block::Paragraph("Cleanup:".into()));
+                let cleanup_items: Vec<String> = res
+                    .cleanup_items
+                    .iter()
+                    .map(|c| format!("{} — {}", c.description, c.size.as_deref().unwrap_or("?")))
+                    .collect();
+                blocks.push(Block::List(cleanup_items));
             }
 
             for issue in &res.issues {
-                lines.push(format!("> {issue}"));
+                blocks.push(Block::Paragraph(format!("> {issue}")));
             }
 
-            lines.push(String::new());
+            blocks.push(Block::Blank);
         }
     }
 
-    lines.join("\n")
+    blocks
+}
+
+pub fn format_report(report: &Report) -> String {
+    render_markdown(&build_blocks(report))
 }
 
 #[allow(dead_code)]
@@ -626,7 +811,7 @@ pub fn format_status(report: &Report) -> String {
             t.add_row(&[display, &label, &count]);
         }
     }
-    lines.push(t.render());
+    lines.push(t.render(true));
 
     lines.push(String::new());
     lines.push("Run `/envexa:scan` for full report or `/envexa:outdated` for details.".into());
@@ -667,7 +852,7 @@ pub fn format_outdated(report: &Report) -> String {
         return "All packages are up to date!".into();
     }
 
-    format!("# Outdated Packages\n\n{}", t.render())
+    format!("# Outdated Packages\n\n{}", t.render(true))
 }
 
 pub fn format_sarif(report: &Report) -> String {

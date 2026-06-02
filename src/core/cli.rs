@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::io::IsTerminal;
 use std::io::Write;
 use std::time::Instant;
 
@@ -26,8 +27,11 @@ enum Commands {
     Scan {
         #[arg(long, default_value = "7")]
         ttl: u64,
-        #[arg(long, default_value = "markdown")]
-        format: String,
+        #[arg(
+            long,
+            help = "Output format: json, sarif, markdown (raw). Default: styled terminal or raw markdown if piped."
+        )]
+        format: Option<String>,
         #[arg(long, short, help = "Show per-toolchain progress during scan")]
         verbose: bool,
     },
@@ -120,15 +124,31 @@ async fn run_cmd(cmd: Commands) -> Result<(), anyhow::Error> {
                 }
                 r
             };
-            if format.to_lowercase() == "json" {
-                match serde_json::to_string_pretty(&report) {
+            match format.as_deref() {
+                Some("json") => match serde_json::to_string_pretty(&report) {
                     Ok(json) => println!("{}", json),
                     Err(e) => eprintln!("Error formatting JSON: {}", e),
+                },
+                Some("sarif") => {
+                    println!("{}", scanner::format_sarif(&report));
                 }
-            } else if format.to_lowercase() == "sarif" {
-                println!("{}", scanner::format_sarif(&report));
-            } else {
-                println!("{}", scanner::format_report(&report));
+                Some("markdown") => {
+                    println!(
+                        "{}",
+                        scanner::format_markdown(&scanner::build_blocks(&report),)
+                    );
+                }
+                _ => {
+                    let tty = std::io::stdout().is_terminal();
+                    if tty {
+                        println!("{}", scanner::render_tty(&scanner::build_blocks(&report)));
+                    } else {
+                        println!(
+                            "{}",
+                            scanner::format_markdown(&scanner::build_blocks(&report),)
+                        );
+                    }
+                }
             }
         }
         Commands::Update => {

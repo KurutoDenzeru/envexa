@@ -116,7 +116,7 @@ impl ScanResult {
     }
 }
 
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub fn which(cmd: &str) -> bool {
     std::env::var("PATH")
