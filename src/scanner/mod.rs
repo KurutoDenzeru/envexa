@@ -311,8 +311,9 @@ pub fn extract_cleanup_items(res: &ScanResult) -> &[CleanupItem] {
     &res.cleanup_items
 }
 
-pub fn first_version(res: &ScanResult) -> &str {
-    res.project_type
+pub fn first_version(res: &ScanResult) -> String {
+    let raw = res
+        .project_type
         .as_deref()
         .or(res.version.as_deref())
         .or(res.node_version.as_deref())
@@ -323,7 +324,21 @@ pub fn first_version(res: &ScanResult) -> &str {
         .or(res.pnpm_version.as_deref())
         .or(res.bun_version.as_deref())
         .or(res.deno_version.as_deref())
-        .unwrap_or("")
+        .unwrap_or("");
+    let cleaned: String = raw
+        .chars()
+        .map(|c| if c == '\n' { ' ' } else { c })
+        .collect();
+    if cleaned.len() > 60 {
+        // Find safe UTF-8 boundary at or before position 57
+        let mut end = 57;
+        while !cleaned.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!("{}…", &cleaned[..end])
+    } else {
+        cleaned
+    }
 }
 
 pub fn cli_status_label(s: &str) -> String {
@@ -398,7 +413,7 @@ pub fn format_report(report: &Report) -> String {
             let display = display_name(tool);
             let label = cli_status_label(&res.status);
             let ver = first_version(res);
-            dt.add_row(&[display, &label, ver]);
+            dt.add_row(&[display, &label, &ver]);
         }
     }
     lines.push(dt.render());
