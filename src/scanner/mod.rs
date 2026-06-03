@@ -158,15 +158,15 @@ pub fn tool_categories() -> [ToolCategory; 3] {
         },
         ToolCategory {
             name: "Project Tooling",
-            tools: &["project", "security", "audit", "ci", "git", "cleanup"],
+            tools: &["project", "security", "audit", "ci", "git"],
         },
     ]
 }
 
-pub fn tool_order() -> [&'static str; 16] {
+pub fn tool_order() -> [&'static str; 15] {
     [
         "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
-        "security", "audit", "ci", "git", "cleanup",
+        "security", "audit", "ci", "git",
     ]
 }
 
@@ -187,7 +187,6 @@ pub fn display_name(tool: &str) -> &str {
         "audit" => "Audit",
         "ci" => "CI/CD",
         "git" => "Git",
-        "cleanup" => "Cleanup",
         _ => tool,
     }
 }

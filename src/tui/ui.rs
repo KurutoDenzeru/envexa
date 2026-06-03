@@ -1575,21 +1575,6 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
                 ]));
             }
 
-            if step >= 45 {
-                let (sym, color) = if step < 55 {
-                    (spin_char, app.theme().primary)
-                } else {
-                    ("\u{2714}", app.theme().success)
-                };
-                log_lines.push(Line::from(vec![
-                    Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
-                    Span::styled(
-                        "Collecting cleanup candidates...",
-                        Style::default().fg(app.theme().text_normal),
-                    ),
-                ]));
-            }
-
             if chunks[3].height > 0 {
                 let progress = Paragraph::new(log_lines).alignment(Alignment::Left);
                 frame.render_widget(progress, chunks[3]);
