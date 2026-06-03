@@ -53,29 +53,6 @@ async fn check_uncommitted_changes(dir: &Path) -> Vec<String> {
     issues
 }
 
-async fn check_large_git_dir(dir: &Path) -> Vec<CleanupItem> {
-    let mut cleanups = vec![];
-    let git_dir = dir.join(".git");
-    if git_dir.exists() {
-        if let Ok(out) = run_cmd("du", &["-sk", git_dir.to_str().unwrap_or(".git")], None).await {
-            if let Some(size_str) = out.split_whitespace().next() {
-                if let Ok(size_kb) = size_str.parse::<u64>() {
-                    let size_mb = size_kb / 1024;
-                    if size_mb > 500 {
-                        cleanups.push(CleanupItem {
-                            category: "git".into(),
-                            description: "Large .git directory".into(),
-                            size: Some(format!("{} MB", size_mb)),
-                            command: Some("git gc --prune=now".into()),
-                        });
-                    }
-                }
-            }
-        }
-    }
-    cleanups
-}
-
 pub async fn scan() -> ScanResult {
     let mut result = ScanResult::new("git");
     let project_path = get_project_path();
@@ -84,17 +61,15 @@ pub async fn scan() -> ScanResult {
         return ScanResult::skipped("Not a git repository");
     }
 
-    let (stale_res, uncommitted_res, large_res) = tokio::join!(
+    let (stale_res, uncommitted_res) = tokio::join!(
         check_stale_branches(&project_path),
         check_uncommitted_changes(&project_path),
-        check_large_git_dir(&project_path)
     );
 
     result.issues.extend(stale_res);
     result.issues.extend(uncommitted_res);
-    result.cleanup_items.extend(large_res);
 
-    let n = result.issues.len() + result.cleanup_items.len();
+    let n = result.issues.len();
     result.status = if n == 0 {
         "ok".into()
     } else {

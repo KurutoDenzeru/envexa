@@ -682,13 +682,6 @@ fn detail_table_constraints(width: u16, kind: &str) -> Vec<Constraint> {
             Constraint::Length(10),
             Constraint::Min(30),
         ],
-        "cleanup" if width < 80 => vec![
-            Constraint::Length(6),
-            Constraint::Length(10),
-            Constraint::Min(16),
-            Constraint::Length(8),
-            Constraint::Min(12),
-        ],
         _ => vec![
             Constraint::Length(6),
             Constraint::Length(12),
@@ -783,17 +776,6 @@ fn dashboard_cells(
                 .audit_items
                 .first()
                 .map(|a| format!("{}: {}", a.name, a.note))
-                .or_else(|| res.issues.first().cloned())
-                .unwrap_or_default();
-            (signal, focus)
-        }
-        "cleanup" => {
-            let n = res.cleanup_items.len();
-            let signal = if n > 0 { n.to_string() } else { String::new() };
-            let focus = res
-                .cleanup_items
-                .first()
-                .and_then(|c| c.size.clone())
                 .or_else(|| res.issues.first().cloned())
                 .unwrap_or_default();
             (signal, focus)
@@ -2059,7 +2041,6 @@ fn render_package_detail(frame: &mut Frame, area: Rect, app: &App) {
     match app.detail.key.as_deref() {
         Some("security") => render_vulnerabilities(frame, area, &tool, app),
         Some("audit") => render_audit_items(frame, area, &tool, app),
-        Some("cleanup") => render_cleanup_items(frame, area, &tool, app),
         _ => render_outdated_detail(frame, area, &tool, app),
     }
 }
@@ -2538,229 +2519,6 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
             &rows,
             "audit",
             bottom_msg.as_deref(),
-        );
-    }
-}
-
-fn parse_size_to_mb(size_str: &str) -> f64 {
-    let clean: String = size_str
-        .chars()
-        .filter(|c| !c.is_whitespace() && *c != ',')
-        .collect();
-
-    let numeric_part: String = clean
-        .chars()
-        .take_while(|c| c.is_ascii_digit() || *c == '.')
-        .collect();
-
-    let Ok(val) = numeric_part.parse::<f64>() else {
-        return 0.0;
-    };
-
-    let suffix = &clean[numeric_part.len()..];
-    let suffix_lower = suffix.to_lowercase();
-
-    if suffix_lower.starts_with('g') {
-        val * 1024.0
-    } else if suffix_lower.starts_with('m') {
-        val
-    } else if suffix_lower.starts_with('k') {
-        val / 1024.0
-    } else if suffix_lower.starts_with('b') {
-        val / (1024.0 * 1024.0)
-    } else {
-        0.0
-    }
-}
-
-fn get_cleanup_label(item: &crate::toolchains::CleanupItem) -> String {
-    let desc = item.description.to_lowercase();
-    if desc.contains("npm") {
-        "NPM".to_string()
-    } else if desc.contains("cargo") {
-        "Cargo".to_string()
-    } else if desc.contains("bun") {
-        "Bun".to_string()
-    } else if desc.contains("pip") {
-        "Pip".to_string()
-    } else if desc.contains("docker") {
-        "Docker".to_string()
-    } else if desc.contains("homebrew") || desc.contains("brew") {
-        "Homebrew".to_string()
-    } else {
-        item.category.to_uppercase()
-    }
-}
-
-fn get_label_color(label: &str, theme: &Theme) -> Color {
-    match label {
-        "NPM" => theme.error,
-        "Cargo" => Color::LightRed,
-        "Bun" => theme.warning,
-        "Pip" => theme.success,
-        "Docker" => theme.secondary,
-        "Homebrew" => theme.secondary,
-        _ => theme.primary,
-    }
-}
-
-fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
-    let items = &app.detail.cleanup;
-
-    if items.is_empty() {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(format!(" {tool} — Cleanup (0) "))
-            .border_style(Style::default().fg(app.theme().success));
-        let text = Paragraph::new(Text::from(vec![
-            Line::from(""),
-            Line::from(vec![
-                Span::styled(
-                    "  \u{2714} ",
-                    Style::default().fg(app.theme().success).bold(),
-                ),
-                Span::styled(
-                    "Your environment is fully clean! No cache cleanup needed.",
-                    Style::default().fg(app.theme().text_normal),
-                ),
-            ]),
-        ]))
-        .block(block);
-        frame.render_widget(text, area);
-        return;
-    }
-
-    let rows: Vec<Row> = items
-        .iter()
-        .enumerate()
-        .map(|(i, c)| {
-            let sel = i == app.detail.selection;
-            let checked = app.detail.checked.contains(&i);
-            let cb = if checked { "[x]" } else { "[ ]" };
-            let indicator = if sel {
-                format!("{cb}\u{25b8}")
-            } else {
-                format!("{cb} ")
-            };
-            let size = c.size.as_deref().unwrap_or("-");
-            let cmd = c.command.as_deref().unwrap_or("-");
-            let mut row = Row::new(vec![
-                Cell::from(indicator),
-                Cell::from(c.category.as_str()),
-                Cell::from(c.description.as_str()),
-                Cell::from(size),
-                Cell::from(cmd),
-            ]);
-            if sel {
-                row = row.style(
-                    Style::default()
-                        .bg(app.theme().text_muted)
-                        .add_modifier(Modifier::BOLD),
-                );
-            }
-            row
-        })
-        .collect();
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" {tool} — Cleanup ({}) ", items.len()))
-        .border_style(Style::default().fg(app.theme().success));
-
-    let inner_area = block.inner(area);
-
-    if inner_area.width >= 80 && inner_area.height >= 8 {
-        frame.render_widget(block, area);
-
-        let chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
-            .split(inner_area);
-
-        let mut category_sizes: std::collections::HashMap<String, f64> =
-            std::collections::HashMap::new();
-        for item in items {
-            if let Some(ref sz) = item.size {
-                let label = get_cleanup_label(item);
-                let bytes = parse_size_to_mb(sz);
-                *category_sizes.entry(label).or_insert(0.0) += bytes;
-            }
-        }
-
-        let mut sorted_categories: Vec<(String, f64)> = category_sizes.into_iter().collect();
-        sorted_categories
-            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-
-        let slice_labels: Vec<String> = sorted_categories
-            .iter()
-            .map(|(label, mb)| {
-                if *mb >= 1024.0 {
-                    format!("{} ({:.1}G)", label, mb / 1024.0)
-                } else {
-                    format!("{} ({:.1}M)", label, mb)
-                }
-            })
-            .collect();
-
-        let mut slices = Vec::new();
-        for (i, (label, mb)) in sorted_categories.iter().enumerate() {
-            if *mb > 0.0 {
-                let color = get_label_color(label, &app.theme());
-                slices.push(PieSlice::new(&slice_labels[i], *mb, color));
-            }
-        }
-
-        if slices.is_empty() {
-            slices.push(PieSlice::new("EMPTY", 1.0, app.theme().text_muted));
-        }
-
-        let piechart = PieChart::new(slices)
-            .resolution(Resolution::Braille)
-            .show_legend(chunks[0].width >= 24 && chunks[0].height >= 8)
-            .legend_position(LegendPosition::Top)
-            .legend_layout(LegendLayout::Vertical)
-            .legend_alignment(LegendAlignment::Center)
-            .show_percentages(false)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(" Heatmap ")
-                    .border_style(Style::default().fg(app.theme().primary)),
-            );
-        frame.render_widget(piechart, chunks[0]);
-        // Draw Right Table
-        let c_header = Row::new(
-            ["", "Category ", "Description ", "Size ", "Command "]
-                .iter()
-                .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD)),
-        )
-        .style(
-            Style::default()
-                .bg(app.theme().secondary)
-                .fg(app.theme().text_normal),
-        )
-        .height(1);
-
-        let table = Table::new(
-            rows.clone(),
-            detail_table_constraints(chunks[1].width, "cleanup"),
-        )
-        .header(c_header)
-        .column_spacing(1);
-        let mut state = TableState::default();
-        state.select(Some(app.detail.selection));
-        frame.render_stateful_widget(table, chunks[1], &mut state);
-    } else {
-        render_item_table(
-            frame,
-            area,
-            app,
-            format!(" {tool} — Cleanup ({}) ", items.len()),
-            Style::default().fg(app.theme().success),
-            &["", "Category ", "Description ", "Size ", "Command "],
-            &rows,
-            "cleanup",
-            None,
         );
     }
 }

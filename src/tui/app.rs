@@ -11,11 +11,11 @@ use throbber_widgets_tui::ThrobberState;
 use crate::core::config;
 use crate::scanner::{self, OutdatedItem, Report};
 use crate::toolchains;
-use crate::toolchains::{AuditItem, CleanupItem, VulnerabilityInfo};
+use crate::toolchains::{AuditItem, VulnerabilityInfo};
 
 pub const ALL_SCANNERS: &[&str] = &[
     "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
-    "security", "audit", "ci", "git", "cleanup",
+    "security", "audit", "ci", "git",
 ];
 
 pub enum View {
@@ -39,13 +39,9 @@ pub enum AppEvent {
         result_msg: String,
         updated_packages: Vec<(String, String, String)>, // (tool_key, name, source)
     },
-    CleanupFinished {
-        result_msg: String,
-        new_report_res: Option<crate::toolchains::ScanResult>,
-    },
     SecurityFixFinished {
         result_msg: String,
-        new_report_res: Option<crate::toolchains::ScanResult>,
+        new_report_res: Box<Option<crate::toolchains::ScanResult>>,
     },
 }
 
@@ -79,7 +75,6 @@ pub struct DetailState {
     pub items: Vec<OutdatedItem>,
     pub vulns: Vec<VulnerabilityInfo>,
     pub audits: Vec<AuditItem>,
-    pub cleanup: Vec<CleanupItem>,
     pub checked: HashSet<usize>,
     pub message: String,
 }
@@ -136,7 +131,6 @@ impl App {
                 items: Vec::new(),
                 vulns: Vec::new(),
                 audits: Vec::new(),
-                cleanup: Vec::new(),
                 checked: HashSet::new(),
                 message: String::new(),
             },
@@ -293,9 +287,6 @@ impl App {
                                 KeyCode::Char(' ') => {}
                                 KeyCode::Char('y') | KeyCode::Char('Y') => {
                                     match self.detail.key.as_deref() {
-                                        Some("cleanup") => {
-                                            self.do_detail_cleanups(tx.clone())?;
-                                        }
                                         Some("security") | Some("audit") => {}
                                         _ => {
                                             self.do_detail_updates(tx.clone())?;
@@ -502,22 +493,6 @@ impl App {
                         }
                         self.clamp_selection();
                     }
-                    AppEvent::CleanupFinished {
-                        result_msg,
-                        new_report_res,
-                    } => {
-                        self.detail.message = result_msg;
-                        self.ui.view = View::PackageDetail;
-
-                        if let Some(res) = new_report_res {
-                            if let Some(ref mut report) = self.report {
-                                report.results.insert("cleanup".to_string(), res.clone());
-                                self.detail.cleanup =
-                                    crate::scanner::extract_cleanup_items(&res).to_vec();
-                            }
-                        }
-                        self.clamp_selection();
-                    }
                     AppEvent::SecurityFixFinished {
                         result_msg,
                         new_report_res,
@@ -525,7 +500,7 @@ impl App {
                         self.detail.message = result_msg;
                         self.ui.view = View::PackageDetail;
 
-                        if let Some(res) = new_report_res {
+                        if let Some(res) = *new_report_res {
                             if let Some(ref mut report) = self.report {
                                 report.results.insert("security".to_string(), res.clone());
                                 self.detail.vulns =
@@ -569,28 +544,18 @@ impl App {
                 self.detail.vulns = vulns.to_vec();
                 self.detail.items.clear();
                 self.detail.audits.clear();
-                self.detail.cleanup.clear();
             }
             "audit" => {
                 let audits = scanner::extract_audit_items(res);
                 self.detail.audits = audits.to_vec();
                 self.detail.items.clear();
                 self.detail.vulns.clear();
-                self.detail.cleanup.clear();
-            }
-            "cleanup" => {
-                let cleanup = scanner::extract_cleanup_items(res);
-                self.detail.cleanup = cleanup.to_vec();
-                self.detail.items.clear();
-                self.detail.vulns.clear();
-                self.detail.audits.clear();
             }
             _ => {
                 let items = scanner::extract_outdated(res);
                 self.detail.items = items;
                 self.detail.vulns.clear();
                 self.detail.audits.clear();
-                self.detail.cleanup.clear();
             }
         }
 
@@ -629,68 +594,6 @@ impl App {
         let _count = work.len();
 
         tokio::spawn(run_updates(work, tx));
-        Ok(())
-    }
-
-    fn do_detail_cleanups(
-        &mut self,
-        tx: mpsc::UnboundedSender<AppEvent>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let work: Vec<CleanupItem> = self
-            .detail
-            .cleanup
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| self.detail.checked.contains(i))
-            .map(|(_, item)| item.clone())
-            .collect();
-        self.detail.checked.clear();
-        if work.is_empty() {
-            return Ok(());
-        }
-
-        self.ui.view = View::Updating;
-        self.ui.progress_counter = 0;
-
-        tokio::spawn(async move {
-            let mut cleaned = 0usize;
-            let mut failed = 0usize;
-            let mut errors = vec![];
-            for item in &work {
-                if let Some(ref cmd_str) = item.command {
-                    let mut command = tokio::process::Command::new("sh");
-                    command.arg("-c").arg(cmd_str);
-                    match command.output().await {
-                        Ok(output) if output.status.success() => cleaned += 1,
-                        Ok(output) => {
-                            failed += 1;
-                            let err_msg =
-                                String::from_utf8_lossy(&output.stderr).trim().to_string();
-                            errors.push(format!("{}: {}", item.description, err_msg));
-                        }
-                        Err(e) => {
-                            failed += 1;
-                            errors.push(format!("{}: {}", item.description, e));
-                        }
-                    }
-                } else {
-                    failed += 1;
-                    errors.push(format!("{}: no command configured", item.description));
-                }
-            }
-            let result_msg = if errors.is_empty() {
-                format!("\u{2714} Successfully cleaned up {cleaned} item(s)")
-            } else {
-                let e = errors.join("; ");
-                format!("\u{2714} Cleaned up {cleaned} | \u{2716} Failed {failed}: {e}")
-            };
-
-            let new_report_res = toolchains::scan_one("cleanup").await;
-            let _ = tx.send(AppEvent::CleanupFinished {
-                result_msg,
-                new_report_res,
-            });
-        });
         Ok(())
     }
 
@@ -750,7 +653,7 @@ impl App {
             let new_report_res = toolchains::scan_one("security").await;
             let _ = tx.send(AppEvent::SecurityFixFinished {
                 result_msg,
-                new_report_res,
+                new_report_res: Box::new(new_report_res),
             });
         });
         Ok(())
@@ -1192,7 +1095,6 @@ impl App {
         match self.detail.key.as_deref() {
             Some("security") => self.detail.vulns.len(),
             Some("audit") => self.detail.audits.len(),
-            Some("cleanup") => self.detail.cleanup.len(),
             _ => self.detail.items.len(),
         }
     }
@@ -1201,7 +1103,6 @@ impl App {
         self.detail.items.clear();
         self.detail.vulns.clear();
         self.detail.audits.clear();
-        self.detail.cleanup.clear();
         self.detail.checked.clear();
         self.detail.message.clear();
     }

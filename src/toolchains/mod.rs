@@ -27,14 +27,6 @@ pub struct AuditItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CleanupItem {
-    pub category: String,
-    pub description: String,
-    pub size: Option<String>,
-    pub command: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScanResult {
     pub tool: String,
     pub status: String,
@@ -76,8 +68,6 @@ pub struct ScanResult {
     pub vulnerabilities: Vec<VulnerabilityInfo>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub audit_items: Vec<AuditItem>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub cleanup_items: Vec<CleanupItem>,
 }
 
 impl ScanResult {
@@ -104,7 +94,6 @@ impl ScanResult {
             project_type: None,
             vulnerabilities: Vec::with_capacity(4),
             audit_items: Vec::with_capacity(4),
-            cleanup_items: Vec::with_capacity(4),
         }
     }
 
@@ -179,7 +168,6 @@ pub mod brew;
 pub mod bun;
 pub mod cargo;
 pub mod ci;
-pub mod cleanup;
 pub mod deno;
 pub mod docker;
 pub mod gem;
@@ -227,7 +215,6 @@ pub async fn scan_all_with(
         scanner_task!(project),
         scanner_task!(security),
         scanner_task!(audit),
-        scanner_task!(cleanup),
         scanner_task!(git),
         scanner_task!(ci),
     ];
@@ -302,7 +289,6 @@ pub async fn scan_one(name: &str) -> Option<ScanResult> {
         "project" => Some(project::scan().await),
         "security" => Some(security::scan().await),
         "audit" => Some(audit::scan().await),
-        "cleanup" => Some(cleanup::scan().await),
         "git" => Some(git::scan().await),
         "ci" => Some(ci::scan().await),
         _ => None,

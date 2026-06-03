@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 pub mod sarif;
 
-use crate::toolchains::{AuditItem, CleanupItem, ScanResult, VulnerabilityInfo};
+use crate::toolchains::{AuditItem, ScanResult, VulnerabilityInfo};
 
 fn visible_len(s: &str) -> usize {
     let mut len = 0;
@@ -307,10 +307,6 @@ pub fn extract_audit_items(res: &ScanResult) -> &[AuditItem] {
     &res.audit_items
 }
 
-pub fn extract_cleanup_items(res: &ScanResult) -> &[CleanupItem] {
-    &res.cleanup_items
-}
-
 pub fn first_version(res: &ScanResult) -> String {
     let raw = res
         .project_type
@@ -385,7 +381,6 @@ pub fn format_report(report: &Report) -> String {
     let mut outdated_all: HashMap<&str, Vec<OutdatedItem>> = HashMap::new();
     let mut vuln_all: HashMap<&str, &Vec<VulnerabilityInfo>> = HashMap::new();
     let mut audit_all: HashMap<&str, &Vec<AuditItem>> = HashMap::new();
-    let mut cleanup_all: HashMap<&str, &Vec<CleanupItem>> = HashMap::new();
 
     for tool in &tool_order() {
         if let Some(res) = results.get(*tool) {
@@ -398,9 +393,6 @@ pub fn format_report(report: &Report) -> String {
             }
             if !res.audit_items.is_empty() {
                 audit_all.insert(tool, &res.audit_items);
-            }
-            if !res.cleanup_items.is_empty() {
-                cleanup_all.insert(tool, &res.cleanup_items);
             }
         }
     }
@@ -469,26 +461,6 @@ pub fn format_report(report: &Report) -> String {
             }
         }
         lines.push(at.render());
-        lines.push(String::new());
-    }
-
-    if !cleanup_all.is_empty() {
-        lines.push("## Cleanup".into());
-        for tool in &tool_order() {
-            if let Some(items) = cleanup_all.get(tool) {
-                let display = display_name(tool);
-                for c in items.iter() {
-                    lines.push(format!(
-                        "- **[{display}]** {} — {}",
-                        c.description,
-                        c.size.as_deref().unwrap_or("?")
-                    ));
-                    if let Some(ref cmd) = c.command {
-                        lines.push(format!("  `{cmd}`"));
-                    }
-                }
-            }
-        }
         lines.push(String::new());
     }
 
@@ -588,17 +560,6 @@ pub fn format_report(report: &Report) -> String {
                 lines.push("Audit items:".into());
                 for a in &res.audit_items {
                     lines.push(format!("- **{}:** {} ({})", a.name, a.note, a.current));
-                }
-            }
-
-            if !res.cleanup_items.is_empty() {
-                lines.push("Cleanup:".into());
-                for c in &res.cleanup_items {
-                    lines.push(format!(
-                        "- {} — {}",
-                        c.description,
-                        c.size.as_deref().unwrap_or("?")
-                    ));
                 }
             }
 
