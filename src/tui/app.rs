@@ -450,6 +450,10 @@ impl App {
                                 self.ui.outdated_selection = 0;
                             }
                             KeyCode::Right | KeyCode::Char('l') => {
+                                // Prevent tab switching during scan or update
+                                if matches!(self.ui.view, View::Scanning | View::Updating) {
+                                    continue;
+                                }
                                 if !(matches!(self.ui.view, View::Settings)
                                     && self.ui.settings_edit_mode)
                                 {
@@ -462,6 +466,10 @@ impl App {
                                 };
                             }
                             KeyCode::Left | KeyCode::Char('h') => {
+                                // Prevent tab switching during scan or update
+                                if matches!(self.ui.view, View::Scanning | View::Updating) {
+                                    continue;
+                                }
                                 if !(matches!(self.ui.view, View::Settings)
                                     && self.ui.settings_edit_mode)
                                 {
