@@ -1980,20 +1980,30 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
         let completion_rows = n_completions.min(8) as u16;
         let popup_height = (30 + completion_rows * 2).min(70);
         let popup_area = centered_rect(60, popup_height, area);
-        let valid = !app.ui.input_buffer.is_empty()
-            && std::path::Path::new(app.ui.input_buffer.trim()).is_dir();
+        let input_path = if let Some(idx) = app.ui.input_buffer.find("  [") {
+            &app.ui.input_buffer[..idx]
+        } else {
+            app.ui.input_buffer.trim()
+        };
+        let valid = !input_path.is_empty() && std::path::Path::new(input_path).is_dir();
 
         let body = if app.ui.input_buffer.is_empty() {
             "Enter an absolute path, e.g. /Users/me/my-project".to_string()
         } else if valid {
-            let p = std::path::Path::new(app.ui.input_buffer.trim());
+            let p = std::path::Path::new(input_path);
             let file_count = std::fs::read_dir(p).map(|e| e.count()).unwrap_or(0);
-            format!(
-                " \u{2713} {file_count} items  {}",
-                app.ui.input_buffer.trim()
-            )
+            let lockfiles = detect_lockfiles(p);
+            if lockfiles.is_empty() {
+                format!(" \u{2713} {file_count} items  {}", input_path)
+            } else {
+                format!(
+                    " \u{2713} {file_count} items  {}  [{}]",
+                    input_path,
+                    lockfiles.join(", ")
+                )
+            }
         } else {
-            format!(" \u{2717} Path not found: {}", app.ui.input_buffer.trim())
+            format!(" \u{2717} Path not found: {}", input_path)
         };
 
         let status_color = if valid {
@@ -2035,8 +2045,17 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
                 } else {
                     app.theme().text_muted
                 };
+                let display = if app.ui.input_completions[i].contains("  [") {
+                    // Show lockfile info with different styling
+                    let parts: Vec<&str> = app.ui.input_completions[i].splitn(2, "  [").collect();
+                    let path = parts[0];
+                    let lockfiles = parts.get(1).unwrap_or(&"");
+                    format!("{}  \x1b[36m{}\x1b[0m", path, lockfiles)
+                } else {
+                    app.ui.input_completions[i].clone()
+                };
                 lines.push(Line::from(Span::styled(
-                    format!("{}{}", marker, app.ui.input_completions[i]),
+                    format!("{}{}", marker, display),
                     Style::default().fg(fg),
                 )));
             }

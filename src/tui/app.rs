@@ -282,7 +282,12 @@ impl App {
                                     self.ui.input_completions.clear();
                                 }
                                 KeyCode::Enter => {
-                                    let path = self.ui.input_buffer.trim().to_string();
+                                    let input = self.ui.input_buffer.trim().to_string();
+                                    let path = if let Some(idx) = input.find("  [") {
+                                        input[..idx].to_string()
+                                    } else {
+                                        input
+                                    };
                                     if !path.is_empty() {
                                         let p = std::path::Path::new(&path);
                                         if p.is_dir() {
@@ -303,7 +308,13 @@ impl App {
                                     } else if self.ui.input_completion_index < completions.len() {
                                         let sel =
                                             completions[self.ui.input_completion_index].clone();
-                                        self.ui.input_buffer = format!("{}/", sel);
+                                        // Extract path from "path  [lockfiles]" format
+                                        let path = if let Some(idx) = sel.find("  [") {
+                                            &sel[..idx]
+                                        } else {
+                                            &sel
+                                        };
+                                        self.ui.input_buffer = format!("{}/", path);
                                         self.refresh_completions();
                                     }
                                 }
@@ -858,13 +869,27 @@ impl App {
 
         let mut completions = Vec::new();
         if let Ok(entries) = std::fs::read_dir(&parent) {
+            let mut dirs: Vec<(String, Vec<String>)> = Vec::new();
             for entry in entries.flatten() {
                 if entry.path().is_dir() {
                     let name = entry.file_name().to_string_lossy().to_string();
                     if name.starts_with(&prefix) && !name.starts_with('.') {
-                        let full = parent.join(&name).display().to_string();
-                        completions.push(full);
+                        let path = entry.path();
+                        let lockfiles: Vec<String> = detect_lockfiles(&path)
+                            .into_iter()
+                            .map(String::from)
+                            .collect();
+                        let full = path.display().to_string();
+                        dirs.push((full, lockfiles));
                     }
+                }
+            }
+            dirs.sort_by(|a, b| a.0.cmp(&b.0));
+            for (full, lockfiles) in dirs {
+                if lockfiles.is_empty() {
+                    completions.push(full);
+                } else {
+                    completions.push(format!("{}  [{}]", full, lockfiles.join(", ")));
                 }
             }
         }
