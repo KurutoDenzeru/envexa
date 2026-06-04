@@ -171,7 +171,6 @@ pub mod ci;
 pub mod deno;
 pub mod docker;
 pub mod gem;
-pub mod git;
 pub mod npm;
 pub mod pip;
 pub mod pnpm;
@@ -215,7 +214,6 @@ pub async fn scan_all_with(
         scanner_task!(project),
         scanner_task!(security),
         scanner_task!(audit),
-        scanner_task!(git),
         scanner_task!(ci),
     ];
 
@@ -289,7 +287,6 @@ pub async fn scan_one(name: &str) -> Option<ScanResult> {
         "project" => Some(project::scan().await),
         "security" => Some(security::scan().await),
         "audit" => Some(audit::scan().await),
-        "git" => Some(git::scan().await),
         "ci" => Some(ci::scan().await),
         _ => None,
     }

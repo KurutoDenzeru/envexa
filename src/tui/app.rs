@@ -15,7 +15,7 @@ use crate::toolchains::{AuditItem, VulnerabilityInfo};
 
 pub const ALL_SCANNERS: &[&str] = &[
     "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
-    "security", "audit", "ci", "git",
+    "security", "audit", "ci",
 ];
 
 pub enum View {
