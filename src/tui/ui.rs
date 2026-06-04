@@ -1843,17 +1843,8 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
                         _ => "",
                     },
                     2 => {
-                        if val.contains("Custom path...") {
-                            "Enter a custom directory path"
-                        } else if val.contains("↑ ") {
-                            "↑ Parent directory"
-                        } else if val.contains("[no lockfiles]") {
-                            "No lockfiles detected in this directory"
-                        } else if val.contains("[") {
-                            "Directory with lockfiles detected"
-                        } else {
-                            "Select a directory to scan"
-                        }
+                        // No descriptions for project path - save space
+                        ""
                     }
                     3 => match val.as_str() {
                         "10s" => "Fast scans, may timeout on slow machines",
@@ -1923,15 +1914,15 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
             .collect();
 
         let popup_area = if app.ui.settings_selection == 2 {
-            // Larger popup for project path folder browser
-            centered_rect(70, 70, area)
+            // Smaller popup for project path folder browser to avoid overlap
+            centered_rect(55, 60, area)
         } else {
             centered_rect(50, 50, area)
         };
         let title = match app.ui.settings_selection {
             0 => " Cache TTL ",
             1 => " Auto-Scan ",
-            2 => " Project Path — Select Directory ",
+            2 => " Project Path ",
             3 => " Scan Timeout ",
             4 => " Daemon Interval ",
             5 => " Enabled Scanners ",
@@ -2045,19 +2036,22 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
                 } else {
                     app.theme().text_muted
                 };
-                let display = if app.ui.input_completions[i].contains("  [") {
+                let (display, _lockfile_style) = if app.ui.input_completions[i].contains("  [") {
                     // Show lockfile info with different styling
                     let parts: Vec<&str> = app.ui.input_completions[i].splitn(2, "  [").collect();
                     let path = parts[0];
                     let lockfiles = parts.get(1).unwrap_or(&"");
-                    format!("{}  \x1b[36m{}\x1b[0m", path, lockfiles)
+                    (
+                        format!("{}  [{}", path, lockfiles),
+                        Style::default().fg(app.theme().primary),
+                    )
                 } else {
-                    app.ui.input_completions[i].clone()
+                    (app.ui.input_completions[i].clone(), Style::default().fg(fg))
                 };
-                lines.push(Line::from(Span::styled(
+                lines.push(Line::from(vec![Span::styled(
                     format!("{}{}", marker, display),
                     Style::default().fg(fg),
-                )));
+                )]));
             }
             lines.push(Line::from(Span::raw("")));
             if n_completions > 8 {
