@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 pub mod sarif;
 
-use crate::toolchains::{AuditItem, CleanupItem, ScanResult, VulnerabilityInfo};
+use crate::toolchains::{AuditItem, ScanResult, VulnerabilityInfo};
 
 fn visible_len(s: &str) -> usize {
     let mut len = 0;
@@ -29,8 +29,8 @@ struct Table {
 impl Table {
     fn new() -> Self {
         Table {
-            headers: Vec::new(),
-            rows: Vec::new(),
+            headers: Vec::with_capacity(8),
+            rows: Vec::with_capacity(16),
         }
     }
 
@@ -60,24 +60,51 @@ impl Table {
             }
         }
 
-        let top_sep_parts: Vec<String> = widths.iter().map(|w| "─".repeat(w + 2)).collect();
-        let top_border = format!("╭{}╮", top_sep_parts.join("┬"));
+        let mut top_border = String::with_capacity(ncols * 12);
+        top_border.push('╭');
+        for (i, w) in widths.iter().enumerate() {
+            if i > 0 {
+                top_border.push('┬');
+            }
+            top_border.extend(std::iter::repeat_n('─', w + 2));
+        }
+        top_border.push('╮');
 
-        let mid_sep_parts: Vec<String> = widths.iter().map(|w| "─".repeat(w + 2)).collect();
-        let mid_border = format!("├{}┤", mid_sep_parts.join("┼"));
+        let mut mid_border = String::with_capacity(ncols * 12);
+        mid_border.push('├');
+        for (i, w) in widths.iter().enumerate() {
+            if i > 0 {
+                mid_border.push('┼');
+            }
+            mid_border.extend(std::iter::repeat_n('─', w + 2));
+        }
+        mid_border.push('┤');
 
-        let bot_sep_parts: Vec<String> = widths.iter().map(|w| "─".repeat(w + 2)).collect();
-        let bot_border = format!("╰{}╯", bot_sep_parts.join("┴"));
+        let mut bot_border = String::with_capacity(ncols * 12);
+        bot_border.push('╰');
+        for (i, w) in widths.iter().enumerate() {
+            if i > 0 {
+                bot_border.push('┴');
+            }
+            bot_border.extend(std::iter::repeat_n('─', w + 2));
+        }
+        bot_border.push('╯');
 
         let fmt = |cells: &[String]| -> String {
-            let mut s = String::from("│");
+            let mut s = String::with_capacity(ncols * 12);
+            s.push('│');
             for (i, cell) in cells.iter().enumerate() {
                 if let Some(&w) = widths.get(i) {
                     let vlen = visible_len(cell);
                     let padding = w.saturating_sub(vlen);
-                    s.push_str(&format!(" {}{} │", cell, " ".repeat(padding)));
+                    s.push(' ');
+                    s.push_str(cell);
+                    s.extend(std::iter::repeat_n(' ', padding));
+                    s.push_str(" │");
                 } else {
-                    s.push_str(&format!(" {} │", cell));
+                    s.push(' ');
+                    s.push_str(cell);
+                    s.push_str(" │");
                 }
             }
             s
@@ -105,32 +132,6 @@ pub struct Report {
     pub results: HashMap<String, ScanResult>,
 }
 
-const LABELS: &[(&str, &str)] = &[
-    ("ok", "PASS"),
-    ("warning", "WARN"),
-    ("error", "FAIL"),
-    ("skipped", "SKIP"),
-];
-
-const DISPLAY_NAMES: &[(&str, &str)] = &[
-    ("brew", "Brew"),
-    ("npm", "npm"),
-    ("pnpm", "pnpm"),
-    ("yarn", "Yarn"),
-    ("bun", "Bun"),
-    ("deno", "Deno"),
-    ("pip", "pip"),
-    ("gem", "Gem"),
-    ("cargo", "Cargo"),
-    ("docker", "Docker"),
-    ("project", "Project"),
-    ("security", "Security"),
-    ("audit", "Audit"),
-    ("ci", "CI/CD"),
-    ("git", "Git"),
-    ("cleanup", "Cleanup"),
-];
-
 #[derive(Debug, Clone)]
 pub struct OutdatedItem {
     pub source: String,
@@ -157,36 +158,54 @@ pub fn tool_categories() -> [ToolCategory; 3] {
         },
         ToolCategory {
             name: "Project Tooling",
-            tools: &["project", "security", "audit", "ci", "git", "cleanup"],
+            tools: &["project", "security", "audit", "ci"],
         },
     ]
 }
 
-pub fn tool_order() -> [&'static str; 16] {
+pub fn tool_order() -> [&'static str; 14] {
     [
         "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
-        "security", "audit", "ci", "git", "cleanup",
+        "security", "audit", "ci",
     ]
 }
 
 pub fn display_name(tool: &str) -> &str {
-    DISPLAY_NAMES
-        .iter()
-        .find(|(k, _)| *k == tool)
-        .map(|(_, v)| *v)
-        .unwrap_or(tool)
+    match tool {
+        "brew" => "Brew",
+        "npm" => "npm",
+        "pnpm" => "pnpm",
+        "yarn" => "Yarn",
+        "bun" => "Bun",
+        "deno" => "Deno",
+        "pip" => "pip",
+        "gem" => "Gem",
+        "cargo" => "Cargo",
+        "docker" => "Docker",
+        "project" => "Project",
+        "security" => "Security",
+        "audit" => "Audit",
+        "ci" => "CI/CD",
+        _ => tool,
+    }
 }
 
 pub fn status_label(s: &str) -> &str {
-    LABELS
-        .iter()
-        .find(|(k, _)| *k == s)
-        .map(|(_, v)| *v)
-        .unwrap_or("?")
+    match s {
+        "ok" => "PASS",
+        "warning" => "WARN",
+        "error" => "FAIL",
+        "skipped" => "SKIP",
+        _ => "?",
+    }
 }
 
 pub fn extract_outdated(res: &ScanResult) -> Vec<OutdatedItem> {
-    let mut items = vec![];
+    let total = res.outdated_formulae.len()
+        + res.outdated_casks.len()
+        + res.outdated.len()
+        + res.outdated_global.len();
+    let mut items = Vec::with_capacity(total);
     for f in &res.outdated_formulae {
         items.push(OutdatedItem {
             source: "formula".into(),
@@ -227,61 +246,54 @@ pub fn extract_outdated(res: &ScanResult) -> Vec<OutdatedItem> {
 }
 
 pub fn estimate_update_size(source: &str, name: &str) -> String {
-    let name_lower = name.to_lowercase();
     if source == "cask" {
-        if name_lower.contains("stats") {
-            "14.2 MB".to_string()
-        } else if name_lower.contains("docker") {
-            "642.5 MB".to_string()
-        } else if name_lower.contains("slack") {
-            "112.4 MB".to_string()
-        } else if name_lower.contains("discord") {
-            "98.1 MB".to_string()
-        } else if name_lower.contains("ngrok") {
-            "18.4 MB".to_string()
-        } else if name_lower.contains("vscode") || name_lower.contains("code") {
-            "201.8 MB".to_string()
-        } else if name_lower.contains("chrome") {
-            "195.3 MB".to_string()
-        } else {
-            let hash = name.chars().map(|c| c as usize).sum::<usize>();
-            let mb = 15 + (hash % 135);
-            let frac = hash % 10;
-            format!("{}.{} MB", mb, frac)
+        let name_l = name.to_ascii_lowercase();
+        if let Some(size) = [
+            ("stats", "14.2 MB"),
+            ("docker", "642.5 MB"),
+            ("slack", "112.4 MB"),
+            ("discord", "98.1 MB"),
+            ("ngrok", "18.4 MB"),
+            ("chrome", "195.3 MB"),
+        ]
+        .iter()
+        .find(|(pat, _)| name_l.contains(pat))
+        .map(|(_, s)| *s)
+        {
+            return size.to_string();
         }
-    } else if source == "formula" {
-        if name_lower.contains("gh") {
-            "9.2 MB".to_string()
-        } else if name_lower.contains("fzf") {
-            "3.4 MB".to_string()
-        } else if name_lower.contains("cloudflared") {
-            "31.6 MB".to_string()
-        } else if name_lower.contains("fontconfig") {
-            "1.8 MB".to_string()
-        } else if name_lower.contains("node") {
-            "38.5 MB".to_string()
-        } else if name_lower.contains("git") {
-            "12.4 MB".to_string()
-        } else if name_lower.contains("rust") {
-            "75.1 MB".to_string()
-        } else if name_lower.contains("python") {
-            "24.8 MB".to_string()
-        } else {
-            let hash = name.chars().map(|c| c as usize).sum::<usize>();
-            let mb = 1 + (hash % 15);
-            let frac = hash % 10;
-            format!("{}.{} MB", mb, frac)
+        if name_l.contains("vscode") || name_l.contains("code") {
+            return "201.8 MB".to_string();
         }
+        let hash = name.bytes().map(|b| b as usize).sum::<usize>();
+        return format!("{}.{} MB", 15 + (hash % 135), hash % 10);
+    }
+    if source == "formula" {
+        let name_l = name.to_ascii_lowercase();
+        if let Some(size) = [
+            ("gh", "9.2 MB"),
+            ("fzf", "3.4 MB"),
+            ("cloudflared", "31.6 MB"),
+            ("fontconfig", "1.8 MB"),
+            ("node", "38.5 MB"),
+            ("git", "12.4 MB"),
+            ("rust", "75.1 MB"),
+            ("python", "24.8 MB"),
+        ]
+        .iter()
+        .find(|(pat, _)| name_l.contains(pat))
+        .map(|(_, s)| *s)
+        {
+            return size.to_string();
+        }
+        let hash = name.bytes().map(|b| b as usize).sum::<usize>();
+        return format!("{}.{} MB", 1 + (hash % 15), hash % 10);
+    }
+    let hash = name.bytes().map(|b| b as usize).sum::<usize>();
+    if hash % 5 == 0 {
+        format!("{} KB", 50 + (hash % 900))
     } else {
-        let hash = name.chars().map(|c| c as usize).sum::<usize>();
-        if hash % 5 == 0 {
-            let kb = 50 + (hash % 900);
-            format!("{} KB", kb)
-        } else {
-            let mb = 1 + (hash % 8);
-            let frac = hash % 10;
-            format!("{}.{} MB", mb, frac)
-        }
+        format!("{}.{} MB", 1 + (hash % 8), hash % 10)
     }
 }
 
@@ -293,43 +305,34 @@ pub fn extract_audit_items(res: &ScanResult) -> &[AuditItem] {
     &res.audit_items
 }
 
-pub fn extract_cleanup_items(res: &ScanResult) -> &[CleanupItem] {
-    &res.cleanup_items
-}
-
 pub fn first_version(res: &ScanResult) -> String {
-    if let Some(ref pt) = res.project_type {
-        return pt.clone();
-    }
-    let fields = [
-        "version",
-        "node_version",
-        "python_version",
-        "ruby_version",
-        "rustc_version",
-        "cargo_version",
-        "pnpm_version",
-        "bun_version",
-        "deno_version",
-    ];
-    for f in fields {
-        let val = match f {
-            "version" => &res.version,
-            "node_version" => &res.node_version,
-            "python_version" => &res.python_version,
-            "ruby_version" => &res.ruby_version,
-            "rustc_version" => &res.rustc_version,
-            "cargo_version" => &res.cargo_version,
-            "pnpm_version" => &res.pnpm_version,
-            "bun_version" => &res.bun_version,
-            "deno_version" => &res.deno_version,
-            _ => &None,
-        };
-        if let Some(v) = val {
-            return v.clone();
+    let raw = res
+        .project_type
+        .as_deref()
+        .or(res.version.as_deref())
+        .or(res.node_version.as_deref())
+        .or(res.python_version.as_deref())
+        .or(res.ruby_version.as_deref())
+        .or(res.rustc_version.as_deref())
+        .or(res.cargo_version.as_deref())
+        .or(res.pnpm_version.as_deref())
+        .or(res.bun_version.as_deref())
+        .or(res.deno_version.as_deref())
+        .unwrap_or("");
+    let cleaned: String = raw
+        .chars()
+        .map(|c| if c == '\n' { ' ' } else { c })
+        .collect();
+    if cleaned.len() > 60 {
+        // Find safe UTF-8 boundary at or before position 57
+        let mut end = 57;
+        while !cleaned.is_char_boundary(end) {
+            end -= 1;
         }
+        format!("{}…", &cleaned[..end])
+    } else {
+        cleaned
     }
-    String::new()
 }
 
 pub fn cli_status_label(s: &str) -> String {
@@ -344,7 +347,7 @@ pub fn cli_status_label(s: &str) -> String {
 }
 
 pub fn cli_severity(sev: &str) -> String {
-    let upper = sev.to_uppercase();
+    let upper = sev.to_ascii_uppercase();
     if upper.contains("CRITICAL") {
         format!("\x1b[1;31m{}\x1b[0m", sev)
     } else if upper.contains("HIGH") {
@@ -368,15 +371,14 @@ pub fn cli_yellow(s: &str) -> String {
 
 pub fn format_report(report: &Report) -> String {
     let results = &report.results;
-    let mut lines = vec![];
+    let mut lines = Vec::with_capacity(128);
     lines.push("# Envexa Health Report".into());
     lines.push(format!("**Generated:** {}", report.timestamp));
     lines.push(String::new());
 
     let mut outdated_all: HashMap<&str, Vec<OutdatedItem>> = HashMap::new();
-    let mut vuln_all: HashMap<&str, Vec<VulnerabilityInfo>> = HashMap::new();
-    let mut audit_all: HashMap<&str, Vec<AuditItem>> = HashMap::new();
-    let mut cleanup_all: HashMap<&str, Vec<CleanupItem>> = HashMap::new();
+    let mut vuln_all: HashMap<&str, &Vec<VulnerabilityInfo>> = HashMap::new();
+    let mut audit_all: HashMap<&str, &Vec<AuditItem>> = HashMap::new();
 
     for tool in &tool_order() {
         if let Some(res) = results.get(*tool) {
@@ -385,13 +387,10 @@ pub fn format_report(report: &Report) -> String {
                 outdated_all.insert(tool, items);
             }
             if !res.vulnerabilities.is_empty() {
-                vuln_all.insert(tool, res.vulnerabilities.clone());
+                vuln_all.insert(tool, &res.vulnerabilities);
             }
             if !res.audit_items.is_empty() {
-                audit_all.insert(tool, res.audit_items.clone());
-            }
-            if !res.cleanup_items.is_empty() {
-                cleanup_all.insert(tool, res.cleanup_items.clone());
+                audit_all.insert(tool, &res.audit_items);
             }
         }
     }
@@ -435,7 +434,7 @@ pub fn format_report(report: &Report) -> String {
         for tool in &tool_order() {
             if let Some(items) = vuln_all.get(tool) {
                 let display = display_name(tool);
-                for v in items {
+                for v in items.iter() {
                     let sev = cli_severity(&v.severity);
                     let patched = cli_green(&v.patched_version);
                     vt.add_row(&[display, &v.package, &sev, &patched]);
@@ -453,33 +452,13 @@ pub fn format_report(report: &Report) -> String {
         for tool in &tool_order() {
             if let Some(items) = audit_all.get(tool) {
                 let display = display_name(tool);
-                for a in items {
+                for a in items.iter() {
                     let cur = cli_yellow(&a.current);
                     at.add_row(&[display, &a.name, &cur, &a.note]);
                 }
             }
         }
         lines.push(at.render());
-        lines.push(String::new());
-    }
-
-    if !cleanup_all.is_empty() {
-        lines.push("## Cleanup".into());
-        for tool in &tool_order() {
-            if let Some(items) = cleanup_all.get(tool) {
-                let display = display_name(tool);
-                for c in items {
-                    lines.push(format!(
-                        "- **[{display}]** {} — {}",
-                        c.description,
-                        c.size.as_deref().unwrap_or("?")
-                    ));
-                    if let Some(ref cmd) = c.command {
-                        lines.push(format!("  `{cmd}`"));
-                    }
-                }
-            }
-        }
         lines.push(String::new());
     }
 
@@ -582,17 +561,6 @@ pub fn format_report(report: &Report) -> String {
                 }
             }
 
-            if !res.cleanup_items.is_empty() {
-                lines.push("Cleanup:".into());
-                for c in &res.cleanup_items {
-                    lines.push(format!(
-                        "- {} — {}",
-                        c.description,
-                        c.size.as_deref().unwrap_or("?")
-                    ));
-                }
-            }
-
             for issue in &res.issues {
                 lines.push(format!("> {issue}"));
             }
@@ -604,71 +572,12 @@ pub fn format_report(report: &Report) -> String {
     lines.join("\n")
 }
 
-#[allow(dead_code)]
-pub fn format_status(report: &Report) -> String {
-    let results = &report.results;
-    let mut lines = vec![];
-    lines.push("# Envexa Status".into());
-    lines.push(format!("**Generated:** {}", report.timestamp));
-    lines.push(String::new());
-
-    let mut t = Table::new();
-    t.header(&["Toolchain", "Status", "Count"]);
-    for tool in &tool_order() {
-        if let Some(res) = results.get(*tool) {
-            let label = cli_status_label(&res.status);
-            let n = extract_outdated(res).len();
-            let count = if n > 0 {
-                cli_yellow(&n.to_string())
-            } else {
-                "-".into()
-            };
-            let display = display_name(tool);
-            t.add_row(&[display, &label, &count]);
-        }
-    }
-    lines.push(t.render());
-
-    lines.push(String::new());
-    lines.push("Run `/envexa:scan` for full report or `/envexa:outdated` for details.".into());
-    lines.join("\n")
-}
-
 pub fn count_outdated(report: &Report) -> usize {
     report
         .results
         .values()
         .map(|res| extract_outdated(res).len())
         .sum()
-}
-
-#[allow(dead_code)]
-pub fn format_outdated(report: &Report) -> String {
-    let results = &report.results;
-
-    let mut t = Table::new();
-    t.header(&["Toolchain", "Package", "Current", "Latest"]);
-    let mut has_anything = false;
-    for tool in &tool_order() {
-        if let Some(res) = results.get(*tool) {
-            let items = extract_outdated(res);
-            if !items.is_empty() {
-                has_anything = true;
-                let display = display_name(tool);
-                for item in &items {
-                    let cur = cli_yellow(&item.current);
-                    let lat = cli_green(&item.latest);
-                    t.add_row(&[display, &item.name, &cur, &lat]);
-                }
-            }
-        }
-    }
-
-    if !has_anything {
-        return "All packages are up to date!".into();
-    }
-
-    format!("# Outdated Packages\n\n{}", t.render())
 }
 
 pub fn format_sarif(report: &Report) -> String {

@@ -12,7 +12,7 @@ use ratatui::{
 use tui_piechart::{LegendAlignment, LegendLayout, LegendPosition, PieChart, PieSlice, Resolution};
 
 use crate::scanner;
-use crate::tui::app::{App, View};
+use crate::tui::app::{detect_lockfiles, App, View, ALL_SCANNERS};
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()
@@ -682,13 +682,6 @@ fn detail_table_constraints(width: u16, kind: &str) -> Vec<Constraint> {
             Constraint::Length(10),
             Constraint::Min(30),
         ],
-        "cleanup" if width < 80 => vec![
-            Constraint::Length(6),
-            Constraint::Length(10),
-            Constraint::Min(16),
-            Constraint::Length(8),
-            Constraint::Min(12),
-        ],
         _ => vec![
             Constraint::Length(6),
             Constraint::Length(12),
@@ -716,6 +709,49 @@ fn project_tooling_risk(
     score.min(100) as u64
 }
 
+/// Shared helper: renders a stateful table with header, selection highlight,
+/// and responsive constraints. Used by all four detail render functions.
+#[allow(clippy::too_many_arguments)]
+fn render_item_table(
+    frame: &mut Frame,
+    area: Rect,
+    app: &App,
+    title: String,
+    border_style: Style,
+    header_cells: &[&str],
+    rows: &[Row],
+    kind: &str,
+    title_bottom: Option<&str>,
+) {
+    let header = Row::new(
+        header_cells
+            .iter()
+            .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD)),
+    )
+    .style(
+        Style::default()
+            .bg(app.theme().secondary)
+            .fg(app.theme().text_normal),
+    )
+    .height(1);
+
+    let mut block = Block::default()
+        .borders(Borders::ALL)
+        .title(title)
+        .border_style(border_style);
+    if let Some(msg) = title_bottom {
+        block = block.title_bottom(msg);
+    }
+
+    let table = Table::new(rows.to_vec(), detail_table_constraints(area.width, kind))
+        .header(header)
+        .block(block)
+        .column_spacing(1);
+    let mut state = TableState::default();
+    state.select(Some(app.detail.selection));
+    frame.render_stateful_widget(table, area, &mut state);
+}
+
 fn dashboard_cells(
     tool: &str,
     res: &crate::toolchains::ScanResult,
@@ -740,17 +776,6 @@ fn dashboard_cells(
                 .audit_items
                 .first()
                 .map(|a| format!("{}: {}", a.name, a.note))
-                .or_else(|| res.issues.first().cloned())
-                .unwrap_or_default();
-            (signal, focus)
-        }
-        "cleanup" => {
-            let n = res.cleanup_items.len();
-            let signal = if n > 0 { n.to_string() } else { String::new() };
-            let focus = res
-                .cleanup_items
-                .first()
-                .and_then(|c| c.size.clone())
                 .or_else(|| res.issues.first().cloned())
                 .unwrap_or_default();
             (signal, focus)
@@ -1550,21 +1575,6 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
                 ]));
             }
 
-            if step >= 45 {
-                let (sym, color) = if step < 55 {
-                    (spin_char, app.theme().primary)
-                } else {
-                    ("\u{2714}", app.theme().success)
-                };
-                log_lines.push(Line::from(vec![
-                    Span::styled(format!("  {} ", sym), Style::default().fg(color).bold()),
-                    Span::styled(
-                        "Collecting cleanup candidates...",
-                        Style::default().fg(app.theme().text_normal),
-                    ),
-                ]));
-            }
-
             if chunks[3].height > 0 {
                 let progress = Paragraph::new(log_lines).alignment(Alignment::Left);
                 frame.render_widget(progress, chunks[3]);
@@ -1576,11 +1586,6 @@ fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
 }
 
 const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
-const ALL_SCANNERS: &[&str] = &[
-    "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
-    "security", "audit", "ci", "git", "cleanup",
-];
 
 pub fn render(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
@@ -1645,14 +1650,26 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
             }
             .to_string(),
         ),
-        (
-            "Project Path",
-            app.config.project_path.clone().unwrap_or_else(|| {
+        ("Project Path", {
+            let path = app.config.project_path.clone().unwrap_or_else(|| {
                 std::env::current_dir()
                     .map(|p| p.display().to_string())
                     .unwrap_or_default()
-            }),
-        ),
+            });
+            let path_buf = std::path::PathBuf::from(&path);
+            if !path_buf.exists() {
+                format!("{} (not found)", path)
+            } else if !path_buf.is_dir() {
+                format!("{} (not a directory)", path)
+            } else {
+                let lockfiles = detect_lockfiles(&path_buf);
+                if lockfiles.is_empty() {
+                    format!("{} (no lockfiles)", path)
+                } else {
+                    format!("{} ({})", path, lockfiles.join(", "))
+                }
+            }
+        }),
         ("Scan Timeout", format!("{}s", app.config.scan_timeout_secs)),
         (
             "Daemon Interval",
@@ -1666,11 +1683,14 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
             .to_string(),
         ),
         ("Enabled Scanners", {
+            let scanner_count = ALL_SCANNERS.len();
             let enabled = app
                 .config
                 .enabled_scanners
                 .as_ref()
-                .map_or("All (16)".to_string(), |v| format!("{}/16", v.len()));
+                .map_or(format!("All ({})", scanner_count), |v| {
+                    format!("{}/{}", v.len(), scanner_count)
+                });
             enabled
         }),
         ("Export Format", app.config.export_format.clone()),
@@ -1822,7 +1842,10 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
                         "Off" => "Wait for manual scan command",
                         _ => "",
                     },
-                    2 => "Root directory scanned by envexa",
+                    2 => {
+                        // No descriptions for project path - save space
+                        ""
+                    }
                     3 => match val.as_str() {
                         "10s" => "Fast scans, may timeout on slow machines",
                         "30s" => "Balanced timeout, recommended",
@@ -1890,7 +1913,12 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
             })
             .collect();
 
-        let popup_area = centered_rect(50, 50, area);
+        let popup_area = if app.ui.settings_selection == 2 {
+            // Smaller popup for project path folder browser to avoid overlap
+            centered_rect(55, 60, area)
+        } else {
+            centered_rect(50, 50, area)
+        };
         let title = match app.ui.settings_selection {
             0 => " Cache TTL ",
             1 => " Auto-Scan ",
@@ -1904,13 +1932,32 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
             _ => " Options ",
         };
 
-        let list = List::new(items).block(
+        // Add footer hint for project path
+        let block = if app.ui.settings_selection == 2 {
             Block::default()
                 .title(title)
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(app.theme().primary))
-                .bg(app.theme().background),
-        );
+                .bg(app.theme().background)
+                .title_bottom(
+                    Line::from(vec![
+                        Span::styled(" ↑↓ Navigate ", Style::default().fg(app.theme().text_muted)),
+                        Span::styled("│ ", Style::default().fg(app.theme().text_muted)),
+                        Span::styled("Enter Select ", Style::default().fg(app.theme().text_muted)),
+                        Span::styled("│ ", Style::default().fg(app.theme().text_muted)),
+                        Span::styled("Esc Back", Style::default().fg(app.theme().text_muted)),
+                    ])
+                    .alignment(Alignment::Center),
+                )
+        } else {
+            Block::default()
+                .title(title)
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(app.theme().primary))
+                .bg(app.theme().background)
+        };
+
+        let list = List::new(items).block(block);
 
         frame.render_widget(Clear, popup_area);
 
@@ -1924,20 +1971,30 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
         let completion_rows = n_completions.min(8) as u16;
         let popup_height = (30 + completion_rows * 2).min(70);
         let popup_area = centered_rect(60, popup_height, area);
-        let valid = !app.ui.input_buffer.is_empty()
-            && std::path::Path::new(app.ui.input_buffer.trim()).is_dir();
+        let input_path = if let Some(idx) = app.ui.input_buffer.find("  [") {
+            &app.ui.input_buffer[..idx]
+        } else {
+            app.ui.input_buffer.trim()
+        };
+        let valid = !input_path.is_empty() && std::path::Path::new(input_path).is_dir();
 
         let body = if app.ui.input_buffer.is_empty() {
             "Enter an absolute path, e.g. /Users/me/my-project".to_string()
         } else if valid {
-            let p = std::path::Path::new(app.ui.input_buffer.trim());
+            let p = std::path::Path::new(input_path);
             let file_count = std::fs::read_dir(p).map(|e| e.count()).unwrap_or(0);
-            format!(
-                " \u{2713} {file_count} items  {}",
-                app.ui.input_buffer.trim()
-            )
+            let lockfiles = detect_lockfiles(p);
+            if lockfiles.is_empty() {
+                format!(" \u{2713} {file_count} items  {}", input_path)
+            } else {
+                format!(
+                    " \u{2713} {file_count} items  {}  [{}]",
+                    input_path,
+                    lockfiles.join(", ")
+                )
+            }
         } else {
-            format!(" \u{2717} Path not found: {}", app.ui.input_buffer.trim())
+            format!(" \u{2717} Path not found: {}", input_path)
         };
 
         let status_color = if valid {
@@ -1979,10 +2036,22 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
                 } else {
                     app.theme().text_muted
                 };
-                lines.push(Line::from(Span::styled(
-                    format!("{}{}", marker, app.ui.input_completions[i]),
+                let (display, _lockfile_style) = if app.ui.input_completions[i].contains("  [") {
+                    // Show lockfile info with different styling
+                    let parts: Vec<&str> = app.ui.input_completions[i].splitn(2, "  [").collect();
+                    let path = parts[0];
+                    let lockfiles = parts.get(1).unwrap_or(&"");
+                    (
+                        format!("{}  [{}", path, lockfiles),
+                        Style::default().fg(app.theme().primary),
+                    )
+                } else {
+                    (app.ui.input_completions[i].clone(), Style::default().fg(fg))
+                };
+                lines.push(Line::from(vec![Span::styled(
+                    format!("{}{}", marker, display),
                     Style::default().fg(fg),
-                )));
+                )]));
             }
             lines.push(Line::from(Span::raw("")));
             if n_completions > 8 {
@@ -2021,7 +2090,6 @@ fn render_package_detail(frame: &mut Frame, area: Rect, app: &App) {
     match app.detail.key.as_deref() {
         Some("security") => render_vulnerabilities(frame, area, &tool, app),
         Some("audit") => render_audit_items(frame, area, &tool, app),
-        Some("cleanup") => render_cleanup_items(frame, area, &tool, app),
         _ => render_outdated_detail(frame, area, &tool, app),
     }
 }
@@ -2051,17 +2119,6 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         frame.render_widget(text, area);
         return;
     }
-
-    let header_cells = ["", "Package ", "Source ", "Current ", "Latest ", "Size "]
-        .iter()
-        .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
-    let header = Row::new(header_cells)
-        .style(
-            Style::default()
-                .bg(app.theme().secondary)
-                .fg(app.theme().text_normal),
-        )
-        .height(1);
 
     let rows: Vec<Row> = items
         .iter()
@@ -2095,25 +2152,22 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         .collect();
 
     let sub = if !app.detail.message.is_empty() {
-        format!("  {}", app.detail.message)
+        Some(format!("  {}", app.detail.message))
     } else {
-        String::new()
+        None
     };
 
-    let table = Table::new(rows, detail_table_constraints(area.width, "outdated"))
-        .header(header)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!(" {tool} — Outdated Packages ({}) ", items.len()))
-                .title_bottom(sub)
-                .border_style(Style::default().fg(app.theme().primary)),
-        )
-        .column_spacing(1);
-
-    let mut state = TableState::default();
-    state.select(Some(app.detail.selection));
-    frame.render_stateful_widget(table, area, &mut state);
+    render_item_table(
+        frame,
+        area,
+        app,
+        format!(" {tool} — Outdated Packages ({}) ", items.len()),
+        Style::default().fg(app.theme().primary),
+        &["", "Package ", "Source ", "Current ", "Latest ", "Size "],
+        &rows,
+        "outdated",
+        sub.as_deref(),
+    );
 }
 
 fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
@@ -2142,16 +2196,14 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         return;
     }
 
-    let header_cells = ["Package ", "Severity ", "CVE ", "Title ", "Patched In "]
-        .iter()
-        .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
-    let header = Row::new(header_cells)
-        .style(
-            Style::default()
-                .bg(app.theme().secondary)
-                .fg(app.theme().text_normal),
-        )
-        .height(1);
+    let bottom_msg = if !app.detail.message.is_empty() {
+        Some(format!(
+            "  {}  |  [E] Export Report  [Esc] Back ",
+            app.detail.message
+        ))
+    } else {
+        Some("  [E] Export Report  |  [Esc] Back ".to_string())
+    };
 
     let rows: Vec<Row> = items
         .iter()
@@ -2177,21 +2229,6 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         })
         .collect();
 
-    let bottom_msg = if !app.detail.message.is_empty() {
-        format!(
-            "  {}  |  [E] Export Report  [Esc] Back ",
-            app.detail.message
-        )
-    } else {
-        "  [E] Export Report  |  [Esc] Back ".to_string()
-    };
-
-    let table_block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" {tool} — Vulnerabilities ({}) ", items.len()))
-        .title_bottom(bottom_msg)
-        .border_style(Style::default().fg(app.theme().error));
-
     // Responsive 2-column layout
     if area.width >= 100 && area.height >= 8 {
         let chunks = Layout::default()
@@ -2203,13 +2240,17 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         let right_area = chunks[1];
 
         // Draw Left Table
-        let table = Table::new(rows, detail_table_constraints(left_area.width, "security"))
-            .header(header)
-            .block(table_block)
-            .column_spacing(1);
-        let mut state = TableState::default();
-        state.select(Some(app.detail.selection));
-        frame.render_stateful_widget(table, left_area, &mut state);
+        render_item_table(
+            frame,
+            left_area,
+            app,
+            format!(" {tool} — Vulnerabilities ({}) ", items.len()),
+            Style::default().fg(app.theme().error),
+            &["Package ", "Severity ", "CVE ", "Title ", "Patched In "],
+            &rows,
+            "security",
+            bottom_msg.as_deref(),
+        );
 
         // Draw Right Stats and Detail Panel
         let right_chunks = Layout::default()
@@ -2350,15 +2391,18 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             );
             frame.render_widget(empty_card, right_chunks[1]);
         }
-    } else {
         // Fallback layout (narrow terminal)
-        let table = Table::new(rows, detail_table_constraints(area.width, "security"))
-            .header(header)
-            .block(table_block)
-            .column_spacing(1);
-        let mut state = TableState::default();
-        state.select(Some(app.detail.selection));
-        frame.render_stateful_widget(table, area, &mut state);
+        render_item_table(
+            frame,
+            area,
+            app,
+            format!(" {tool} — Vulnerabilities ({}) ", items.len()),
+            Style::default().fg(app.theme().error),
+            &["Package ", "Severity ", "CVE ", "Title ", "Patched In "],
+            &rows,
+            "security",
+            bottom_msg.as_deref(),
+        );
     }
 }
 
@@ -2388,17 +2432,6 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         return;
     }
 
-    let header_cells = ["Name ", "Current ", "Note "]
-        .iter()
-        .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
-    let header = Row::new(header_cells)
-        .style(
-            Style::default()
-                .bg(app.theme().secondary)
-                .fg(app.theme().text_normal),
-        )
-        .height(1);
-
     let rows: Vec<Row> = items
         .iter()
         .enumerate()
@@ -2421,19 +2454,13 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         .collect();
 
     let bottom_msg = if !app.detail.message.is_empty() {
-        format!(
+        Some(format!(
             "  {}  |  [E] Export Report  [Esc] Back ",
             app.detail.message
-        )
+        ))
     } else {
-        "  [E] Export Report  |  [Esc] Back ".to_string()
+        Some("  [E] Export Report  |  [Esc] Back ".to_string())
     };
-
-    let table_block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" {tool} — Audit Items ({}) ", items.len()))
-        .title_bottom(bottom_msg)
-        .border_style(Style::default().fg(app.theme().warning));
 
     // Responsive 2-column layout
     if area.width >= 100 && area.height >= 8 {
@@ -2446,13 +2473,17 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
         let right_area = chunks[1];
 
         // Draw Left Table
-        let table = Table::new(rows, detail_table_constraints(left_area.width, "audit"))
-            .header(header)
-            .block(table_block)
-            .column_spacing(1);
-        let mut state = TableState::default();
-        state.select(Some(app.detail.selection));
-        frame.render_stateful_widget(table, left_area, &mut state);
+        render_item_table(
+            frame,
+            left_area,
+            app,
+            format!(" {tool} — Audit Items ({}) ", items.len()),
+            Style::default().fg(app.theme().warning),
+            &["Name ", "Current ", "Note "],
+            &rows,
+            "audit",
+            bottom_msg.as_deref(),
+        );
 
         // Draw Right Stats and Detail Panel
         let right_chunks = Layout::default()
@@ -2526,230 +2557,18 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
             );
             frame.render_widget(empty_card, right_chunks[1]);
         }
-    } else {
         // Fallback layout (narrow terminal)
-        let table = Table::new(rows, detail_table_constraints(area.width, "audit"))
-            .header(header)
-            .block(table_block)
-            .column_spacing(1);
-        let mut state = TableState::default();
-        state.select(Some(app.detail.selection));
-        frame.render_stateful_widget(table, area, &mut state);
-    }
-}
-
-fn parse_size_to_mb(size_str: &str) -> f64 {
-    let clean: String = size_str
-        .chars()
-        .filter(|c| !c.is_whitespace() && *c != ',')
-        .collect();
-
-    let numeric_part: String = clean
-        .chars()
-        .take_while(|c| c.is_ascii_digit() || *c == '.')
-        .collect();
-
-    let Ok(val) = numeric_part.parse::<f64>() else {
-        return 0.0;
-    };
-
-    let suffix = &clean[numeric_part.len()..];
-    let suffix_lower = suffix.to_lowercase();
-
-    if suffix_lower.starts_with('g') {
-        val * 1024.0
-    } else if suffix_lower.starts_with('m') {
-        val
-    } else if suffix_lower.starts_with('k') {
-        val / 1024.0
-    } else if suffix_lower.starts_with('b') {
-        val / (1024.0 * 1024.0)
-    } else {
-        0.0
-    }
-}
-
-fn get_cleanup_label(item: &crate::toolchains::CleanupItem) -> String {
-    let desc = item.description.to_lowercase();
-    if desc.contains("npm") {
-        "NPM".to_string()
-    } else if desc.contains("cargo") {
-        "Cargo".to_string()
-    } else if desc.contains("bun") {
-        "Bun".to_string()
-    } else if desc.contains("pip") {
-        "Pip".to_string()
-    } else if desc.contains("docker") {
-        "Docker".to_string()
-    } else if desc.contains("homebrew") || desc.contains("brew") {
-        "Homebrew".to_string()
-    } else {
-        item.category.to_uppercase()
-    }
-}
-
-fn get_label_color(label: &str, theme: &Theme) -> Color {
-    match label {
-        "NPM" => theme.error,
-        "Cargo" => Color::LightRed,
-        "Bun" => theme.warning,
-        "Pip" => theme.success,
-        "Docker" => theme.secondary,
-        "Homebrew" => theme.secondary,
-        _ => theme.primary,
-    }
-}
-
-fn render_cleanup_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
-    let items = &app.detail.cleanup;
-
-    if items.is_empty() {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(format!(" {tool} — Cleanup (0) "))
-            .border_style(Style::default().fg(app.theme().success));
-        let text = Paragraph::new(Text::from(vec![
-            Line::from(""),
-            Line::from(vec![
-                Span::styled(
-                    "  \u{2714} ",
-                    Style::default().fg(app.theme().success).bold(),
-                ),
-                Span::styled(
-                    "Your environment is fully clean! No cache cleanup needed.",
-                    Style::default().fg(app.theme().text_normal),
-                ),
-            ]),
-        ]))
-        .block(block);
-        frame.render_widget(text, area);
-        return;
-    }
-
-    let header_cells = ["", "Category ", "Description ", "Size ", "Command "]
-        .iter()
-        .map(|h| Cell::from(*h).add_modifier(Modifier::BOLD));
-    let header = Row::new(header_cells)
-        .style(
-            Style::default()
-                .bg(app.theme().secondary)
-                .fg(app.theme().text_normal),
-        )
-        .height(1);
-
-    let rows: Vec<Row> = items
-        .iter()
-        .enumerate()
-        .map(|(i, c)| {
-            let sel = i == app.detail.selection;
-            let checked = app.detail.checked.contains(&i);
-            let cb = if checked { "[x]" } else { "[ ]" };
-            let indicator = if sel {
-                format!("{cb}\u{25b8}")
-            } else {
-                format!("{cb} ")
-            };
-            let size = c.size.as_deref().unwrap_or("-");
-            let cmd = c.command.as_deref().unwrap_or("-");
-            let mut row = Row::new(vec![
-                Cell::from(indicator),
-                Cell::from(c.category.as_str()),
-                Cell::from(c.description.as_str()),
-                Cell::from(size),
-                Cell::from(cmd),
-            ]);
-            if sel {
-                row = row.style(
-                    Style::default()
-                        .bg(app.theme().text_muted)
-                        .add_modifier(Modifier::BOLD),
-                );
-            }
-            row
-        })
-        .collect();
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" {tool} — Cleanup ({}) ", items.len()))
-        .border_style(Style::default().fg(app.theme().success));
-
-    let inner_area = block.inner(area);
-
-    if inner_area.width >= 80 && inner_area.height >= 8 {
-        frame.render_widget(block, area);
-
-        let chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
-            .split(inner_area);
-
-        let mut category_sizes: std::collections::HashMap<String, f64> =
-            std::collections::HashMap::new();
-        for item in items {
-            if let Some(ref sz) = item.size {
-                let label = get_cleanup_label(item);
-                let bytes = parse_size_to_mb(sz);
-                *category_sizes.entry(label).or_insert(0.0) += bytes;
-            }
-        }
-
-        let mut sorted_categories: Vec<(String, f64)> = category_sizes.into_iter().collect();
-        sorted_categories
-            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-
-        let slice_labels: Vec<String> = sorted_categories
-            .iter()
-            .map(|(label, mb)| {
-                if *mb >= 1024.0 {
-                    format!("{} ({:.1}G)", label, mb / 1024.0)
-                } else {
-                    format!("{} ({:.1}M)", label, mb)
-                }
-            })
-            .collect();
-
-        let mut slices = Vec::new();
-        for (i, (label, mb)) in sorted_categories.iter().enumerate() {
-            if *mb > 0.0 {
-                let color = get_label_color(label, &app.theme());
-                slices.push(PieSlice::new(&slice_labels[i], *mb, color));
-            }
-        }
-
-        if slices.is_empty() {
-            slices.push(PieSlice::new("EMPTY", 1.0, app.theme().text_muted));
-        }
-
-        let piechart = PieChart::new(slices)
-            .resolution(Resolution::Braille)
-            .show_legend(chunks[0].width >= 24 && chunks[0].height >= 8)
-            .legend_position(LegendPosition::Top)
-            .legend_layout(LegendLayout::Vertical)
-            .legend_alignment(LegendAlignment::Center)
-            .show_percentages(false)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(" Heatmap ")
-                    .border_style(Style::default().fg(app.theme().primary)),
-            );
-        frame.render_widget(piechart, chunks[0]);
-
-        let table = Table::new(rows, detail_table_constraints(chunks[1].width, "cleanup"))
-            .header(header)
-            .column_spacing(1);
-        let mut state = TableState::default();
-        state.select(Some(app.detail.selection));
-        frame.render_stateful_widget(table, chunks[1], &mut state);
-    } else {
-        let table = Table::new(rows, detail_table_constraints(area.width, "cleanup"))
-            .header(header)
-            .block(block)
-            .column_spacing(1);
-        let mut state = TableState::default();
-        state.select(Some(app.detail.selection));
-        frame.render_stateful_widget(table, area, &mut state);
+        render_item_table(
+            frame,
+            area,
+            app,
+            format!(" {tool} — Audit Items ({}) ", items.len()),
+            Style::default().fg(app.theme().warning),
+            &["Name ", "Current ", "Note "],
+            &rows,
+            "audit",
+            bottom_msg.as_deref(),
+        );
     }
 }
 

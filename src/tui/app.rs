@@ -11,11 +11,70 @@ use throbber_widgets_tui::ThrobberState;
 use crate::core::config;
 use crate::scanner::{self, OutdatedItem, Report};
 use crate::toolchains;
-use crate::toolchains::{AuditItem, CleanupItem, VulnerabilityInfo};
+use crate::toolchains::{AuditItem, VulnerabilityInfo};
 
-const ALL_SCANNERS: &[&str] = &[
+pub fn detect_lockfiles(dir: &std::path::Path) -> Vec<&'static str> {
+    let mut lockfiles = Vec::new();
+
+    // Node.js ecosystem
+    if dir.join("package.json").exists() {
+        lockfiles.push("npm");
+    }
+    if dir.join("pnpm-lock.yaml").exists() || dir.join("pnpm-lock.yml").exists() {
+        lockfiles.push("pnpm");
+    }
+    if dir.join("yarn.lock").exists() {
+        lockfiles.push("yarn");
+    }
+    if dir.join("bun.lockb").exists() || dir.join("bun.lock").exists() {
+        lockfiles.push("bun");
+    }
+
+    // Deno
+    if dir.join("deno.json").exists() || dir.join("deno.jsonc").exists() {
+        lockfiles.push("deno");
+    }
+
+    // Rust
+    if dir.join("Cargo.toml").exists() {
+        lockfiles.push("cargo");
+    }
+
+    // Python
+    if dir.join("poetry.lock").exists() {
+        lockfiles.push("poetry");
+    }
+    if dir.join("Pipfile").exists() || dir.join("Pipfile.lock").exists() {
+        lockfiles.push("pipenv");
+    }
+    if dir.join("requirements.txt").exists() {
+        lockfiles.push("requirements");
+    }
+
+    // Go
+    if dir.join("go.mod").exists() {
+        lockfiles.push("go");
+    }
+
+    // Java/Kotlin
+    if dir.join("build.gradle").exists() || dir.join("build.gradle.kts").exists() {
+        lockfiles.push("gradle");
+    }
+    if dir.join("pom.xml").exists() {
+        lockfiles.push("maven");
+    }
+
+    // PHP
+    if dir.join("composer.json").exists() {
+        lockfiles.push("composer");
+    }
+
+    lockfiles
+}
+
+pub const ALL_SCANNERS: &[&str] = &[
     "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
-    "security", "audit", "ci", "git", "cleanup",
+    "security", "audit", "ci",
 ];
 
 pub enum View {
@@ -39,13 +98,9 @@ pub enum AppEvent {
         result_msg: String,
         updated_packages: Vec<(String, String, String)>, // (tool_key, name, source)
     },
-    CleanupFinished {
-        result_msg: String,
-        new_report_res: Option<crate::toolchains::ScanResult>,
-    },
     SecurityFixFinished {
         result_msg: String,
-        new_report_res: Option<crate::toolchains::ScanResult>,
+        new_report_res: Box<Option<crate::toolchains::ScanResult>>,
     },
 }
 
@@ -79,7 +134,6 @@ pub struct DetailState {
     pub items: Vec<OutdatedItem>,
     pub vulns: Vec<VulnerabilityInfo>,
     pub audits: Vec<AuditItem>,
-    pub cleanup: Vec<CleanupItem>,
     pub checked: HashSet<usize>,
     pub message: String,
 }
@@ -136,7 +190,6 @@ impl App {
                 items: Vec::new(),
                 vulns: Vec::new(),
                 audits: Vec::new(),
-                cleanup: Vec::new(),
                 checked: HashSet::new(),
                 message: String::new(),
             },
@@ -229,7 +282,12 @@ impl App {
                                     self.ui.input_completions.clear();
                                 }
                                 KeyCode::Enter => {
-                                    let path = self.ui.input_buffer.trim().to_string();
+                                    let input = self.ui.input_buffer.trim().to_string();
+                                    let path = if let Some(idx) = input.find("  [") {
+                                        input[..idx].to_string()
+                                    } else {
+                                        input
+                                    };
                                     if !path.is_empty() {
                                         let p = std::path::Path::new(&path);
                                         if p.is_dir() {
@@ -250,7 +308,13 @@ impl App {
                                     } else if self.ui.input_completion_index < completions.len() {
                                         let sel =
                                             completions[self.ui.input_completion_index].clone();
-                                        self.ui.input_buffer = format!("{}/", sel);
+                                        // Extract path from "path  [lockfiles]" format
+                                        let path = if let Some(idx) = sel.find("  [") {
+                                            &sel[..idx]
+                                        } else {
+                                            &sel
+                                        };
+                                        self.ui.input_buffer = format!("{}/", path);
                                         self.refresh_completions();
                                     }
                                 }
@@ -293,9 +357,6 @@ impl App {
                                 KeyCode::Char(' ') => {}
                                 KeyCode::Char('y') | KeyCode::Char('Y') => {
                                     match self.detail.key.as_deref() {
-                                        Some("cleanup") => {
-                                            self.do_detail_cleanups(tx.clone())?;
-                                        }
                                         Some("security") | Some("audit") => {}
                                         _ => {
                                             self.do_detail_updates(tx.clone())?;
@@ -389,6 +450,10 @@ impl App {
                                 self.ui.outdated_selection = 0;
                             }
                             KeyCode::Right | KeyCode::Char('l') => {
+                                // Prevent tab switching during scan or update
+                                if matches!(self.ui.view, View::Scanning | View::Updating) {
+                                    continue;
+                                }
                                 if !(matches!(self.ui.view, View::Settings)
                                     && self.ui.settings_edit_mode)
                                 {
@@ -401,6 +466,10 @@ impl App {
                                 };
                             }
                             KeyCode::Left | KeyCode::Char('h') => {
+                                // Prevent tab switching during scan or update
+                                if matches!(self.ui.view, View::Scanning | View::Updating) {
+                                    continue;
+                                }
                                 if !(matches!(self.ui.view, View::Settings)
                                     && self.ui.settings_edit_mode)
                                 {
@@ -502,22 +571,6 @@ impl App {
                         }
                         self.clamp_selection();
                     }
-                    AppEvent::CleanupFinished {
-                        result_msg,
-                        new_report_res,
-                    } => {
-                        self.detail.message = result_msg;
-                        self.ui.view = View::PackageDetail;
-
-                        if let Some(res) = new_report_res {
-                            if let Some(ref mut report) = self.report {
-                                report.results.insert("cleanup".to_string(), res.clone());
-                                self.detail.cleanup =
-                                    crate::scanner::extract_cleanup_items(&res).to_vec();
-                            }
-                        }
-                        self.clamp_selection();
-                    }
                     AppEvent::SecurityFixFinished {
                         result_msg,
                         new_report_res,
@@ -525,7 +578,7 @@ impl App {
                         self.detail.message = result_msg;
                         self.ui.view = View::PackageDetail;
 
-                        if let Some(res) = new_report_res {
+                        if let Some(res) = *new_report_res {
                             if let Some(ref mut report) = self.report {
                                 report.results.insert("security".to_string(), res.clone());
                                 self.detail.vulns =
@@ -569,28 +622,18 @@ impl App {
                 self.detail.vulns = vulns.to_vec();
                 self.detail.items.clear();
                 self.detail.audits.clear();
-                self.detail.cleanup.clear();
             }
             "audit" => {
                 let audits = scanner::extract_audit_items(res);
                 self.detail.audits = audits.to_vec();
                 self.detail.items.clear();
                 self.detail.vulns.clear();
-                self.detail.cleanup.clear();
-            }
-            "cleanup" => {
-                let cleanup = scanner::extract_cleanup_items(res);
-                self.detail.cleanup = cleanup.to_vec();
-                self.detail.items.clear();
-                self.detail.vulns.clear();
-                self.detail.audits.clear();
             }
             _ => {
                 let items = scanner::extract_outdated(res);
                 self.detail.items = items;
                 self.detail.vulns.clear();
                 self.detail.audits.clear();
-                self.detail.cleanup.clear();
             }
         }
 
@@ -628,100 +671,7 @@ impl App {
         self.ui.update_downloaded_mb = 0.0;
         let _count = work.len();
 
-        tokio::spawn(async move {
-            let mut updated = 0usize;
-            let mut failed = 0usize;
-            let mut errors = vec![];
-            let mut successful_updates = vec![];
-            for (tk, td, item) in &work {
-                match run_update(td, item, tx.clone()).await {
-                    Ok(_) => {
-                        updated += 1;
-                        successful_updates.push((
-                            tk.clone(),
-                            item.name.clone(),
-                            item.source.clone(),
-                        ));
-                    }
-                    Err(e) => {
-                        failed += 1;
-                        errors.push(format!("{}: {}", item.name, e));
-                    }
-                }
-            }
-            let result_msg = if errors.is_empty() {
-                format!("\u{2714} Updated {updated} package(s)")
-            } else {
-                let e = errors.join("; ");
-                format!("\u{2714} Updated {updated} | \u{2716} Failed {failed}: {e}")
-            };
-            let _ = tx.send(AppEvent::UpdateFinished {
-                result_msg,
-                updated_packages: successful_updates,
-            });
-        });
-        Ok(())
-    }
-
-    fn do_detail_cleanups(
-        &mut self,
-        tx: mpsc::UnboundedSender<AppEvent>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let work: Vec<CleanupItem> = self
-            .detail
-            .cleanup
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| self.detail.checked.contains(i))
-            .map(|(_, item)| item.clone())
-            .collect();
-        self.detail.checked.clear();
-        if work.is_empty() {
-            return Ok(());
-        }
-
-        self.ui.view = View::Updating;
-        self.ui.progress_counter = 0;
-
-        tokio::spawn(async move {
-            let mut cleaned = 0usize;
-            let mut failed = 0usize;
-            let mut errors = vec![];
-            for item in &work {
-                if let Some(ref cmd_str) = item.command {
-                    let mut command = tokio::process::Command::new("sh");
-                    command.arg("-c").arg(cmd_str);
-                    match command.output().await {
-                        Ok(output) if output.status.success() => cleaned += 1,
-                        Ok(output) => {
-                            failed += 1;
-                            let err_msg =
-                                String::from_utf8_lossy(&output.stderr).trim().to_string();
-                            errors.push(format!("{}: {}", item.description, err_msg));
-                        }
-                        Err(e) => {
-                            failed += 1;
-                            errors.push(format!("{}: {}", item.description, e));
-                        }
-                    }
-                } else {
-                    failed += 1;
-                    errors.push(format!("{}: no command configured", item.description));
-                }
-            }
-            let result_msg = if errors.is_empty() {
-                format!("\u{2714} Successfully cleaned up {cleaned} item(s)")
-            } else {
-                let e = errors.join("; ");
-                format!("\u{2714} Cleaned up {cleaned} | \u{2716} Failed {failed}: {e}")
-            };
-
-            let new_report_res = toolchains::scan_one("cleanup").await;
-            let _ = tx.send(AppEvent::CleanupFinished {
-                result_msg,
-                new_report_res,
-            });
-        });
+        tokio::spawn(run_updates(work, tx));
         Ok(())
     }
 
@@ -781,7 +731,7 @@ impl App {
             let new_report_res = toolchains::scan_one("security").await;
             let _ = tx.send(AppEvent::SecurityFixFinished {
                 result_msg,
-                new_report_res,
+                new_report_res: Box::new(new_report_res),
             });
         });
         Ok(())
@@ -827,38 +777,7 @@ impl App {
         self.ui.update_downloaded_mb = 0.0;
         let _count = work.len();
 
-        tokio::spawn(async move {
-            let mut updated = 0usize;
-            let mut failed = 0usize;
-            let mut errors = vec![];
-            let mut successful_updates = vec![];
-            for (tk, td, item) in &work {
-                match run_update(td, item, tx.clone()).await {
-                    Ok(_) => {
-                        updated += 1;
-                        successful_updates.push((
-                            tk.clone(),
-                            item.name.clone(),
-                            item.source.clone(),
-                        ));
-                    }
-                    Err(e) => {
-                        failed += 1;
-                        errors.push(format!("{}: {}", item.name, e));
-                    }
-                }
-            }
-            let result_msg = if errors.is_empty() {
-                format!("\u{2714} Updated {updated} package(s)")
-            } else {
-                let e = errors.join("; ");
-                format!("\u{2714} Updated {updated} | \u{2716} Failed {failed}: {e}")
-            };
-            let _ = tx.send(AppEvent::UpdateFinished {
-                result_msg,
-                updated_packages: successful_updates,
-            });
-        });
+        tokio::spawn(run_updates(work, tx));
         Ok(())
     }
 
@@ -888,7 +807,7 @@ impl App {
     fn clamp_selection(&mut self) {
         match self.ui.view {
             View::Dashboard => {
-                let n = self.count_filtered_tools().saturating_sub(1);
+                let n = self.filtered_tools().len().saturating_sub(1);
                 self.ui.dashboard_selection = self.ui.dashboard_selection.min(n);
             }
             View::Outdated => {
@@ -958,42 +877,33 @@ impl App {
 
         let mut completions = Vec::new();
         if let Ok(entries) = std::fs::read_dir(&parent) {
+            let mut dirs: Vec<(String, Vec<String>)> = Vec::new();
             for entry in entries.flatten() {
                 if entry.path().is_dir() {
                     let name = entry.file_name().to_string_lossy().to_string();
                     if name.starts_with(&prefix) && !name.starts_with('.') {
-                        let full = parent.join(&name).display().to_string();
-                        completions.push(full);
+                        let path = entry.path();
+                        let lockfiles: Vec<String> = detect_lockfiles(&path)
+                            .into_iter()
+                            .map(String::from)
+                            .collect();
+                        let full = path.display().to_string();
+                        dirs.push((full, lockfiles));
                     }
+                }
+            }
+            dirs.sort_by(|a, b| a.0.cmp(&b.0));
+            for (full, lockfiles) in dirs {
+                if lockfiles.is_empty() {
+                    completions.push(full);
+                } else {
+                    completions.push(format!("{}  [{}]", full, lockfiles.join(", ")));
                 }
             }
         }
         completions.sort();
         self.ui.input_completions = completions;
         self.ui.input_completion_index = 0;
-    }
-
-    fn count_filtered_tools(&self) -> usize {
-        let report = match &self.report {
-            Some(r) => r,
-            None => return 0,
-        };
-        let q = self.ui.search_query.to_lowercase();
-        let mut count = 0;
-        for cat in scanner::tool_categories() {
-            for tool in cat.tools {
-                let matches_search = if q.is_empty() || !self.ui.search_mode {
-                    true
-                } else {
-                    let name = scanner::display_name(tool).to_lowercase();
-                    name.contains(&q) || tool.contains(&q)
-                };
-                if matches_search && report.results.contains_key(*tool) {
-                    count += 1;
-                }
-            }
-        }
-        count
     }
 
     fn do_scan(
@@ -1022,7 +932,7 @@ impl App {
     fn next_item(&mut self) {
         match self.ui.view {
             View::Dashboard => {
-                let n = self.count_filtered_tools().saturating_sub(1);
+                let n = self.filtered_tools().len().saturating_sub(1);
                 self.ui.dashboard_selection = self.ui.dashboard_selection.saturating_add(1).min(n);
             }
             View::Outdated => {
@@ -1099,14 +1009,80 @@ impl App {
             ],
             1 => vec!["On".to_string(), "Off".to_string()],
             2 => {
+                let mut opts = Vec::new();
                 let cwd = std::env::current_dir()
                     .map(|p| p.display().to_string())
                     .unwrap_or_default();
-                vec![
-                    cwd,
-                    "~/.envexa/project".to_string(),
-                    "Custom path...".to_string(),
-                ]
+
+                // Add current directory if it exists
+                let cwd_path = std::path::PathBuf::from(&cwd);
+                if cwd_path.exists() && cwd_path.is_dir() {
+                    let lockfiles = detect_lockfiles(&cwd_path);
+                    if lockfiles.is_empty() {
+                        opts.push(format!("{}  [no lockfiles]", cwd));
+                    } else {
+                        opts.push(format!("{}  [{}]", cwd, lockfiles.join(", ")));
+                    }
+                }
+
+                // Add subdirectories (show all, sorted alphabetically)
+                if let Ok(entries) = std::fs::read_dir(&cwd_path) {
+                    let mut subdirs: Vec<(String, Vec<String>, bool)> = Vec::new();
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.is_dir() {
+                            // Skip hidden directories
+                            let name = path.file_name().unwrap_or_default().to_string_lossy();
+                            if name.starts_with('.') {
+                                continue;
+                            }
+                            let lockfiles: Vec<String> = detect_lockfiles(&path)
+                                .into_iter()
+                                .map(String::from)
+                                .collect();
+                            let has_children = path
+                                .read_dir()
+                                .map(|mut r| r.next().is_some())
+                                .unwrap_or(false);
+                            subdirs.push((path.display().to_string(), lockfiles, has_children));
+                        }
+                    }
+                    subdirs.sort_by(|a, b| a.0.cmp(&b.0));
+                    for (path, lockfiles, has_children) in subdirs {
+                        let tree_prefix = if has_children { "├─ " } else { "└─ " };
+                        if lockfiles.is_empty() {
+                            opts.push(format!("{}{}  ", tree_prefix, path));
+                        } else {
+                            opts.push(format!(
+                                "{}{}  [{}]",
+                                tree_prefix,
+                                path,
+                                lockfiles.join(", ")
+                            ));
+                        }
+                    }
+                }
+
+                // Add parent directory
+                if let Some(parent) = cwd_path.parent() {
+                    let parent_str = parent.display().to_string();
+                    if !opts.iter().any(|o| o.contains(&parent_str)) {
+                        let lockfiles = detect_lockfiles(parent);
+                        if lockfiles.is_empty() {
+                            opts.push(format!("↑ {}  [parent, no lockfiles]", parent_str));
+                        } else {
+                            opts.push(format!(
+                                "↑ {}  [parent, {}]",
+                                parent_str,
+                                lockfiles.join(", ")
+                            ));
+                        }
+                    }
+                }
+
+                // Add custom path option
+                opts.push("✎ Custom path...".to_string());
+                opts
             }
             3 => vec![
                 "10s".to_string(),
@@ -1163,12 +1139,28 @@ impl App {
                 self.config.auto_scan_on_startup = val == "On";
             }
             2 => {
-                if val == "Custom path..." {
+                if val.contains("Custom path...") {
                     self.ui.input_mode = true;
                     self.ui.input_buffer = self.config.project_path.clone().unwrap_or_default();
                     return;
                 }
-                self.config.project_path = Some(val.clone());
+                // Extract path from format "├─ /path/to/dir  [lockfiles]" or "↑ /path/to/dir  [parent]"
+                let path = if let Some(idx) = val.find("  [") {
+                    &val[..idx]
+                } else {
+                    val
+                };
+                // Remove tree prefixes
+                let path = path
+                    .trim_start_matches("├─ ")
+                    .trim_start_matches("└─ ")
+                    .trim_start_matches("↑ ");
+
+                // Validate directory exists
+                let path_buf = std::path::PathBuf::from(path);
+                if path_buf.exists() && path_buf.is_dir() {
+                    self.config.project_path = Some(path.to_string());
+                }
             }
             3 => {
                 if let Ok(s) = val.replace("s", "").parse::<u64>() {
@@ -1241,13 +1233,13 @@ impl App {
         };
         let selection = opts.iter().position(|o| {
             if self.ui.settings_selection == 2 {
-                o == &current_val
-                    || (current_val
-                        != std::env::current_dir()
-                            .map(|p| p.display().to_string())
-                            .unwrap_or_default()
-                        && current_val != "~/.envexa/project"
-                        && o == "Custom path...")
+                // For project path, match by directory path prefix
+                let opt_path = if let Some(idx) = o.find(" (") {
+                    &o[..idx]
+                } else {
+                    o.as_str()
+                };
+                opt_path == current_val
             } else {
                 o == &current_val
             }
@@ -1277,7 +1269,6 @@ impl App {
         match self.detail.key.as_deref() {
             Some("security") => self.detail.vulns.len(),
             Some("audit") => self.detail.audits.len(),
-            Some("cleanup") => self.detail.cleanup.len(),
             _ => self.detail.items.len(),
         }
     }
@@ -1286,7 +1277,6 @@ impl App {
         self.detail.items.clear();
         self.detail.vulns.clear();
         self.detail.audits.clear();
-        self.detail.cleanup.clear();
         self.detail.checked.clear();
         self.detail.message.clear();
     }
@@ -1505,12 +1495,14 @@ async fn run_update(
     let mut total_downloaded_mb = 0.0;
     let mut stderr_accum = String::new();
     let mut stdout_accum = String::new();
+    let mut stdout_done = false;
+    let mut stderr_done = false;
 
     let name_clone = item.name.clone();
 
     loop {
         tokio::select! {
-            res = stdout_reader.next_line() => {
+            res = stdout_reader.next_line(), if !stdout_done => {
                 match res {
                     Ok(Some(line)) => {
                         if let Some(mb) = parse_downloaded_mb(&line) {
@@ -1533,11 +1525,11 @@ async fn run_update(
                             stdout_accum.push_str(&line);
                         }
                     }
-                    Ok(None) => {},
-                    Err(_) => {}
+                    Ok(None) => stdout_done = true,
+                    Err(_) => stdout_done = true,
                 }
             }
-            res = stderr_reader.next_line() => {
+            res = stderr_reader.next_line(), if !stderr_done => {
                 match res {
                     Ok(Some(line)) => {
                         if let Some(mb) = parse_downloaded_mb(&line) {
@@ -1560,8 +1552,8 @@ async fn run_update(
                             stderr_accum.push_str(&line);
                         }
                     }
-                    Ok(None) => {},
-                    Err(_) => {}
+                    Ok(None) => stderr_done = true,
+                    Err(_) => stderr_done = true,
                 }
             }
             status = child.wait() => {
@@ -1582,6 +1574,38 @@ async fn run_update(
             }
         }
     }
+}
+
+async fn run_updates(
+    work: Vec<(String, String, OutdatedItem)>,
+    tx: mpsc::UnboundedSender<AppEvent>,
+) {
+    let mut updated = 0usize;
+    let mut failed = 0usize;
+    let mut errors = vec![];
+    let mut successful_updates = vec![];
+    for (tk, td, item) in &work {
+        match run_update(td, item, tx.clone()).await {
+            Ok(_) => {
+                updated += 1;
+                successful_updates.push((tk.clone(), item.name.clone(), item.source.clone()));
+            }
+            Err(e) => {
+                failed += 1;
+                errors.push(format!("{}: {}", item.name, e));
+            }
+        }
+    }
+    let result_msg = if errors.is_empty() {
+        format!("\u{2714} Updated {updated} package(s)")
+    } else {
+        let e = errors.join("; ");
+        format!("\u{2714} Updated {updated} | \u{2716} Failed {failed}: {e}")
+    };
+    let _ = tx.send(AppEvent::UpdateFinished {
+        result_msg,
+        updated_packages: successful_updates,
+    });
 }
 
 fn parse_downloaded_mb(line: &str) -> Option<f64> {

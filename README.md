@@ -39,7 +39,7 @@ Blazing-fast Rust TUI and CLI that monitors developer tooling health, tracks out
 
 - **Concurrent Engine**: Scans 14+ toolchains in parallel using `tokio::join!`.
 - **Interactive TUI**: Implements a highly responsive `ratatui` dashboard featuring custom pie charts, health gauges, real-time activity spinners, and keyboard shortcuts.
-- **Project Tooling Sector**: Dedicated checks for project dependencies, security vulnerabilities, environmental alignment, and cache-clearing opportunities.
+- **Project Tooling Sector**: Dedicated checks for project dependencies, security vulnerabilities, and environmental alignment.
 - **Scriptable CLI**: Generates production-ready Markdown reports with a single `scan` command.
 - **Instant Launch**: Utilizes a JSON-backed local cache (`~/.envexa/cache.json`) to render previous scan states instantly.
 - **Zero-Friction Updates**: Integrates a self-update pipeline for native macOS binaries directly from GitHub Releases.
@@ -93,7 +93,7 @@ The dashboard features a classic developer-monitoring interface: key metric visu
 | **Health Stats** | Core metrics line displaying system health ratios, outdated package count, and cache age. |
 | **Category Tables** | Organized rows for System, Web Development, and Project Tooling packages. |
 | **Outdated Tab** | Centralized package update queues supporting individual selection. |
-| **Details Pane** | Complete outputs for individual toolchains, security advisories, audits, and cleanup paths. |
+| **Details Pane** | Complete outputs for individual toolchains, security advisories, and audit findings. |
 
 ### Keybindings
 
@@ -131,7 +131,6 @@ The Project Tooling sector provides a specialized local lens into your active pr
 | 🔐 **Security** | Audits dependencies using language-specific advisory databases (Rust Sec, npm audit, pip-audit). |
 | 🧪 **Audit** | Validates runtime parity across toolsets (e.g., verifying Node, npm, Python, pip, and Rust compiler alignment). |
 | 🤖 **CI/CD** | Parses GitHub Actions workflows locally (zero-network) to flag outdated CI/CD steps and dependencies. |
-| 🧹 **Cleanup** | Identifies local package caches, build artifacts, and Docker caches that can be safely reclaimed. |
 
 Envexa compiles these signals into:
 - A dynamic **Readiness Gauge** mapping dependency risk, warning levels, and unpatched security issues.
@@ -177,7 +176,6 @@ The CLI prints a structured Markdown document including:
 - Complete outdated package queue
 - Categorized security vulnerabilities
 - Core runtime version audit findings
-- Actionable disk cleanup suggestions
 
 Perfect for generating PR comments, build logs, and environment documentation in automated environments.
 
@@ -242,7 +240,7 @@ envexa/
 │       ├── brew.rs
 │       ├── npm.rs / pnpm.rs / yarn.rs / bun.rs / deno.rs
 │       ├── pip.rs / gem.rs / cargo.rs / docker.rs
-│       └── project.rs / security.rs / audit.rs / ci.rs / cleanup.rs
+│       └── project.rs / security.rs / audit.rs / ci.rs
 ├── scripts/
 │   ├── install.sh
 │   └── build-and-upload.sh
@@ -251,6 +249,114 @@ envexa/
 ```
 
 Individual scanner modules are kept highly isolated. Each scanner implements a single `pub async fn scan() -> ScanResult` function, executes in parallel, and handles missing CLI tools gracefully to prevent crashes.
+
+### System Overview
+
+```mermaid
+graph TB
+    subgraph "Envexa Architecture"
+        Main[main.rs<br/>Application Entry]
+        
+        subgraph "Core Modules"
+            CLI[cli.rs<br/>CLI Parser]
+            Config[config.rs<br/>Configuration]
+            Scanner[scanner/mod.rs<br/>Formatting & Extraction]
+        end
+        
+        subgraph "TUI Layer"
+            App[app.rs<br/>State & Events]
+            UI[ui.rs<br/>Ratatui Rendering]
+        end
+        
+        subgraph "Toolchain Scanners"
+            direction LR
+            Brew[brew.rs]
+            NPM[npm.rs]
+            Pnpm[pnpm.rs]
+            Yarn[yarn.rs]
+            Bun[bun.rs]
+            Deno[deno.rs]
+            Pip[pip.rs]
+            Gem[gem.rs]
+            Cargo[cargo.rs]
+            Docker[docker.rs]
+            Project[project.rs]
+            Security[security.rs]
+            Audit[audit.rs]
+            CI[ci.rs]
+        end
+    end
+    
+    Main --> CLI
+    Main --> App
+    CLI --> Scanner
+    App --> UI
+    App --> Scanner
+    
+    Scanner --> Brew
+    Scanner --> NPM
+    Scanner --> Pnpm
+    Scanner --> Yarn
+    Scanner --> Bun
+    Scanner --> Deno
+    Scanner --> Pip
+    Scanner --> Gem
+    Scanner --> Cargo
+    Scanner --> Docker
+    Scanner --> Project
+    Scanner --> Security
+    Scanner --> Audit
+    Scanner --> CI
+    
+    style Main fill:#e1f5fe
+    style CLI fill:#f3e5f5
+    style Config fill:#f3e5f5
+    style Scanner fill:#fff3e0
+    style App fill:#e8f5e9
+    style UI fill:#e8f5e9
+    style Brew fill:#fce4ec
+    style NPM fill:#fce4ec
+    style Pnpm fill:#fce4ec
+    style Yarn fill:#fce4ec
+    style Bun fill:#fce4ec
+    style Deno fill:#fce4ec
+    style Pip fill:#fce4ec
+    style Gem fill:#fce4ec
+    style Cargo fill:#fce4ec
+    style Docker fill:#fce4ec
+    style Project fill:#e0f2f1
+    style Security fill:#e0f2f1
+    style Audit fill:#e0f2f1
+    style CI fill:#e0f2f1
+```
+
+```mermaid
+graph LR
+    subgraph "Scan Pipeline"
+        Input[User Trigger] --> Parallel[Parallel Scanner Engine<br/>tokio::join!]
+        Parallel --> Results[ScanResult Aggregation]
+        Results --> Cache[Cache Layer<br/>~/.envexa/cache.json]
+        Cache --> Output{Output Mode}
+        Output -->|TUI| Dashboard[Interactive Dashboard<br/>ratatui]
+        Output -->|CLI| Report[Markdown Report]
+    end
+    
+    subgraph "Data Flow"
+        Results --> Outdated[Outdated Packages]
+        Results --> Security[Security Advisories]
+        Results --> Audit[Audit Findings]
+    end
+    
+    style Input fill:#e1f5fe
+    style Parallel fill:#fff3e0
+    style Results fill:#e8f5e9
+    style Cache fill:#f3e5f5
+    style Dashboard fill:#e0f2f1
+    style Report fill:#e0f2f1
+    style Outdated fill:#fce4ec
+    style Security fill:#fce4ec
+    style Audit fill:#fce4ec
+```
 
 ---
 

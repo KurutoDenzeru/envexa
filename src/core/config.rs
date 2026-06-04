@@ -32,7 +32,6 @@ fn cache_path() -> PathBuf {
     dir().join("cache.json")
 }
 
-#[allow(dead_code)]
 fn config_path() -> PathBuf {
     dir().join("config.json")
 }
@@ -99,7 +98,6 @@ pub struct CacheEntry {
     pub ttl_minutes: u64,
 }
 
-#[allow(dead_code)]
 pub fn load_config() -> UserConfig {
     let path = config_path();
     std::fs::read_to_string(path)
@@ -108,7 +106,6 @@ pub fn load_config() -> UserConfig {
         .unwrap_or_default()
 }
 
-#[allow(dead_code)]
 pub fn save_config(cfg: &UserConfig) -> std::io::Result<()> {
     ensure()?;
     std::fs::write(config_path(), serde_json::to_string_pretty(cfg)?)
@@ -131,7 +128,6 @@ pub fn write_cache(report: &Report, ttl_minutes: u64) -> std::io::Result<()> {
     std::fs::write(cache_path(), serde_json::to_string_pretty(&entry)?)
 }
 
-#[allow(dead_code)]
 pub fn cache_expired(entry: &CacheEntry) -> bool {
     chrono::NaiveDateTime::parse_from_str(&entry.cached_at, "%Y-%m-%dT%H:%M:%S")
         .map(|dt| {
@@ -139,15 +135,6 @@ pub fn cache_expired(entry: &CacheEntry) -> bool {
             chrono::Local::now().naive_local() > expiry
         })
         .unwrap_or(true)
-}
-
-#[allow(dead_code)]
-pub fn remove_all() -> std::io::Result<()> {
-    let d = dir();
-    if d.exists() {
-        std::fs::remove_dir_all(&d)?;
-    }
-    Ok(())
 }
 
 #[derive(Debug, Default)]
