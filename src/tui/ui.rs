@@ -1843,14 +1843,16 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
                         _ => "",
                     },
                     2 => {
-                        if val == "Custom path..." {
+                        if val.contains("Custom path...") {
                             "Enter a custom directory path"
-                        } else if val.contains(" (parent, ") {
-                            "Parent directory"
-                        } else if val.contains(" (no lockfiles)") {
-                            "No lockfiles detected"
+                        } else if val.contains("↑ ") {
+                            "↑ Parent directory"
+                        } else if val.contains("[no lockfiles]") {
+                            "No lockfiles detected in this directory"
+                        } else if val.contains("[") {
+                            "Directory with lockfiles detected"
                         } else {
-                            "Directory with lockfiles"
+                            "Select a directory to scan"
                         }
                     }
                     3 => match val.as_str() {
@@ -1920,11 +1922,16 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
             })
             .collect();
 
-        let popup_area = centered_rect(50, 50, area);
+        let popup_area = if app.ui.settings_selection == 2 {
+            // Larger popup for project path folder browser
+            centered_rect(70, 70, area)
+        } else {
+            centered_rect(50, 50, area)
+        };
         let title = match app.ui.settings_selection {
             0 => " Cache TTL ",
             1 => " Auto-Scan ",
-            2 => " Project Path ",
+            2 => " Project Path — Select Directory ",
             3 => " Scan Timeout ",
             4 => " Daemon Interval ",
             5 => " Enabled Scanners ",
@@ -1934,13 +1941,32 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
             _ => " Options ",
         };
 
-        let list = List::new(items).block(
+        // Add footer hint for project path
+        let block = if app.ui.settings_selection == 2 {
             Block::default()
                 .title(title)
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(app.theme().primary))
-                .bg(app.theme().background),
-        );
+                .bg(app.theme().background)
+                .title_bottom(
+                    Line::from(vec![
+                        Span::styled(" ↑↓ Navigate ", Style::default().fg(app.theme().text_muted)),
+                        Span::styled("│ ", Style::default().fg(app.theme().text_muted)),
+                        Span::styled("Enter Select ", Style::default().fg(app.theme().text_muted)),
+                        Span::styled("│ ", Style::default().fg(app.theme().text_muted)),
+                        Span::styled("Esc Back", Style::default().fg(app.theme().text_muted)),
+                    ])
+                    .alignment(Alignment::Center),
+                )
+        } else {
+            Block::default()
+                .title(title)
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(app.theme().primary))
+                .bg(app.theme().background)
+        };
+
+        let list = List::new(items).block(block);
 
         frame.render_widget(Clear, popup_area);
 

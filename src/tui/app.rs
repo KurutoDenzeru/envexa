@@ -986,48 +986,69 @@ impl App {
                 if cwd_path.exists() && cwd_path.is_dir() {
                     let lockfiles = detect_lockfiles(&cwd_path);
                     if lockfiles.is_empty() {
-                        opts.push(format!("{} (no lockfiles)", cwd));
+                        opts.push(format!("{}  [no lockfiles]", cwd));
                     } else {
-                        opts.push(format!("{} ({})", cwd, lockfiles.join(", ")));
+                        opts.push(format!("{}  [{}]", cwd, lockfiles.join(", ")));
                     }
                 }
 
-                // Add subdirectories with lockfiles
+                // Add subdirectories (show all, sorted alphabetically)
                 if let Ok(entries) = std::fs::read_dir(&cwd_path) {
-                    let mut subdirs: Vec<(String, Vec<String>)> = Vec::new();
+                    let mut subdirs: Vec<(String, Vec<String>, bool)> = Vec::new();
                     for entry in entries.flatten() {
                         let path = entry.path();
                         if path.is_dir() {
+                            // Skip hidden directories
+                            let name = path.file_name().unwrap_or_default().to_string_lossy();
+                            if name.starts_with('.') {
+                                continue;
+                            }
                             let lockfiles: Vec<String> = detect_lockfiles(&path)
                                 .into_iter()
                                 .map(String::from)
                                 .collect();
-                            if !lockfiles.is_empty() {
-                                subdirs.push((path.display().to_string(), lockfiles));
-                            }
+                            let has_children = path
+                                .read_dir()
+                                .map(|mut r| r.next().is_some())
+                                .unwrap_or(false);
+                            subdirs.push((path.display().to_string(), lockfiles, has_children));
                         }
                     }
                     subdirs.sort_by(|a, b| a.0.cmp(&b.0));
-                    for (path, lockfiles) in subdirs.into_iter().take(8) {
-                        opts.push(format!("{} ({})", path, lockfiles.join(", ")));
+                    for (path, lockfiles, has_children) in subdirs {
+                        let tree_prefix = if has_children { "├─ " } else { "└─ " };
+                        if lockfiles.is_empty() {
+                            opts.push(format!("{}{}  ", tree_prefix, path));
+                        } else {
+                            opts.push(format!(
+                                "{}{}  [{}]",
+                                tree_prefix,
+                                path,
+                                lockfiles.join(", ")
+                            ));
+                        }
                     }
                 }
 
                 // Add parent directory
                 if let Some(parent) = cwd_path.parent() {
                     let parent_str = parent.display().to_string();
-                    if !opts.iter().any(|o| o.starts_with(&parent_str)) {
+                    if !opts.iter().any(|o| o.contains(&parent_str)) {
                         let lockfiles = detect_lockfiles(parent);
                         if lockfiles.is_empty() {
-                            opts.push(format!("{} (parent, no lockfiles)", parent_str));
+                            opts.push(format!("↑ {}  [parent, no lockfiles]", parent_str));
                         } else {
-                            opts.push(format!("{} (parent, {})", parent_str, lockfiles.join(", ")));
+                            opts.push(format!(
+                                "↑ {}  [parent, {}]",
+                                parent_str,
+                                lockfiles.join(", ")
+                            ));
                         }
                     }
                 }
 
                 // Add custom path option
-                opts.push("Custom path...".to_string());
+                opts.push("✎ Custom path...".to_string());
                 opts
             }
             3 => vec![
@@ -1085,17 +1106,22 @@ impl App {
                 self.config.auto_scan_on_startup = val == "On";
             }
             2 => {
-                if val == "Custom path..." {
+                if val.contains("Custom path...") {
                     self.ui.input_mode = true;
                     self.ui.input_buffer = self.config.project_path.clone().unwrap_or_default();
                     return;
                 }
-                // Extract path from format "/path/to/dir (lockfiles)" or "/path/to/dir (parent, lockfiles)"
-                let path = if let Some(idx) = val.find(" (") {
+                // Extract path from format "├─ /path/to/dir  [lockfiles]" or "↑ /path/to/dir  [parent]"
+                let path = if let Some(idx) = val.find("  [") {
                     &val[..idx]
                 } else {
                     val
                 };
+                // Remove tree prefixes
+                let path = path
+                    .trim_start_matches("├─ ")
+                    .trim_start_matches("└─ ")
+                    .trim_start_matches("↑ ");
 
                 // Validate directory exists
                 let path_buf = std::path::PathBuf::from(path);
