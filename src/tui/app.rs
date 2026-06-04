@@ -13,6 +13,65 @@ use crate::scanner::{self, OutdatedItem, Report};
 use crate::toolchains;
 use crate::toolchains::{AuditItem, VulnerabilityInfo};
 
+pub fn detect_lockfiles(dir: &std::path::Path) -> Vec<&'static str> {
+    let mut lockfiles = Vec::new();
+
+    // Node.js ecosystem
+    if dir.join("package.json").exists() {
+        lockfiles.push("npm");
+    }
+    if dir.join("pnpm-lock.yaml").exists() || dir.join("pnpm-lock.yml").exists() {
+        lockfiles.push("pnpm");
+    }
+    if dir.join("yarn.lock").exists() {
+        lockfiles.push("yarn");
+    }
+    if dir.join("bun.lockb").exists() || dir.join("bun.lock").exists() {
+        lockfiles.push("bun");
+    }
+
+    // Deno
+    if dir.join("deno.json").exists() || dir.join("deno.jsonc").exists() {
+        lockfiles.push("deno");
+    }
+
+    // Rust
+    if dir.join("Cargo.toml").exists() {
+        lockfiles.push("cargo");
+    }
+
+    // Python
+    if dir.join("poetry.lock").exists() {
+        lockfiles.push("poetry");
+    }
+    if dir.join("Pipfile").exists() || dir.join("Pipfile.lock").exists() {
+        lockfiles.push("pipenv");
+    }
+    if dir.join("requirements.txt").exists() {
+        lockfiles.push("requirements");
+    }
+
+    // Go
+    if dir.join("go.mod").exists() {
+        lockfiles.push("go");
+    }
+
+    // Java/Kotlin
+    if dir.join("build.gradle").exists() || dir.join("build.gradle.kts").exists() {
+        lockfiles.push("gradle");
+    }
+    if dir.join("pom.xml").exists() {
+        lockfiles.push("maven");
+    }
+
+    // PHP
+    if dir.join("composer.json").exists() {
+        lockfiles.push("composer");
+    }
+
+    lockfiles
+}
+
 pub const ALL_SCANNERS: &[&str] = &[
     "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
     "security", "audit", "ci",
@@ -917,14 +976,59 @@ impl App {
             ],
             1 => vec!["On".to_string(), "Off".to_string()],
             2 => {
+                let mut opts = Vec::new();
                 let cwd = std::env::current_dir()
                     .map(|p| p.display().to_string())
                     .unwrap_or_default();
-                vec![
-                    cwd,
-                    "~/.envexa/project".to_string(),
-                    "Custom path...".to_string(),
-                ]
+
+                // Add current directory if it exists
+                let cwd_path = std::path::PathBuf::from(&cwd);
+                if cwd_path.exists() && cwd_path.is_dir() {
+                    let lockfiles = detect_lockfiles(&cwd_path);
+                    if lockfiles.is_empty() {
+                        opts.push(format!("{} (no lockfiles)", cwd));
+                    } else {
+                        opts.push(format!("{} ({})", cwd, lockfiles.join(", ")));
+                    }
+                }
+
+                // Add subdirectories with lockfiles
+                if let Ok(entries) = std::fs::read_dir(&cwd_path) {
+                    let mut subdirs: Vec<(String, Vec<String>)> = Vec::new();
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.is_dir() {
+                            let lockfiles: Vec<String> = detect_lockfiles(&path)
+                                .into_iter()
+                                .map(String::from)
+                                .collect();
+                            if !lockfiles.is_empty() {
+                                subdirs.push((path.display().to_string(), lockfiles));
+                            }
+                        }
+                    }
+                    subdirs.sort_by(|a, b| a.0.cmp(&b.0));
+                    for (path, lockfiles) in subdirs.into_iter().take(8) {
+                        opts.push(format!("{} ({})", path, lockfiles.join(", ")));
+                    }
+                }
+
+                // Add parent directory
+                if let Some(parent) = cwd_path.parent() {
+                    let parent_str = parent.display().to_string();
+                    if !opts.iter().any(|o| o.starts_with(&parent_str)) {
+                        let lockfiles = detect_lockfiles(parent);
+                        if lockfiles.is_empty() {
+                            opts.push(format!("{} (parent, no lockfiles)", parent_str));
+                        } else {
+                            opts.push(format!("{} (parent, {})", parent_str, lockfiles.join(", ")));
+                        }
+                    }
+                }
+
+                // Add custom path option
+                opts.push("Custom path...".to_string());
+                opts
             }
             3 => vec![
                 "10s".to_string(),
@@ -986,7 +1090,18 @@ impl App {
                     self.ui.input_buffer = self.config.project_path.clone().unwrap_or_default();
                     return;
                 }
-                self.config.project_path = Some(val.clone());
+                // Extract path from format "/path/to/dir (lockfiles)" or "/path/to/dir (parent, lockfiles)"
+                let path = if let Some(idx) = val.find(" (") {
+                    &val[..idx]
+                } else {
+                    val
+                };
+
+                // Validate directory exists
+                let path_buf = std::path::PathBuf::from(path);
+                if path_buf.exists() && path_buf.is_dir() {
+                    self.config.project_path = Some(path.to_string());
+                }
             }
             3 => {
                 if let Ok(s) = val.replace("s", "").parse::<u64>() {
@@ -1059,13 +1174,13 @@ impl App {
         };
         let selection = opts.iter().position(|o| {
             if self.ui.settings_selection == 2 {
-                o == &current_val
-                    || (current_val
-                        != std::env::current_dir()
-                            .map(|p| p.display().to_string())
-                            .unwrap_or_default()
-                        && current_val != "~/.envexa/project"
-                        && o == "Custom path...")
+                // For project path, match by directory path prefix
+                let opt_path = if let Some(idx) = o.find(" (") {
+                    &o[..idx]
+                } else {
+                    o.as_str()
+                };
+                opt_path == current_val
             } else {
                 o == &current_val
             }

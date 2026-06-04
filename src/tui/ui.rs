@@ -12,7 +12,7 @@ use ratatui::{
 use tui_piechart::{LegendAlignment, LegendLayout, LegendPosition, PieChart, PieSlice, Resolution};
 
 use crate::scanner;
-use crate::tui::app::{App, View, ALL_SCANNERS};
+use crate::tui::app::{detect_lockfiles, App, View, ALL_SCANNERS};
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()
@@ -1650,14 +1650,26 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
             }
             .to_string(),
         ),
-        (
-            "Project Path",
-            app.config.project_path.clone().unwrap_or_else(|| {
+        ("Project Path", {
+            let path = app.config.project_path.clone().unwrap_or_else(|| {
                 std::env::current_dir()
                     .map(|p| p.display().to_string())
                     .unwrap_or_default()
-            }),
-        ),
+            });
+            let path_buf = std::path::PathBuf::from(&path);
+            if !path_buf.exists() {
+                format!("{} (not found)", path)
+            } else if !path_buf.is_dir() {
+                format!("{} (not a directory)", path)
+            } else {
+                let lockfiles = detect_lockfiles(&path_buf);
+                if lockfiles.is_empty() {
+                    format!("{} (no lockfiles)", path)
+                } else {
+                    format!("{} ({})", path, lockfiles.join(", "))
+                }
+            }
+        }),
         ("Scan Timeout", format!("{}s", app.config.scan_timeout_secs)),
         (
             "Daemon Interval",
@@ -1671,11 +1683,14 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
             .to_string(),
         ),
         ("Enabled Scanners", {
+            let scanner_count = ALL_SCANNERS.len();
             let enabled = app
                 .config
                 .enabled_scanners
                 .as_ref()
-                .map_or("All (16)".to_string(), |v| format!("{}/16", v.len()));
+                .map_or(format!("All ({})", scanner_count), |v| {
+                    format!("{}/{}", v.len(), scanner_count)
+                });
             enabled
         }),
         ("Export Format", app.config.export_format.clone()),
@@ -1827,7 +1842,17 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
                         "Off" => "Wait for manual scan command",
                         _ => "",
                     },
-                    2 => "Root directory scanned by envexa",
+                    2 => {
+                        if val == "Custom path..." {
+                            "Enter a custom directory path"
+                        } else if val.contains(" (parent, ") {
+                            "Parent directory"
+                        } else if val.contains(" (no lockfiles)") {
+                            "No lockfiles detected"
+                        } else {
+                            "Directory with lockfiles"
+                        }
+                    }
                     3 => match val.as_str() {
                         "10s" => "Fast scans, may timeout on slow machines",
                         "30s" => "Balanced timeout, recommended",
