@@ -448,7 +448,7 @@ checksum = "91622ff5e7162018101f2fea40d6ebf4a78bbe5a49736a2020649edf9693679e"
 
 [[package]]
 name = "envexa"
-version = "2.7.0"
+version = "2.8.0"
 dependencies = [
  "anyhow",
  "chrono",
