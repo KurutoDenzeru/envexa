@@ -57,6 +57,8 @@ pub struct UserConfig {
     #[serde(default = "default_export_format")]
     pub export_format: String,
     pub enabled_scanners: Option<Vec<String>>,
+    #[serde(default = "default_log_retention")]
+    pub log_retention_days: u64,
 }
 
 fn default_theme() -> String {
@@ -75,6 +77,10 @@ fn default_export_format() -> String {
     "markdown".to_string()
 }
 
+fn default_log_retention() -> u64 {
+    7
+}
+
 impl Default for UserConfig {
     fn default() -> Self {
         Self {
@@ -87,6 +93,7 @@ impl Default for UserConfig {
             daemon_interval_secs: default_daemon_interval(),
             export_format: default_export_format(),
             enabled_scanners: None,
+            log_retention_days: default_log_retention(),
         }
     }
 }
@@ -135,6 +142,34 @@ pub fn cache_expired(entry: &CacheEntry) -> bool {
             chrono::Local::now().naive_local() > expiry
         })
         .unwrap_or(true)
+}
+
+pub fn logs_path() -> PathBuf {
+    dir().join("logs.json")
+}
+
+pub fn read_logs(retention_days: u64) -> Vec<(chrono::DateTime<chrono::Local>, String)> {
+    let path = logs_path();
+    let logs: Vec<(chrono::DateTime<chrono::Local>, String)> = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default();
+
+    if retention_days == 0 {
+        return logs;
+    }
+
+    let now = chrono::Local::now();
+    let cutoff = now - chrono::Duration::days(retention_days as i64);
+
+    logs.into_iter()
+        .filter(|(time, _)| *time >= cutoff)
+        .collect()
+}
+
+pub fn write_logs(logs: &[(chrono::DateTime<chrono::Local>, String)]) -> std::io::Result<()> {
+    ensure()?;
+    std::fs::write(logs_path(), serde_json::to_string_pretty(logs)?)
 }
 
 #[derive(Debug, Default)]

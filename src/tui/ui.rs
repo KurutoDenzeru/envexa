@@ -190,11 +190,12 @@ fn title_bar(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn tab_bar(frame: &mut Frame, area: Rect, app: &App) {
-    let titles = vec![" Dashboard ", " Outdated ", " Settings "];
+    let titles = vec![" Dashboard ", " Outdated ", " Logs ", " Settings "];
     let selected = match app.ui.view {
         View::Dashboard => 0,
         View::Outdated => 1,
-        View::Settings => 2,
+        View::Logs => 2,
+        View::Settings => 3,
         View::Scanning | View::PackageDetail | View::Updating => app.ui.tab_index,
     };
     let tabs = Tabs::new(titles)
@@ -1629,13 +1630,43 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         View::Dashboard => render_dashboard(frame, chunks[4], app),
         View::Outdated => render_outdated(frame, chunks[4], app),
         View::Settings => render_settings(frame, chunks[4], app),
+        View::Logs => render_logs(frame, chunks[4], app),
         View::Scanning => render_scanning(frame, chunks[4], app),
         View::PackageDetail => render_package_detail(frame, chunks[4], app),
         View::Updating => render_updating(frame, chunks[4], app),
     }
 }
 
-fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
+fn render_logs(frame: &mut Frame, area: Rect, app: &App) {
+    let mut log_items = Vec::new();
+    for (time, action) in &app.logs {
+        let time_str = time.format("----%B %d, %Y %H:%M----").to_string();
+
+        log_items.push(Line::from(vec![Span::styled(
+            time_str,
+            Style::default().fg(app.theme().text_muted),
+        )]));
+        log_items.push(Line::from(vec![Span::styled(
+            action.clone(),
+            Style::default().fg(app.theme().text_normal),
+        )]));
+        log_items.push(Line::from(vec![]));
+    }
+
+    let paragraph = Paragraph::new(log_items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Application Logs ")
+                .border_style(Style::default().fg(app.theme().primary)),
+        )
+        .wrap(ratatui::widgets::Wrap { trim: true })
+        .scroll((0, 0)); // Could add scrolling state later if desired
+
+    frame.render_widget(paragraph, area);
+}
+
+fn render_settings(frame: &mut Frame, area: Rect, app: &mut App) {
     let items = [
         (
             "Cache TTL (Minutes)",
@@ -1699,6 +1730,18 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
             "Verbose Logs",
             if app.config.verbose_logs { "On" } else { "Off" }.to_string(),
         ),
+        (
+            "Log Retention",
+            match app.config.log_retention_days {
+                1 => "1 Day".to_string(),
+                7 => "7 Days".to_string(),
+                14 => "14 Days".to_string(),
+                30 => "30 Days".to_string(),
+                0 => "Unlimited".to_string(),
+                _ => format!("{} Days", app.config.log_retention_days),
+            },
+        ),
+        ("Update Envexa", format!("v{}", crate::core::cli::VERSION)),
     ];
 
     let mut rows = Vec::new();
@@ -1747,6 +1790,43 @@ fn render_settings(frame: &mut Frame, area: Rect, app: &App) {
         .column_spacing(1);
 
     frame.render_widget(table, area);
+
+    if app.ui.is_self_updating || !app.ui.update_message.is_empty() {
+        let msg_area = Rect {
+            x: area.x,
+            y: area.y + area.height.saturating_sub(2),
+            width: area.width,
+            height: 1,
+        };
+
+        if app.ui.is_self_updating {
+            let label = if app.ui.update_message.is_empty() {
+                "Checking for updates...".to_string()
+            } else {
+                app.ui.update_message.clone()
+            };
+
+            let throbber = throbber_widgets_tui::Throbber::default()
+                .label(label)
+                .style(Style::default().fg(app.theme().primary))
+                .throbber_style(
+                    Style::default()
+                        .fg(app.theme().primary)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .throbber_set(throbber_widgets_tui::BRAILLE_EIGHT)
+                .use_type(throbber_widgets_tui::WhichUse::Spin);
+
+            // Render the throbber in the center
+            let centered = centered_rect(50, 100, msg_area);
+            frame.render_stateful_widget(throbber, centered, &mut app.ui.throbber_state);
+        } else if !app.ui.settings_edit_mode {
+            let msg = Paragraph::new(app.ui.update_message.clone())
+                .style(Style::default().fg(app.theme().text_normal))
+                .alignment(Alignment::Center);
+            frame.render_widget(msg, msg_area);
+        }
+    }
 
     if app.ui.settings_edit_mode && app.ui.settings_selection == 5 {
         let scanner_area = Rect {

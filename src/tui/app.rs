@@ -84,6 +84,7 @@ pub enum View {
     PackageDetail,
     Updating,
     Settings,
+    Logs,
 }
 
 pub enum AppEvent {
@@ -101,6 +102,12 @@ pub enum AppEvent {
     SecurityFixFinished {
         result_msg: String,
         new_report_res: Box<Option<crate::toolchains::ScanResult>>,
+    },
+    SelfUpdateProgress {
+        msg: String,
+    },
+    SelfUpdateFinished {
+        error: Option<String>,
     },
 }
 
@@ -125,6 +132,8 @@ pub struct UiState {
     pub checked_outdated: HashSet<usize>,
     pub update_package_name: String,
     pub update_downloaded_mb: f64,
+    pub update_message: String,
+    pub is_self_updating: bool,
 }
 
 pub struct DetailState {
@@ -143,6 +152,7 @@ pub struct App {
     pub report: Option<Report>,
     pub ui: UiState,
     pub detail: DetailState,
+    pub logs: Vec<(chrono::DateTime<chrono::Local>, String)>,
 }
 
 impl Default for App {
@@ -158,6 +168,7 @@ impl App {
     pub fn new() -> Self {
         let config = config::load_config();
         let report = config::read_cache().map(|e| e.report);
+        let logs = config::read_logs(config.log_retention_days);
         Self {
             config,
             report,
@@ -182,6 +193,8 @@ impl App {
                 checked_outdated: HashSet::new(),
                 update_package_name: String::new(),
                 update_downloaded_mb: 0.0,
+                update_message: String::new(),
+                is_self_updating: false,
             },
             detail: DetailState {
                 tool: None,
@@ -193,7 +206,18 @@ impl App {
                 checked: HashSet::new(),
                 message: String::new(),
             },
+            logs,
         }
+    }
+
+    pub fn log_action(&mut self, action: &str) {
+        self.logs.push((chrono::Local::now(), action.to_string()));
+        if self.config.log_retention_days > 0 {
+            let cutoff = chrono::Local::now()
+                - chrono::Duration::days(self.config.log_retention_days as i64);
+            self.logs.retain(|(time, _)| *time >= cutoff);
+        }
+        let _ = config::write_logs(&self.logs);
     }
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -390,6 +414,9 @@ impl App {
                             }
                             continue;
                         }
+                        if matches!(self.ui.view, View::Settings) {
+                            self.ui.update_message.clear();
+                        }
 
                         match key.code {
                             KeyCode::Esc => {
@@ -457,11 +484,12 @@ impl App {
                                 if !(matches!(self.ui.view, View::Settings)
                                     && self.ui.settings_edit_mode)
                                 {
-                                    self.ui.tab_index = (self.ui.tab_index + 1) % 3;
+                                    self.ui.tab_index = (self.ui.tab_index + 1) % 4;
                                 }
                                 self.ui.view = match self.ui.tab_index {
                                     0 => View::Dashboard,
                                     1 => View::Outdated,
+                                    2 => View::Logs,
                                     _ => View::Settings,
                                 };
                             }
@@ -474,7 +502,7 @@ impl App {
                                     && self.ui.settings_edit_mode)
                                 {
                                     self.ui.tab_index = if self.ui.tab_index == 0 {
-                                        2
+                                        3
                                     } else {
                                         self.ui.tab_index - 1
                                     };
@@ -482,6 +510,7 @@ impl App {
                                 self.ui.view = match self.ui.tab_index {
                                     0 => View::Dashboard,
                                     1 => View::Outdated,
+                                    2 => View::Logs,
                                     _ => View::Settings,
                                 };
                             }
@@ -499,6 +528,8 @@ impl App {
                                         self.apply_setting_selection();
                                         self.ui.settings_edit_mode = false;
                                         let _ = config::save_config(&self.config);
+                                    } else if self.ui.settings_selection == 9 {
+                                        self.do_self_update(tx.clone());
                                     } else {
                                         self.enter_settings_edit_mode();
                                     }
@@ -515,6 +546,12 @@ impl App {
                         let _ = config::write_cache(&report, 15);
 
                         self.report = Some(report);
+                        if let Some(r) = &self.report {
+                            self.log_action(&format!(
+                                "Scan finished. Found {} outdated packages.",
+                                crate::scanner::count_outdated(r)
+                            ));
+                        }
                         self.ui.view = View::Dashboard;
                         self.ui.tab_index = 0;
                         self.ui.dashboard_selection = 0;
@@ -523,6 +560,12 @@ impl App {
                         package_name,
                         downloaded_mb,
                     } => {
+                        if self.config.verbose_logs {
+                            self.log_action(&format!(
+                                "Downloading {}: {:.2} MB",
+                                package_name, downloaded_mb
+                            ));
+                        }
                         self.ui.update_package_name = package_name;
                         self.ui.update_downloaded_mb = downloaded_mb;
                     }
@@ -530,7 +573,12 @@ impl App {
                         result_msg,
                         updated_packages,
                     } => {
-                        self.detail.message = result_msg;
+                        self.detail.message = result_msg.clone();
+                        self.log_action(&format!(
+                            "Updated {} package(s): {}",
+                            updated_packages.len(),
+                            result_msg
+                        ));
 
                         if let Some(ref mut report) = self.report {
                             for (tool_key, name, source) in &updated_packages {
@@ -575,7 +623,8 @@ impl App {
                         result_msg,
                         new_report_res,
                     } => {
-                        self.detail.message = result_msg;
+                        self.detail.message = result_msg.clone();
+                        self.log_action(&format!("Applied security fixes: {}", result_msg));
                         self.ui.view = View::PackageDetail;
 
                         if let Some(res) = *new_report_res {
@@ -586,6 +635,38 @@ impl App {
                             }
                         }
                         self.clamp_selection();
+                    }
+                    AppEvent::SelfUpdateProgress { msg } => {
+                        if self.config.verbose_logs {
+                            self.log_action(&msg);
+                        }
+                        self.ui.update_message = msg;
+                    }
+                    AppEvent::SelfUpdateFinished { error } => {
+                        if let Some(err) = error {
+                            self.log_action(&format!("Envexa self-update failed: {}", err));
+                            self.ui.view = View::Settings;
+                            self.ui.update_message = err;
+                            self.ui.is_self_updating = false;
+                        } else {
+                            #[cfg(unix)]
+                            {
+                                use std::os::unix::process::CommandExt;
+                                let current = std::env::current_exe().unwrap_or_default();
+                                let _ = crossterm::terminal::disable_raw_mode();
+                                let _ = crossterm::execute!(
+                                    std::io::stdout(),
+                                    crossterm::terminal::LeaveAlternateScreen
+                                );
+                                let err = std::process::Command::new(current).exec();
+                                eprintln!("Failed to restart: {err}");
+                                std::process::exit(1);
+                            }
+                            #[cfg(not(unix))]
+                            {
+                                self.ui.should_quit = true;
+                            }
+                        }
                     }
                 }
             }
@@ -770,6 +851,7 @@ impl App {
         if work.is_empty() {
             return Ok(());
         }
+        self.log_action(&format!("Updating {} checked packages...", work.len()));
 
         self.ui.view = View::Updating;
         self.ui.progress_counter = 0;
@@ -846,7 +928,7 @@ impl App {
                 let n = self.detail_len().saturating_sub(1);
                 self.detail.selection = self.detail.selection.min(n);
             }
-            View::Updating => {}
+            View::Updating | View::Logs => {}
         }
     }
 
@@ -912,6 +994,7 @@ impl App {
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.ui.view = View::Scanning;
         self.ui.progress_counter = 0;
+        self.log_action("Checking all toolchains...");
 
         let timeout = self.config.scan_timeout_secs;
         let enabled = self.config.enabled_scanners.clone();
@@ -965,10 +1048,10 @@ impl App {
                         .min(opts_len);
                 } else {
                     self.ui.settings_selection =
-                        self.ui.settings_selection.saturating_add(1).min(8);
+                        self.ui.settings_selection.saturating_add(1).min(10);
                 }
             }
-            View::Updating => {}
+            View::Updating | View::Logs => {}
         }
     }
 
@@ -995,8 +1078,48 @@ impl App {
             View::PackageDetail => {
                 self.detail.selection = self.detail.selection.saturating_sub(1);
             }
-            View::Updating => {}
+            View::Updating | View::Logs => {}
         }
+    }
+
+    fn do_self_update(&mut self, tx: mpsc::UnboundedSender<AppEvent>) {
+        self.log_action("Checking for Envexa updates...");
+        self.ui.is_self_updating = true;
+        self.ui.update_message = "Checking for updates...".to_string();
+        tokio::spawn(async move {
+            let res = crate::core::cli::fetch_latest_tag().await;
+            if let Some((tag, _)) = res {
+                let latest_ver = tag.trim_start_matches('v');
+                if latest_ver == crate::core::cli::VERSION || latest_ver.is_empty() {
+                    let _ = tx.send(AppEvent::SelfUpdateFinished {
+                        error: Some(format!(
+                            "Already up to date (v{})",
+                            crate::core::cli::VERSION
+                        )),
+                    });
+                    return;
+                }
+
+                let _ = tx.send(AppEvent::SelfUpdateProgress {
+                    msg: format!("Downloading {}...", tag),
+                });
+
+                match crate::core::cli::perform_update(&tag).await {
+                    Ok(_) => {
+                        let _ = tx.send(AppEvent::SelfUpdateFinished { error: None });
+                    }
+                    Err(e) => {
+                        let _ = tx.send(AppEvent::SelfUpdateFinished {
+                            error: Some(e.to_string()),
+                        });
+                    }
+                }
+            } else {
+                let _ = tx.send(AppEvent::SelfUpdateFinished {
+                    error: Some("Failed to check for updates".to_string()),
+                });
+            }
+        });
     }
 
     pub fn get_settings_options(&self) -> Vec<String> {
@@ -1119,6 +1242,14 @@ impl App {
                 "rose-pine".to_string(),
             ],
             8 => vec!["On".to_string(), "Off".to_string()],
+            9 => vec![
+                "1 Day".to_string(),
+                "7 Days".to_string(),
+                "14 Days".to_string(),
+                "30 Days".to_string(),
+                "Unlimited".to_string(),
+            ],
+            10 => vec![],
             _ => vec![],
         }
     }
@@ -1187,6 +1318,17 @@ impl App {
             8 => {
                 self.config.verbose_logs = val == "On";
             }
+            9 => {
+                let days = match val.as_str() {
+                    "1 Day" => 1,
+                    "7 Days" => 7,
+                    "14 Days" => 14,
+                    "30 Days" => 30,
+                    "Unlimited" => 0,
+                    _ => 7,
+                };
+                self.config.log_retention_days = days;
+            }
             _ => {}
         }
     }
@@ -1229,6 +1371,15 @@ impl App {
                     "Off".to_string()
                 }
             }
+            9 => match self.config.log_retention_days {
+                1 => "1 Day".to_string(),
+                7 => "7 Days".to_string(),
+                14 => "14 Days".to_string(),
+                30 => "30 Days".to_string(),
+                0 => "Unlimited".to_string(),
+                _ => format!("{} Days", self.config.log_retention_days),
+            },
+            10 => String::new(),
             _ => String::new(),
         };
         let selection = opts.iter().position(|o| {
