@@ -133,6 +133,7 @@ pub struct UiState {
     pub update_package_name: String,
     pub update_downloaded_mb: f64,
     pub update_message: String,
+    pub logs_scroll: u16,
     pub is_self_updating: bool,
 }
 
@@ -194,6 +195,7 @@ impl App {
                 update_package_name: String::new(),
                 update_downloaded_mb: 0.0,
                 update_message: String::new(),
+                logs_scroll: 0,
                 is_self_updating: false,
             },
             detail: DetailState {
@@ -1051,7 +1053,11 @@ impl App {
                         self.ui.settings_selection.saturating_add(1).min(10);
                 }
             }
-            View::Updating | View::Logs => {}
+            View::Updating => {}
+            View::Logs => {
+                let max_scroll = (self.logs.len().saturating_mul(3)).saturating_sub(1) as u16;
+                self.ui.logs_scroll = self.ui.logs_scroll.saturating_add(1).min(max_scroll);
+            }
         }
     }
 
@@ -1078,7 +1084,10 @@ impl App {
             View::PackageDetail => {
                 self.detail.selection = self.detail.selection.saturating_sub(1);
             }
-            View::Updating | View::Logs => {}
+            View::Updating => {}
+            View::Logs => {
+                self.ui.logs_scroll = self.ui.logs_scroll.saturating_sub(1);
+            }
         }
     }
 
@@ -1133,18 +1142,25 @@ impl App {
             1 => vec!["On".to_string(), "Off".to_string()],
             2 => {
                 let mut opts = Vec::new();
-                let cwd = std::env::current_dir()
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_default();
+                let base_dir = self.config.project_path.clone().unwrap_or_else(|| {
+                    std::env::current_dir()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_default()
+                });
 
                 // Add current directory if it exists
-                let cwd_path = std::path::PathBuf::from(&cwd);
+                let cwd_path = std::path::PathBuf::from(&base_dir);
                 if cwd_path.exists() && cwd_path.is_dir() {
                     let lockfiles = detect_lockfiles(&cwd_path);
                     if lockfiles.is_empty() {
-                        opts.push(format!("{}  [no lockfiles]", cwd));
+                        opts.push(format!("{}  [no lockfiles]", base_dir));
                     } else {
-                        opts.push(format!("{}  [{}]", cwd, lockfiles.join(", ")));
+                        opts.push(format!("{}  [{}]", base_dir, lockfiles.join(", ")));
+                    }
+
+                    // Allow navigating up
+                    if let Some(parent) = cwd_path.parent() {
+                        opts.push(format!("↑ {}  [parent]", parent.display()));
                     }
                 }
 
@@ -1285,7 +1301,8 @@ impl App {
                 let path = path
                     .trim_start_matches("├─ ")
                     .trim_start_matches("└─ ")
-                    .trim_start_matches("↑ ");
+                    .trim_start_matches("↑ ")
+                    .trim();
 
                 // Validate directory exists
                 let path_buf = std::path::PathBuf::from(path);

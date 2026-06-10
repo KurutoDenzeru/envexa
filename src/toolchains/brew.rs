@@ -1,9 +1,9 @@
 use super::*;
+use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use regex::Regex;
 
 #[derive(Deserialize, Debug)]
 struct JwsPayload {
@@ -72,10 +72,14 @@ fn get_installed(path: &Path) -> HashMap<String, String> {
 }
 
 #[allow(clippy::type_complexity)]
-fn get_latest_versions_from_cache() -> Option<(HashMap<String, String>, HashMap<String, String>, Option<String>)> {
+fn get_latest_versions_from_cache() -> Option<(
+    HashMap<String, String>,
+    HashMap<String, String>,
+    Option<String>,
+)> {
     let home = std::env::var("HOME").ok()?;
     let api_dir = PathBuf::from(home).join("Library/Caches/Homebrew/api/internal");
-    
+
     let mut cache_path = None;
     if let Ok(entries) = fs::read_dir(&api_dir) {
         for entry in entries.flatten() {
@@ -86,28 +90,28 @@ fn get_latest_versions_from_cache() -> Option<(HashMap<String, String>, HashMap<
             }
         }
     }
-    
+
     let cache_path = cache_path?;
     let content = fs::read_to_string(cache_path).ok()?;
     let jws: JwsPayload = serde_json::from_str(&content).ok()?;
     let data: BrewApiCache = serde_json::from_str(&jws.payload).ok()?;
-    
+
     let mut formulae_latest = HashMap::new();
     for (name, info) in data.formulae {
         if let Some(v) = info.stable_version {
             formulae_latest.insert(name, v);
         }
     }
-    
+
     let mut casks_latest = HashMap::new();
     for (name, info) in data.casks {
         if let Some(v) = info.version {
             casks_latest.insert(name, v);
         }
     }
-    
+
     let version = data.metadata.and_then(|m| m.homebrew_version);
-    
+
     Some((formulae_latest, casks_latest, version))
 }
 
@@ -117,10 +121,10 @@ fn scan_taps(base: &Path) -> HashMap<String, String> {
     if !taps_dir.exists() {
         return tap_versions;
     }
-    
+
     let mut dirs_to_visit = vec![taps_dir];
     let re = Regex::new(r#"version\s+['"]([^'"]+)['"]"#).unwrap();
-    
+
     while let Some(dir) = dirs_to_visit.pop() {
         if let Ok(entries) = fs::read_dir(dir) {
             for entry in entries.flatten() {
@@ -131,8 +135,15 @@ fn scan_taps(base: &Path) -> HashMap<String, String> {
                     }
                     if ft.is_dir() {
                         dirs_to_visit.push(entry.path());
-                    } else if ft.is_file() && entry.path().extension().is_some_and(|ext| ext == "rb") {
-                        let tap_name = entry.path().file_stem().unwrap().to_string_lossy().to_string();
+                    } else if ft.is_file()
+                        && entry.path().extension().is_some_and(|ext| ext == "rb")
+                    {
+                        let tap_name = entry
+                            .path()
+                            .file_stem()
+                            .unwrap()
+                            .to_string_lossy()
+                            .to_string();
                         if let Ok(content) = fs::read_to_string(entry.path()) {
                             if let Some(caps) = re.captures(&content) {
                                 tap_versions.insert(tap_name, caps[1].to_string());
@@ -176,12 +187,12 @@ pub async fn scan() -> ScanResult {
 
     if let Some((core_formulae, core_casks, cache_version)) = get_latest_versions_from_cache() {
         let tap_versions = scan_taps(base);
-        
+
         let installed_formulae = get_installed(&base.join("Cellar"));
         let installed_casks = get_installed(&base.join("Caskroom"));
-        
+
         result.installed_count = Some((installed_formulae.len() + installed_casks.len()) as u64);
-        
+
         for (name, current) in installed_formulae {
             let latest = core_formulae.get(&name).or_else(|| tap_versions.get(&name));
             if let Some(latest) = latest {
@@ -194,7 +205,7 @@ pub async fn scan() -> ScanResult {
                 }
             }
         }
-        
+
         for (name, current) in installed_casks {
             let latest = core_casks.get(&name).or_else(|| tap_versions.get(&name));
             if let Some(latest) = latest {
@@ -207,7 +218,7 @@ pub async fn scan() -> ScanResult {
                 }
             }
         }
-        
+
         let total = result.outdated_formulae.len() + result.outdated_casks.len();
         result.status = if total == 0 {
             "ok".into()

@@ -1465,7 +1465,9 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         )
         .column_spacing(1);
 
-    frame.render_widget(table, area);
+    let mut state = TableState::default();
+    state.select(Some(app.ui.outdated_selection));
+    frame.render_stateful_widget(table, area, &mut state);
 }
 
 fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
@@ -1661,7 +1663,7 @@ fn render_logs(frame: &mut Frame, area: Rect, app: &App) {
                 .border_style(Style::default().fg(app.theme().primary)),
         )
         .wrap(ratatui::widgets::Wrap { trim: true })
-        .scroll((0, 0)); // Could add scrolling state later if desired
+        .scroll((app.ui.logs_scroll, 0));
 
     frame.render_widget(paragraph, area);
 }
