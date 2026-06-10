@@ -2194,6 +2194,31 @@ fn render_package_detail(frame: &mut Frame, area: Rect, app: &App) {
     }
 }
 
+fn update_type_counts(items: &[crate::scanner::OutdatedItem]) -> (usize, usize, usize, usize) {
+    let mut major = 0;
+    let mut minor = 0;
+    let mut patch = 0;
+    let mut unknown = 0;
+
+    for item in items {
+        let cur = item.current.trim_start_matches(|c: char| !c.is_ascii_digit());
+        let lat = item.latest.trim_start_matches(|c: char| !c.is_ascii_digit());
+        let cur_parts: Vec<&str> = cur.split(['.', '-', '+']).collect();
+        let lat_parts: Vec<&str> = lat.split(['.', '-', '+']).collect();
+
+        if !cur_parts.is_empty() && !lat_parts.is_empty() && cur_parts[0] != lat_parts[0] {
+            major += 1;
+        } else if cur_parts.len() >= 2 && lat_parts.len() >= 2 && cur_parts[1] != lat_parts[1] {
+            minor += 1;
+        } else if cur_parts.len() >= 3 && lat_parts.len() >= 3 && cur_parts[2] != lat_parts[2] {
+            patch += 1;
+        } else {
+            unknown += 1;
+        }
+    }
+    (major, minor, patch, unknown)
+}
+
 fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
     let items = &app.detail.items;
 
@@ -2257,17 +2282,148 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         None
     };
 
-    render_item_table(
-        frame,
-        area,
-        app,
-        format!(" {tool} — Outdated Packages ({}) ", items.len()),
-        Style::default().fg(app.theme().primary),
-        &["", "Package ", "Source ", "Current ", "Latest ", "Size "],
-        &rows,
-        "outdated",
-        sub.as_deref(),
-    );
+    if area.width >= 100 && area.height >= 8 {
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .split(area);
+
+        let left_area = chunks[0];
+        let right_area = chunks[1];
+
+        render_item_table(
+            frame,
+            left_area,
+            app,
+            format!(" {tool} — Outdated Packages ({}) ", items.len()),
+            Style::default().fg(app.theme().primary),
+            &["", "Package ", "Source ", "Current ", "Latest ", "Size "],
+            &rows,
+            "outdated",
+            sub.as_deref(),
+        );
+
+        let right_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(12), Constraint::Min(1)])
+            .split(right_area);
+
+        let (maj, min, pat, unk) = update_type_counts(items);
+
+        let overview_text = vec![Line::from(vec![
+            Span::styled("Major: ", Style::default().fg(app.theme().text_muted)),
+            Span::styled(format!("{} ", maj), Style::default().fg(app.theme().error).add_modifier(Modifier::BOLD)),
+            Span::styled(" Minor: ", Style::default().fg(app.theme().text_muted)),
+            Span::styled(format!("{} ", min), Style::default().fg(app.theme().warning).add_modifier(Modifier::BOLD)),
+            Span::styled(" Patch: ", Style::default().fg(app.theme().text_muted)),
+            Span::styled(format!("{} ", pat), Style::default().fg(Color::LightCyan).add_modifier(Modifier::BOLD)),
+            Span::styled(" Other: ", Style::default().fg(app.theme().text_muted)),
+            Span::styled(format!("{} ", unk), Style::default().fg(app.theme().secondary).add_modifier(Modifier::BOLD)),
+        ])];
+
+        let overview_block = Block::default()
+            .borders(Borders::ALL)
+            .title(" Update Readiness ")
+            .border_style(Style::default().fg(app.theme().secondary));
+
+        let overview_inner = overview_block.inner(right_chunks[0]);
+        frame.render_widget(overview_block, right_chunks[0]);
+
+        if overview_inner.width > 0 && overview_inner.height > 0 {
+            let metric_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(2), Constraint::Min(4)])
+                .split(overview_inner);
+
+            frame.render_widget(Paragraph::new(overview_text), metric_chunks[0]);
+
+            let maj_label = format!("Major ({maj})");
+            let min_label = format!("Minor ({min})");
+            let pat_label = format!("Patch ({pat})");
+            let unk_label = format!("Other ({unk})");
+
+            let mut slices = Vec::new();
+            if maj > 0 { slices.push(PieSlice::new(&maj_label, maj as f64, app.theme().error)); }
+            if min > 0 { slices.push(PieSlice::new(&min_label, min as f64, app.theme().warning)); }
+            if pat > 0 { slices.push(PieSlice::new(&pat_label, pat as f64, Color::LightCyan)); }
+            if unk > 0 { slices.push(PieSlice::new(&unk_label, unk as f64, app.theme().secondary)); }
+            if slices.is_empty() { slices.push(PieSlice::new("None", 1.0, app.theme().success)); }
+            
+            let pie = PieChart::new(slices)
+                .resolution(Resolution::Braille)
+                .show_legend(overview_inner.width >= 30)
+                .legend_position(LegendPosition::Right)
+                .legend_alignment(LegendAlignment::Center)
+                .show_percentages(false);
+            
+            frame.render_widget(pie, metric_chunks[1]);
+        }
+
+        if let Some(item) = items.get(app.detail.selection) {
+            let update_cmd = match tool {
+                "npm" | "bun" => format!("{} install {}@latest", tool, item.name),
+                "cargo" => format!("cargo add {}@{}", item.name, item.latest),
+                "pip" | "python" => format!("pip install --upgrade {}", item.name),
+                _ => format!("Update {} to {}", item.name, item.latest),
+            };
+
+            let lines = vec![
+                Line::from(vec![
+                    Span::styled("Package: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(&item.name, Style::default().fg(app.theme().text_normal).add_modifier(Modifier::BOLD)),
+                ]),
+                Line::from(vec![
+                    Span::styled("Source: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(&item.source, source_style(&item.source, &app.theme())),
+                ]),
+                Line::from(vec![
+                    Span::styled("Current: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(&item.current, Style::default().fg(app.theme().warning)),
+                ]),
+                Line::from(vec![
+                    Span::styled("Latest: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(&item.latest, Style::default().fg(app.theme().success)),
+                ]),
+                Line::from(vec![
+                    Span::styled("Size: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(&item.size, Style::default().fg(app.theme().secondary)),
+                ]),
+                Line::from(""),
+                Line::from(Span::styled("Quick Update Command:", Style::default().fg(app.theme().text_muted))),
+                Line::from(Span::styled(update_cmd, Style::default().fg(app.theme().primary))),
+            ];
+
+            let detail_card = Paragraph::new(lines)
+                .wrap(ratatui::widgets::Wrap { trim: true })
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(" Selected Package ")
+                        .border_style(Style::default().fg(app.theme().primary)),
+                );
+
+            frame.render_widget(detail_card, right_chunks[1]);
+        } else {
+            let empty_card = Paragraph::new("No package selected.").block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Selected Package "),
+            );
+            frame.render_widget(empty_card, right_chunks[1]);
+        }
+    } else {
+        render_item_table(
+            frame,
+            area,
+            app,
+            format!(" {tool} — Outdated Packages ({}) ", items.len()),
+            Style::default().fg(app.theme().primary),
+            &["", "Package ", "Source ", "Current ", "Latest ", "Size "],
+            &rows,
+            "outdated",
+            sub.as_deref(),
+        );
+    }
 }
 
 fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
