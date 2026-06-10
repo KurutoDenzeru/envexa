@@ -158,15 +158,15 @@ pub fn tool_categories() -> [ToolCategory; 3] {
         },
         ToolCategory {
             name: "Project Tooling",
-            tools: &["project", "security", "audit", "ci"],
+            tools: &["project", "security", "supply_chain", "audit", "ci"],
         },
     ]
 }
 
-pub fn tool_order() -> [&'static str; 14] {
+pub fn tool_order() -> [&'static str; 15] {
     [
         "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
-        "security", "audit", "ci",
+        "security", "supply_chain", "audit", "ci",
     ]
 }
 
@@ -184,6 +184,7 @@ pub fn display_name(tool: &str) -> &str {
         "docker" => "Docker",
         "project" => "Project",
         "security" => "Security",
+        "supply_chain" => "Supply Chain",
         "audit" => "Audit",
         "ci" => "CI/CD",
         _ => tool,
@@ -459,6 +460,32 @@ pub fn format_report(report: &Report) -> String {
             }
         }
         lines.push(at.render());
+        lines.push(String::new());
+    }
+
+    let mut risk_all: HashMap<&str, &Vec<crate::toolchains::SupplyChainRisk>> = HashMap::new();
+    for tool in &tool_order() {
+        if let Some(res) = results.get(*tool) {
+            if !res.supply_chain_risks.is_empty() {
+                risk_all.insert(tool, &res.supply_chain_risks);
+            }
+        }
+    }
+
+    if !risk_all.is_empty() {
+        lines.push("## Supply Chain Risks".into());
+        let mut rt = Table::new();
+        rt.header(&["Toolchain", "Package", "Risk Type", "Description"]);
+        for tool in &tool_order() {
+            if let Some(items) = risk_all.get(tool) {
+                let display = display_name(tool);
+                for r in items.iter() {
+                    let risk_type = cli_yellow(&r.risk_type);
+                    rt.add_row(&[display, &r.package, &risk_type, &r.description]);
+                }
+            }
+        }
+        lines.push(rt.render());
         lines.push(String::new());
     }
 

@@ -683,6 +683,11 @@ fn detail_table_constraints(width: u16, kind: &str) -> Vec<Constraint> {
             Constraint::Length(10),
             Constraint::Min(30),
         ],
+        "supply_chain" => vec![
+            Constraint::Min(20),
+            Constraint::Length(15),
+            Constraint::Min(30),
+        ],
         _ => vec![
             Constraint::Length(6),
             Constraint::Length(12),
@@ -865,6 +870,7 @@ fn render_project_tooling_panel(
     let project = report.results.get("project");
     let security = report.results.get("security");
     let audit = report.results.get("audit");
+    let supply_chain = report.results.get("supply_chain");
 
     let project_outdated = project
         .map(scanner::extract_outdated)
@@ -876,14 +882,15 @@ fn render_project_tooling_panel(
     let project_status = project.map(|res| res.status.as_str()).unwrap_or("skipped");
     let security_status = security.map(|res| res.status.as_str()).unwrap_or("skipped");
     let audit_status = audit.map(|res| res.status.as_str()).unwrap_or("skipped");
+    let supply_chain_status = supply_chain.map(|res| res.status.as_str()).unwrap_or("skipped");
 
-    let empty_vulns: &[crate::toolchains::VulnerabilityInfo] = &[];
     let vulnerabilities = security
         .map(|res| res.vulnerabilities.as_slice())
-        .unwrap_or(empty_vulns);
+        .unwrap_or(&[]);
     let (critical, high, moderate, other) = severity_counts(vulnerabilities);
     let vuln_count = vulnerabilities.len();
     let audit_count = audit.map(|res| res.audit_items.len()).unwrap_or(0);
+    let risks = supply_chain.map(|res| res.supply_chain_risks.len()).unwrap_or(0);
     let risk = project_tooling_risk(
         project_outdated,
         critical,
@@ -1016,11 +1023,21 @@ fn render_project_tooling_panel(
         ]),
         Line::from(vec![
             Span::styled("Audit   ", Style::default().fg(app.theme().warning)),
+            Span::raw(" "),
             Span::styled(
                 scanner::status_label(audit_status),
                 status_style(audit_status, &app.theme()),
             ),
             Span::raw(format!("  {audit_count} checks flagged")),
+        ]),
+        Line::from(vec![
+            Span::styled("Supply  ", Style::default().fg(app.theme().secondary)),
+            Span::raw(" "),
+            Span::styled(
+                scanner::status_label(supply_chain_status),
+                status_style(supply_chain_status, &app.theme()),
+            ),
+            Span::raw(format!("  {risks} risks")),
         ]),
     ]));
     frame.render_widget(summary, summary_chunk);
@@ -2172,6 +2189,7 @@ fn render_package_detail(frame: &mut Frame, area: Rect, app: &App) {
     match app.detail.key.as_deref() {
         Some("security") => render_vulnerabilities(frame, area, &tool, app),
         Some("audit") => render_audit_items(frame, area, &tool, app),
+        Some("supply_chain") => render_supply_chain_risks(frame, area, &tool, app),
         _ => render_outdated_detail(frame, area, &tool, app),
     }
 }
@@ -2473,6 +2491,7 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             );
             frame.render_widget(empty_card, right_chunks[1]);
         }
+    } else {
         // Fallback layout (narrow terminal)
         render_item_table(
             frame,
@@ -2639,6 +2658,7 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
             );
             frame.render_widget(empty_card, right_chunks[1]);
         }
+    } else {
         // Fallback layout (narrow terminal)
         render_item_table(
             frame,
@@ -2757,4 +2777,73 @@ fn render_updating(frame: &mut Frame, area: Rect, app: &mut App) {
             frame.render_stateful_widget(throbber, inner, &mut app.ui.throbber_state);
         }
     }
+}
+
+fn render_supply_chain_risks(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
+    let items = &app.detail.supply_chains;
+
+    if items.is_empty() {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" {tool} — Supply Chain Risks (0) "))
+            .border_style(Style::default().fg(app.theme().success));
+        let text = Paragraph::new(Text::from(vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled(
+                    "  \u{2714} ",
+                    Style::default().fg(app.theme().success).bold(),
+                ),
+                Span::styled(
+                    "No supply chain risks detected! Your dependencies look safe.",
+                    Style::default().fg(app.theme().text_normal),
+                ),
+            ]),
+        ]))
+        .block(block);
+        frame.render_widget(text, area);
+        return;
+    }
+
+    let rows: Vec<Row> = items
+        .iter()
+        .enumerate()
+        .map(|(i, r)| {
+            let sel = i == app.detail.selection;
+            let mut row = Row::new(vec![
+                Cell::from(r.package.as_str()),
+                Cell::from(r.risk_type.as_str()),
+                Cell::from(r.description.as_str()),
+            ]);
+            if sel {
+                row = row.style(
+                    Style::default()
+                        .bg(app.theme().text_muted)
+                        .add_modifier(Modifier::BOLD),
+                );
+            }
+            row
+        })
+        .collect();
+
+    let bottom_msg = if !app.detail.message.is_empty() {
+        Some(format!(
+            "  {}  |  [E] Export Report  [Esc] Back ",
+            app.detail.message
+        ))
+    } else {
+        Some("  [E] Export Report  |  [Esc] Back ".to_string())
+    };
+
+    render_item_table(
+        frame,
+        area,
+        app,
+        format!(" {tool} — Supply Chain Risks ({}) ", items.len()),
+        Style::default().fg(app.theme().warning),
+        &["Package ", "Risk Type ", "Description "],
+        &rows,
+        "supply_chain",
+        bottom_msg.as_deref(),
+    );
 }

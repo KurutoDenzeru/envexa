@@ -17,6 +17,15 @@ pub struct VulnerabilityInfo {
     pub title: String,
     pub cve: Option<String>,
     pub patched_version: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dependency_path: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SupplyChainRisk {
+    pub package: String,
+    pub risk_type: String,
+    pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,6 +76,8 @@ pub struct ScanResult {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub vulnerabilities: Vec<VulnerabilityInfo>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub supply_chain_risks: Vec<SupplyChainRisk>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub audit_items: Vec<AuditItem>,
 }
 
@@ -93,6 +104,7 @@ impl ScanResult {
             disk_usage: None,
             project_type: None,
             vulnerabilities: Vec::with_capacity(4),
+            supply_chain_risks: Vec::with_capacity(4),
             audit_items: Vec::with_capacity(4),
         }
     }
@@ -176,6 +188,7 @@ pub mod pip;
 pub mod pnpm;
 pub mod project;
 pub mod security;
+pub mod supply_chain;
 pub mod yarn;
 
 pub async fn scan_all() -> HashMap<String, ScanResult> {
@@ -213,6 +226,7 @@ pub async fn scan_all_with(
         scanner_task!(docker),
         scanner_task!(project),
         scanner_task!(security),
+        scanner_task!(supply_chain),
         scanner_task!(audit),
         scanner_task!(ci),
     ];
@@ -286,6 +300,7 @@ pub async fn scan_one(name: &str) -> Option<ScanResult> {
         "docker" => Some(docker::scan().await),
         "project" => Some(project::scan().await),
         "security" => Some(security::scan().await),
+        "supply_chain" => Some(supply_chain::scan().await),
         "audit" => Some(audit::scan().await),
         "ci" => Some(ci::scan().await),
         _ => None,
