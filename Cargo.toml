@@ -3,6 +3,7 @@ name = "envexa"
 version = "2.8.0"
 edition = "2021"
 authors = ["Kurt Calacday <kurtcalacday15@gmail.com>"]
+default-run = "envexa"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

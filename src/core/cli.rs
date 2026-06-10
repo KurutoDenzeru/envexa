@@ -6,7 +6,7 @@ use crate::core::config;
 use crate::scanner::{self, Report};
 use crate::toolchains;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Parser)]
 #[command(
@@ -227,7 +227,7 @@ async fn run_daemon(interval: u64) {
 }
 
 async fn self_update() {
-    let tag = match with_spinner("Checking for updates...", fetch_latest_tag()).await {
+    let (tag, body) = match with_spinner("Checking for updates...", fetch_latest_tag()).await {
         Some(t) => t,
         None => {
             eprintln!("Failed to check for updates. Try manually: https://github.com/KurutoDenzeru/envexa/releases");
@@ -243,6 +243,20 @@ async fn self_update() {
 
     println!("Updating from v{VERSION} to {tag}...");
 
+    match with_spinner("Downloading latest release...", perform_update(&tag)).await {
+        Ok(_) => {
+            println!("Updated to {tag}. Restart envexa to use the new version.");
+            if !body.is_empty() {
+                println!("\n--- CHANGELOG ---\n{body}");
+            }
+        }
+        Err(e) => {
+            eprintln!("{e}");
+        }
+    }
+}
+
+pub async fn perform_update(tag: &str) -> anyhow::Result<()> {
     let os = std::env::consts::OS;
     let arch = std::env::consts::ARCH;
     match (os, arch) {
@@ -252,8 +266,7 @@ async fn self_update() {
         | ("linux", "x86_64")
         | ("windows", "x86_64") => {}
         _ => {
-            eprintln!("Unsupported platform: {os}-{arch}");
-            return;
+            anyhow::bail!("Unsupported platform: {os}-{arch}");
         }
     };
 
@@ -267,38 +280,32 @@ async fn self_update() {
 
     let cmd_url = download_url.clone();
     let cmd_tmp = tmp.clone();
-    let status = with_spinner(
-        "Downloading latest release...",
-        tokio::task::spawn_blocking(move || {
-            std::process::Command::new(if cfg!(windows) { "powershell" } else { "curl" })
-                .args(if cfg!(windows) {
-                    vec![
-                        "-OutFile".into(),
-                        cmd_tmp.to_string_lossy().to_string(),
-                        cmd_url,
-                    ]
-                } else {
-                    vec![
-                        "-fsLo".into(),
-                        cmd_tmp.to_string_lossy().to_string(),
-                        cmd_url,
-                    ]
-                })
-                .status()
-        }),
-    )
-    .await;
+    let status = tokio::task::spawn_blocking(move || {
+        std::process::Command::new(if cfg!(windows) { "powershell" } else { "curl" })
+            .args(if cfg!(windows) {
+                vec![
+                    "-OutFile".into(),
+                    cmd_tmp.to_string_lossy().to_string(),
+                    cmd_url,
+                ]
+            } else {
+                vec![
+                    "-fsLo".into(),
+                    cmd_tmp.to_string_lossy().to_string(),
+                    cmd_url,
+                ]
+            })
+            .status()
+    })
+    .await?;
 
-    let download_success = matches!(status, Ok(Ok(s)) if s.success());
+    let download_success = matches!(status, Ok(s) if s.success());
     if !download_success {
-        eprintln!("Failed to download binary {asset_name}");
-        eprintln!("Download manually: {download_url}");
-        return;
+        anyhow::bail!("Failed to download binary {asset_name}\nDownload manually: {download_url}");
     }
 
     if !tmp.exists() {
-        eprintln!("Download failed (no file written)");
-        return;
+        anyhow::bail!("Download failed (no file written)");
     }
 
     #[cfg(unix)]
@@ -324,31 +331,28 @@ async fn self_update() {
             Some(s) if s.contains("Mach-O") || s.contains("ELF") => {}
             _ => {
                 let _ = std::fs::remove_file(&tmp);
-                eprintln!("Downloaded file is not a valid binary (corrupted or wrong URL)");
-                eprintln!("Download manually: {download_url}");
-                return;
+                anyhow::bail!("Downloaded file is not a valid binary (corrupted or wrong URL)\nDownload manually: {download_url}");
             }
         }
     }
 
     if std::fs::rename(&tmp, &current).is_err() && std::fs::copy(&tmp, &current).is_err() {
-        eprintln!("Failed to replace binary (try with elevated permissions or sudo)");
         let _ = std::fs::remove_file(&tmp);
-        return;
+        anyhow::bail!("Failed to replace binary (try with elevated permissions or sudo)");
     }
     let _ = std::fs::remove_file(&tmp);
 
-    println!("Updated to {tag}. Restart envexa to use the new version.");
+    Ok(())
 }
 
-async fn fetch_latest_tag() -> Option<String> {
+pub async fn fetch_latest_tag() -> Option<(String, String)> {
     let url = "https://api.github.com/repos/KurutoDenzeru/envexa/releases/latest";
 
     let output = std::process::Command::new(if cfg!(windows) { "powershell" } else { "curl" })
         .args(if cfg!(windows) {
             vec![
                 "-Command".into(),
-                format!("(Invoke-WebRequest -Uri '{url}' -Headers @{{'User-Agent'='envexa'}} | ConvertFrom-Json).tag_name"),
+                format!("(Invoke-WebRequest -Uri '{url}' -Headers @{{'User-Agent'='envexa'}} | ConvertFrom-Json) | Select-Object tag_name, body | ConvertTo-Json"),
             ]
         } else {
             vec![
@@ -365,13 +369,23 @@ async fn fetch_latest_tag() -> Option<String> {
         return None;
     }
 
-    let body = String::from_utf8_lossy(&output.stdout).to_string();
+    let body_str = String::from_utf8_lossy(&output.stdout).to_string();
 
     if cfg!(windows) {
-        Some(body.trim().to_string())
-    } else {
-        serde_json::from_str::<serde_json::Value>(&body)
+        serde_json::from_str::<serde_json::Value>(&body_str)
             .ok()
-            .and_then(|v| v["tag_name"].as_str().map(|s| s.to_string()))
+            .and_then(|v| {
+                let tag = v["tag_name"].as_str()?.to_string();
+                let body = v["body"].as_str().unwrap_or("").to_string();
+                Some((tag, body))
+            })
+    } else {
+        serde_json::from_str::<serde_json::Value>(&body_str)
+            .ok()
+            .and_then(|v| {
+                let tag = v["tag_name"].as_str()?.to_string();
+                let body = v["body"].as_str().unwrap_or("").to_string();
+                Some((tag, body))
+            })
     }
 }
