@@ -14,7 +14,7 @@
 
 ---
 
-A blazing-fast Rust TUI and scriptable CLI for monitoring local developer tooling health. Instantly track outdated packages and audit security risks across 14+ toolchains.
+Blazing-fast Rust TUI and scriptable CLI for monitoring local developer tooling health. Instantly track outdated packages and audit security risks across 14+ toolchains.
 
 ## 📚 Table of Contents
 
