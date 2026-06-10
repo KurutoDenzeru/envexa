@@ -1472,19 +1472,159 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
     } else {
         format!(" Outdated Packages ({total}) ")
     };
-    let table = Table::new(rows, outdated_table_constraints(area.width))
-        .header(header)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(title)
-                .border_style(Style::default().fg(app.theme().warning)),
-        )
-        .column_spacing(1);
+    if area.width >= 100 && area.height >= 8 {
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .split(area);
 
-    let mut state = TableState::default();
-    state.select(Some(app.ui.outdated_selection));
-    frame.render_stateful_widget(table, area, &mut state);
+        let left_area = chunks[0];
+        let right_area = chunks[1];
+
+        let table = Table::new(rows.clone(), outdated_table_constraints(left_area.width))
+            .header(header.clone())
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(title.clone())
+                    .border_style(Style::default().fg(app.theme().warning)),
+            )
+            .column_spacing(1);
+
+        let mut state = TableState::default();
+        state.select(Some(app.ui.outdated_selection));
+        frame.render_stateful_widget(table, left_area, &mut state);
+
+        let right_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(12), Constraint::Min(1)])
+            .split(right_area);
+
+        let out_items: Vec<crate::scanner::OutdatedItem> = items.iter().map(|(_, pkg)| pkg.clone()).collect();
+        let (maj, min, pat, unk) = update_type_counts(&out_items);
+
+        let overview_text = vec![Line::from(vec![
+            Span::styled("Major: ", Style::default().fg(app.theme().text_muted)),
+            Span::styled(format!("{} ", maj), Style::default().fg(app.theme().error).add_modifier(Modifier::BOLD)),
+            Span::styled(" Minor: ", Style::default().fg(app.theme().text_muted)),
+            Span::styled(format!("{} ", min), Style::default().fg(app.theme().warning).add_modifier(Modifier::BOLD)),
+            Span::styled(" Patch: ", Style::default().fg(app.theme().text_muted)),
+            Span::styled(format!("{} ", pat), Style::default().fg(Color::LightCyan).add_modifier(Modifier::BOLD)),
+            Span::styled(" Other: ", Style::default().fg(app.theme().text_muted)),
+            Span::styled(format!("{} ", unk), Style::default().fg(app.theme().secondary).add_modifier(Modifier::BOLD)),
+        ])];
+
+        let overview_block = Block::default()
+            .borders(Borders::ALL)
+            .title(" Update Readiness ")
+            .border_style(Style::default().fg(app.theme().secondary));
+
+        let overview_inner = overview_block.inner(right_chunks[0]);
+        frame.render_widget(overview_block, right_chunks[0]);
+
+        if overview_inner.width > 0 && overview_inner.height > 0 {
+            let metric_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(2), Constraint::Min(4)])
+                .split(overview_inner);
+
+            frame.render_widget(Paragraph::new(overview_text), metric_chunks[0]);
+
+            let maj_label = format!("Major ({maj})");
+            let min_label = format!("Minor ({min})");
+            let pat_label = format!("Patch ({pat})");
+            let unk_label = format!("Other ({unk})");
+
+            let mut slices = Vec::new();
+            if maj > 0 { slices.push(PieSlice::new(&maj_label, maj as f64, app.theme().error)); }
+            if min > 0 { slices.push(PieSlice::new(&min_label, min as f64, app.theme().warning)); }
+            if pat > 0 { slices.push(PieSlice::new(&pat_label, pat as f64, Color::LightCyan)); }
+            if unk > 0 { slices.push(PieSlice::new(&unk_label, unk as f64, app.theme().secondary)); }
+            if slices.is_empty() { slices.push(PieSlice::new("None", 1.0, app.theme().success)); }
+            
+            let pie = PieChart::new(slices)
+                .resolution(Resolution::Braille)
+                .show_legend(overview_inner.width >= 30)
+                .legend_position(LegendPosition::Right)
+                .legend_alignment(LegendAlignment::Center)
+                .show_percentages(false);
+            
+            frame.render_widget(pie, metric_chunks[1]);
+        }
+
+        if let Some((tool_name, item)) = items.get(app.ui.outdated_selection) {
+            let update_cmd = match tool_name.to_lowercase().as_str() {
+                "npm" | "bun" => format!("{} install {}@latest", tool_name.to_lowercase(), item.name),
+                "cargo" => format!("cargo add {}@{}", item.name, item.latest),
+                "pip" | "python" => format!("pip install --upgrade {}", item.name),
+                "brew" | "homebrew" => format!("brew upgrade {}", item.name),
+                "gem" | "ruby" => format!("gem update {}", item.name),
+                _ => format!("Update {} to {}", item.name, item.latest),
+            };
+
+            let lines = vec![
+                Line::from(vec![
+                    Span::styled("Package: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(&item.name, Style::default().fg(app.theme().text_normal).add_modifier(Modifier::BOLD)),
+                ]),
+                Line::from(vec![
+                    Span::styled("Toolchain: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(tool_name, Style::default().fg(app.theme().text_normal)),
+                ]),
+                Line::from(vec![
+                    Span::styled("Source: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(&item.source, source_style(&item.source, &app.theme())),
+                ]),
+                Line::from(vec![
+                    Span::styled("Current: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(&item.current, Style::default().fg(app.theme().warning)),
+                ]),
+                Line::from(vec![
+                    Span::styled("Latest: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(&item.latest, Style::default().fg(app.theme().success)),
+                ]),
+                Line::from(vec![
+                    Span::styled("Size: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(&item.size, Style::default().fg(app.theme().secondary)),
+                ]),
+                Line::from(""),
+                Line::from(Span::styled("Quick Update Command:", Style::default().fg(app.theme().text_muted))),
+                Line::from(Span::styled(update_cmd, Style::default().fg(app.theme().primary))),
+            ];
+
+            let detail_card = Paragraph::new(lines)
+                .wrap(ratatui::widgets::Wrap { trim: true })
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(" Selected Package ")
+                        .border_style(Style::default().fg(app.theme().primary)),
+                );
+
+            frame.render_widget(detail_card, right_chunks[1]);
+        } else {
+            let empty_card = Paragraph::new("No package selected.").block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Selected Package "),
+            );
+            frame.render_widget(empty_card, right_chunks[1]);
+        }
+    } else {
+        let table = Table::new(rows, outdated_table_constraints(area.width))
+            .header(header)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(title)
+                    .border_style(Style::default().fg(app.theme().warning)),
+            )
+            .column_spacing(1);
+
+        let mut state = TableState::default();
+        state.select(Some(app.ui.outdated_selection));
+        frame.render_stateful_widget(table, area, &mut state);
+    }
 }
 
 fn render_scanning(frame: &mut Frame, area: Rect, app: &mut App) {
