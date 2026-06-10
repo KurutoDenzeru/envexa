@@ -144,6 +144,7 @@ pub struct DetailState {
     pub items: Vec<OutdatedItem>,
     pub vulns: Vec<VulnerabilityInfo>,
     pub audits: Vec<AuditItem>,
+    pub supply_chains: Vec<crate::toolchains::SupplyChainRisk>,
     pub checked: HashSet<usize>,
     pub message: String,
 }
@@ -205,6 +206,7 @@ impl App {
                 items: Vec::new(),
                 vulns: Vec::new(),
                 audits: Vec::new(),
+                supply_chains: Vec::new(),
                 checked: HashSet::new(),
                 message: String::new(),
             },
@@ -705,18 +707,27 @@ impl App {
                 self.detail.vulns = vulns.to_vec();
                 self.detail.items.clear();
                 self.detail.audits.clear();
+                self.detail.supply_chains.clear();
             }
             "audit" => {
                 let audits = scanner::extract_audit_items(res);
                 self.detail.audits = audits.to_vec();
                 self.detail.items.clear();
                 self.detail.vulns.clear();
+                self.detail.supply_chains.clear();
+            }
+            "supply_chain" => {
+                self.detail.supply_chains = res.supply_chain_risks.clone();
+                self.detail.items.clear();
+                self.detail.vulns.clear();
+                self.detail.audits.clear();
             }
             _ => {
                 let items = scanner::extract_outdated(res);
                 self.detail.items = items;
                 self.detail.vulns.clear();
                 self.detail.audits.clear();
+                self.detail.supply_chains.clear();
             }
         }
 
@@ -1437,6 +1448,7 @@ impl App {
         match self.detail.key.as_deref() {
             Some("security") => self.detail.vulns.len(),
             Some("audit") => self.detail.audits.len(),
+            Some("supply_chain") => self.detail.supply_chains.len(),
             _ => self.detail.items.len(),
         }
     }
