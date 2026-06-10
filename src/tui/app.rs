@@ -530,7 +530,7 @@ impl App {
                                         self.apply_setting_selection();
                                         self.ui.settings_edit_mode = false;
                                         let _ = config::save_config(&self.config);
-                                    } else if self.ui.settings_selection == 9 {
+                                    } else if self.ui.settings_selection == 10 {
                                         self.do_self_update(tx.clone());
                                     } else {
                                         self.enter_settings_edit_mode();
