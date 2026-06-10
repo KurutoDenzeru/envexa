@@ -1,6 +1,6 @@
 [package]
 name = "envexa"
-version = "2.9.1"
+version = "2.10.0"
 edition = "2021"
 authors = ["Kurt Calacday <kurtcalacday15@gmail.com>"]
 default-run = "envexa"
