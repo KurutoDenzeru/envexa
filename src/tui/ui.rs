@@ -1154,6 +1154,31 @@ fn render_dashboard(frame: &mut Frame, area: Rect, app: &App) {
             .split(layout[1]);
         render_dashboard_health_panel(frame, right_chunks[0], report, pass, warn, fail, skip, app);
         right_chunks[1]
+    } else if area.height >= 24 {
+        // Vertical stacking fallback for Portrait modes
+        let top_height = (area.height / 2).clamp(12, 18);
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(top_height), Constraint::Min(1)])
+            .split(area);
+
+        // Tooling taking the top half
+        render_project_tooling_panel(frame, layout[0], report, app);
+
+        // Health panel and Overview Pie side-by-side in the bottom half
+        let bottom_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .split(layout[1]);
+
+        let health_area = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(4), Constraint::Min(1)])
+            .split(bottom_chunks[0]);
+
+        render_dashboard_health_panel(frame, health_area[0], report, pass, warn, fail, skip, app);
+        render_overview_pie(frame, bottom_chunks[1], pass, warn, fail, skip, app);
+        health_area[1]
     } else {
         let tooling_height = if area.height >= 22 {
             9
@@ -1495,121 +1520,32 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         state.select(Some(app.ui.outdated_selection));
         frame.render_stateful_widget(table, left_area, &mut state);
 
-        let right_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(12), Constraint::Min(1)])
-            .split(right_area);
-
         let out_items: Vec<crate::scanner::OutdatedItem> = items.iter().map(|(_, pkg)| pkg.clone()).collect();
-        let (maj, min, pat, unk) = update_type_counts(&out_items);
+        let tool_name = items.get(app.ui.outdated_selection).map(|(t, _)| t.as_str()).unwrap_or("Unknown");
+        render_outdated_detail_panels(frame, right_area, tool_name, &out_items, app.ui.outdated_selection, app, true);
+    } else if area.height >= 24 {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .split(area);
 
-        let overview_text = vec![Line::from(vec![
-            Span::styled("Major: ", Style::default().fg(app.theme().text_muted)),
-            Span::styled(format!("{} ", maj), Style::default().fg(app.theme().error).add_modifier(Modifier::BOLD)),
-            Span::styled(" Minor: ", Style::default().fg(app.theme().text_muted)),
-            Span::styled(format!("{} ", min), Style::default().fg(app.theme().warning).add_modifier(Modifier::BOLD)),
-            Span::styled(" Patch: ", Style::default().fg(app.theme().text_muted)),
-            Span::styled(format!("{} ", pat), Style::default().fg(Color::LightCyan).add_modifier(Modifier::BOLD)),
-            Span::styled(" Other: ", Style::default().fg(app.theme().text_muted)),
-            Span::styled(format!("{} ", unk), Style::default().fg(app.theme().secondary).add_modifier(Modifier::BOLD)),
-        ])];
-
-        let overview_block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Update Readiness ")
-            .border_style(Style::default().fg(app.theme().secondary));
-
-        let overview_inner = overview_block.inner(right_chunks[0]);
-        frame.render_widget(overview_block, right_chunks[0]);
-
-        if overview_inner.width > 0 && overview_inner.height > 0 {
-            let metric_chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Length(2), Constraint::Min(4)])
-                .split(overview_inner);
-
-            frame.render_widget(Paragraph::new(overview_text), metric_chunks[0]);
-
-            let maj_label = format!("Major ({maj})");
-            let min_label = format!("Minor ({min})");
-            let pat_label = format!("Patch ({pat})");
-            let unk_label = format!("Other ({unk})");
-
-            let mut slices = Vec::new();
-            if maj > 0 { slices.push(PieSlice::new(&maj_label, maj as f64, app.theme().error)); }
-            if min > 0 { slices.push(PieSlice::new(&min_label, min as f64, app.theme().warning)); }
-            if pat > 0 { slices.push(PieSlice::new(&pat_label, pat as f64, Color::LightCyan)); }
-            if unk > 0 { slices.push(PieSlice::new(&unk_label, unk as f64, app.theme().secondary)); }
-            if slices.is_empty() { slices.push(PieSlice::new("None", 1.0, app.theme().success)); }
-            
-            let pie = PieChart::new(slices)
-                .resolution(Resolution::Braille)
-                .show_legend(overview_inner.width >= 30)
-                .legend_position(LegendPosition::Right)
-                .legend_alignment(LegendAlignment::Center)
-                .show_percentages(false);
-            
-            frame.render_widget(pie, metric_chunks[1]);
-        }
-
-        if let Some((tool_name, item)) = items.get(app.ui.outdated_selection) {
-            let update_cmd = match tool_name.to_lowercase().as_str() {
-                "npm" | "bun" => format!("{} install {}@latest", tool_name.to_lowercase(), item.name),
-                "cargo" => format!("cargo add {}@{}", item.name, item.latest),
-                "pip" | "python" => format!("pip install --upgrade {}", item.name),
-                "brew" | "homebrew" => format!("brew upgrade {}", item.name),
-                "gem" | "ruby" => format!("gem update {}", item.name),
-                _ => format!("Update {} to {}", item.name, item.latest),
-            };
-
-            let lines = vec![
-                Line::from(vec![
-                    Span::styled("Package: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(&item.name, Style::default().fg(app.theme().text_normal).add_modifier(Modifier::BOLD)),
-                ]),
-                Line::from(vec![
-                    Span::styled("Toolchain: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(tool_name, Style::default().fg(app.theme().text_normal)),
-                ]),
-                Line::from(vec![
-                    Span::styled("Source: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(&item.source, source_style(&item.source, &app.theme())),
-                ]),
-                Line::from(vec![
-                    Span::styled("Current: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(&item.current, Style::default().fg(app.theme().warning)),
-                ]),
-                Line::from(vec![
-                    Span::styled("Latest: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(&item.latest, Style::default().fg(app.theme().success)),
-                ]),
-                Line::from(vec![
-                    Span::styled("Size: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(&item.size, Style::default().fg(app.theme().secondary)),
-                ]),
-                Line::from(""),
-                Line::from(Span::styled("Quick Update Command:", Style::default().fg(app.theme().text_muted))),
-                Line::from(Span::styled(update_cmd, Style::default().fg(app.theme().primary))),
-            ];
-
-            let detail_card = Paragraph::new(lines)
-                .wrap(ratatui::widgets::Wrap { trim: true })
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title(" Selected Package ")
-                        .border_style(Style::default().fg(app.theme().primary)),
-                );
-
-            frame.render_widget(detail_card, right_chunks[1]);
-        } else {
-            let empty_card = Paragraph::new("No package selected.").block(
+        let table = Table::new(rows.clone(), outdated_table_constraints(chunks[0].width))
+            .header(header.clone())
+            .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(" Selected Package "),
-            );
-            frame.render_widget(empty_card, right_chunks[1]);
-        }
+                    .title(title.clone())
+                    .border_style(Style::default().fg(app.theme().warning)),
+            )
+            .column_spacing(1);
+
+        let mut state = TableState::default();
+        state.select(Some(app.ui.outdated_selection));
+        frame.render_stateful_widget(table, chunks[0], &mut state);
+
+        let out_items: Vec<crate::scanner::OutdatedItem> = items.iter().map(|(_, pkg)| pkg.clone()).collect();
+        let tool_name = items.get(app.ui.outdated_selection).map(|(t, _)| t.as_str()).unwrap_or("Unknown");
+        render_outdated_detail_panels(frame, chunks[1], tool_name, &out_items, app.ui.outdated_selection, app, false);
     } else {
         let table = Table::new(rows, outdated_table_constraints(area.width))
             .header(header)
@@ -2359,6 +2295,132 @@ fn update_type_counts(items: &[crate::scanner::OutdatedItem]) -> (usize, usize, 
     (major, minor, patch, unknown)
 }
 
+fn render_outdated_detail_panels(
+    frame: &mut Frame,
+    area: Rect,
+    tool: &str,
+    items: &[crate::scanner::OutdatedItem],
+    selection: usize,
+    app: &App,
+    is_horizontal: bool,
+) {
+    let right_chunks = if is_horizontal {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(12), Constraint::Min(1)])
+            .split(area)
+    } else {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(area)
+    };
+
+    let (maj, min, pat, unk) = update_type_counts(items);
+
+    let overview_text = vec![Line::from(vec![
+        Span::styled("Major: ", Style::default().fg(app.theme().text_muted)),
+        Span::styled(format!("{} ", maj), Style::default().fg(app.theme().error).add_modifier(Modifier::BOLD)),
+        Span::styled(" Minor: ", Style::default().fg(app.theme().text_muted)),
+        Span::styled(format!("{} ", min), Style::default().fg(app.theme().warning).add_modifier(Modifier::BOLD)),
+        Span::styled(" Patch: ", Style::default().fg(app.theme().text_muted)),
+        Span::styled(format!("{} ", pat), Style::default().fg(Color::LightCyan).add_modifier(Modifier::BOLD)),
+        Span::styled(" Other: ", Style::default().fg(app.theme().text_muted)),
+        Span::styled(format!("{} ", unk), Style::default().fg(app.theme().secondary).add_modifier(Modifier::BOLD)),
+    ])];
+
+    let overview_block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Update Readiness ")
+        .border_style(Style::default().fg(app.theme().secondary));
+
+    let overview_inner = overview_block.inner(right_chunks[0]);
+    frame.render_widget(overview_block, right_chunks[0]);
+
+    if overview_inner.width > 0 && overview_inner.height > 0 {
+        let metric_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(2), Constraint::Min(4)])
+            .split(overview_inner);
+
+        frame.render_widget(Paragraph::new(overview_text), metric_chunks[0]);
+
+        let maj_label = format!("Major ({maj})");
+        let min_label = format!("Minor ({min})");
+        let pat_label = format!("Patch ({pat})");
+        let unk_label = format!("Other ({unk})");
+
+        let mut slices = Vec::new();
+        if maj > 0 { slices.push(PieSlice::new(&maj_label, maj as f64, app.theme().error)); }
+        if min > 0 { slices.push(PieSlice::new(&min_label, min as f64, app.theme().warning)); }
+        if pat > 0 { slices.push(PieSlice::new(&pat_label, pat as f64, Color::LightCyan)); }
+        if unk > 0 { slices.push(PieSlice::new(&unk_label, unk as f64, app.theme().secondary)); }
+        if slices.is_empty() { slices.push(PieSlice::new("None", 1.0, app.theme().success)); }
+        
+        let pie = PieChart::new(slices)
+            .resolution(Resolution::Braille)
+            .show_legend(overview_inner.width >= 30)
+            .legend_position(LegendPosition::Right)
+            .legend_alignment(LegendAlignment::Center)
+            .show_percentages(false);
+        
+        frame.render_widget(pie, metric_chunks[1]);
+    }
+
+    if let Some(item) = items.get(selection) {
+        let update_cmd = match tool {
+            "npm" | "bun" => format!("{} install {}@latest", tool, item.name),
+            "cargo" => format!("cargo add {}@{}", item.name, item.latest),
+            "pip" | "python" => format!("pip install --upgrade {}", item.name),
+            _ => format!("Update {} to {}", item.name, item.latest),
+        };
+
+        let lines = vec![
+            Line::from(vec![
+                Span::styled("Package: ", Style::default().fg(app.theme().text_muted)),
+                Span::styled(&item.name, Style::default().fg(app.theme().text_normal).add_modifier(Modifier::BOLD)),
+            ]),
+            Line::from(vec![
+                Span::styled("Source: ", Style::default().fg(app.theme().text_muted)),
+                Span::styled(&item.source, source_style(&item.source, &app.theme())),
+            ]),
+            Line::from(vec![
+                Span::styled("Current: ", Style::default().fg(app.theme().text_muted)),
+                Span::styled(&item.current, Style::default().fg(app.theme().warning)),
+            ]),
+            Line::from(vec![
+                Span::styled("Latest: ", Style::default().fg(app.theme().text_muted)),
+                Span::styled(&item.latest, Style::default().fg(app.theme().success)),
+            ]),
+            Line::from(vec![
+                Span::styled("Size: ", Style::default().fg(app.theme().text_muted)),
+                Span::styled(&item.size, Style::default().fg(app.theme().secondary)),
+            ]),
+            Line::from(""),
+            Line::from(Span::styled("Quick Update Command:", Style::default().fg(app.theme().text_muted))),
+            Line::from(Span::styled(update_cmd, Style::default().fg(app.theme().primary))),
+        ];
+
+        let detail_card = Paragraph::new(lines)
+            .wrap(ratatui::widgets::Wrap { trim: true })
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Selected Package ")
+                    .border_style(Style::default().fg(app.theme().primary)),
+            );
+
+        frame.render_widget(detail_card, right_chunks[1]);
+    } else {
+        let empty_card = Paragraph::new("No package selected.").block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Selected Package "),
+        );
+        frame.render_widget(empty_card, right_chunks[1]);
+    }
+}
+
 fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
     let items = &app.detail.items;
 
@@ -2428,12 +2490,9 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
             .split(area);
 
-        let left_area = chunks[0];
-        let right_area = chunks[1];
-
         render_item_table(
             frame,
-            left_area,
+            chunks[0],
             app,
             format!(" {tool} — Outdated Packages ({}) ", items.len()),
             Style::default().fg(app.theme().primary),
@@ -2443,114 +2502,26 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             sub.as_deref(),
         );
 
-        let right_chunks = Layout::default()
+        render_outdated_detail_panels(frame, chunks[1], tool, items, app.detail.selection, app, true);
+    } else if area.height >= 24 {
+        let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(12), Constraint::Min(1)])
-            .split(right_area);
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .split(area);
 
-        let (maj, min, pat, unk) = update_type_counts(items);
+        render_item_table(
+            frame,
+            chunks[0],
+            app,
+            format!(" {tool} — Outdated Packages ({}) ", items.len()),
+            Style::default().fg(app.theme().primary),
+            &["", "Package ", "Source ", "Current ", "Latest ", "Size "],
+            &rows,
+            "outdated",
+            sub.as_deref(),
+        );
 
-        let overview_text = vec![Line::from(vec![
-            Span::styled("Major: ", Style::default().fg(app.theme().text_muted)),
-            Span::styled(format!("{} ", maj), Style::default().fg(app.theme().error).add_modifier(Modifier::BOLD)),
-            Span::styled(" Minor: ", Style::default().fg(app.theme().text_muted)),
-            Span::styled(format!("{} ", min), Style::default().fg(app.theme().warning).add_modifier(Modifier::BOLD)),
-            Span::styled(" Patch: ", Style::default().fg(app.theme().text_muted)),
-            Span::styled(format!("{} ", pat), Style::default().fg(Color::LightCyan).add_modifier(Modifier::BOLD)),
-            Span::styled(" Other: ", Style::default().fg(app.theme().text_muted)),
-            Span::styled(format!("{} ", unk), Style::default().fg(app.theme().secondary).add_modifier(Modifier::BOLD)),
-        ])];
-
-        let overview_block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Update Readiness ")
-            .border_style(Style::default().fg(app.theme().secondary));
-
-        let overview_inner = overview_block.inner(right_chunks[0]);
-        frame.render_widget(overview_block, right_chunks[0]);
-
-        if overview_inner.width > 0 && overview_inner.height > 0 {
-            let metric_chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Length(2), Constraint::Min(4)])
-                .split(overview_inner);
-
-            frame.render_widget(Paragraph::new(overview_text), metric_chunks[0]);
-
-            let maj_label = format!("Major ({maj})");
-            let min_label = format!("Minor ({min})");
-            let pat_label = format!("Patch ({pat})");
-            let unk_label = format!("Other ({unk})");
-
-            let mut slices = Vec::new();
-            if maj > 0 { slices.push(PieSlice::new(&maj_label, maj as f64, app.theme().error)); }
-            if min > 0 { slices.push(PieSlice::new(&min_label, min as f64, app.theme().warning)); }
-            if pat > 0 { slices.push(PieSlice::new(&pat_label, pat as f64, Color::LightCyan)); }
-            if unk > 0 { slices.push(PieSlice::new(&unk_label, unk as f64, app.theme().secondary)); }
-            if slices.is_empty() { slices.push(PieSlice::new("None", 1.0, app.theme().success)); }
-            
-            let pie = PieChart::new(slices)
-                .resolution(Resolution::Braille)
-                .show_legend(overview_inner.width >= 30)
-                .legend_position(LegendPosition::Right)
-                .legend_alignment(LegendAlignment::Center)
-                .show_percentages(false);
-            
-            frame.render_widget(pie, metric_chunks[1]);
-        }
-
-        if let Some(item) = items.get(app.detail.selection) {
-            let update_cmd = match tool {
-                "npm" | "bun" => format!("{} install {}@latest", tool, item.name),
-                "cargo" => format!("cargo add {}@{}", item.name, item.latest),
-                "pip" | "python" => format!("pip install --upgrade {}", item.name),
-                _ => format!("Update {} to {}", item.name, item.latest),
-            };
-
-            let lines = vec![
-                Line::from(vec![
-                    Span::styled("Package: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(&item.name, Style::default().fg(app.theme().text_normal).add_modifier(Modifier::BOLD)),
-                ]),
-                Line::from(vec![
-                    Span::styled("Source: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(&item.source, source_style(&item.source, &app.theme())),
-                ]),
-                Line::from(vec![
-                    Span::styled("Current: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(&item.current, Style::default().fg(app.theme().warning)),
-                ]),
-                Line::from(vec![
-                    Span::styled("Latest: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(&item.latest, Style::default().fg(app.theme().success)),
-                ]),
-                Line::from(vec![
-                    Span::styled("Size: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(&item.size, Style::default().fg(app.theme().secondary)),
-                ]),
-                Line::from(""),
-                Line::from(Span::styled("Quick Update Command:", Style::default().fg(app.theme().text_muted))),
-                Line::from(Span::styled(update_cmd, Style::default().fg(app.theme().primary))),
-            ];
-
-            let detail_card = Paragraph::new(lines)
-                .wrap(ratatui::widgets::Wrap { trim: true })
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title(" Selected Package ")
-                        .border_style(Style::default().fg(app.theme().primary)),
-                );
-
-            frame.render_widget(detail_card, right_chunks[1]);
-        } else {
-            let empty_card = Paragraph::new("No package selected.").block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(" Selected Package "),
-            );
-            frame.render_widget(empty_card, right_chunks[1]);
-        }
+        render_outdated_detail_panels(frame, chunks[1], tool, items, app.detail.selection, app, false);
     } else {
         render_item_table(
             frame,
@@ -2563,6 +2534,153 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             "outdated",
             sub.as_deref(),
         );
+    }
+}
+
+fn render_vulnerability_detail_panels(
+    frame: &mut Frame,
+    area: Rect,
+    items: &[crate::toolchains::VulnerabilityInfo],
+    selection: usize,
+    app: &App,
+    is_horizontal: bool,
+) {
+    let right_chunks = if is_horizontal {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(12), Constraint::Min(1)])
+            .split(area)
+    } else {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(area)
+    };
+
+    let (crit, high, mod_cnt, other) = severity_counts(items);
+    let score = 100_usize
+        .saturating_sub(crit * 25 + high * 10 + mod_cnt * 5)
+        .clamp(0, 100) as u16;
+    let score_color = if score >= 90 {
+        app.theme().success
+    } else if score >= 70 {
+        app.theme().warning
+    } else {
+        app.theme().error
+    };
+
+    let gauge = LineGauge::default()
+        .block(Block::default().title(" Security Health Score "))
+        .filled_style(Style::default().fg(score_color))
+        .unfilled_style(Style::default().fg(app.theme().text_muted))
+        .ratio(score as f64 / 100.0);
+
+    let overview_text = vec![Line::from(vec![
+        Span::styled("Critical: ", Style::default().fg(app.theme().text_muted)),
+        Span::styled(format!("{} ", crit), Style::default().fg(app.theme().error).add_modifier(Modifier::BOLD)),
+        Span::styled(" High: ", Style::default().fg(app.theme().text_muted)),
+        Span::styled(format!("{} ", high), Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
+        Span::styled(" Mod: ", Style::default().fg(app.theme().text_muted)),
+        Span::styled(format!("{} ", mod_cnt), Style::default().fg(app.theme().warning).add_modifier(Modifier::BOLD)),
+        Span::styled(" Low: ", Style::default().fg(app.theme().text_muted)),
+        Span::styled(format!("{} ", other), Style::default().fg(app.theme().secondary).add_modifier(Modifier::BOLD)),
+    ])];
+
+    let overview_block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Security Scorecard ")
+        .border_style(Style::default().fg(app.theme().secondary));
+
+    let overview_inner = overview_block.inner(right_chunks[0]);
+    frame.render_widget(overview_block, right_chunks[0]);
+
+    if overview_inner.width > 0 && overview_inner.height > 0 {
+        let metric_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(2), Constraint::Length(2), Constraint::Min(4)])
+            .split(overview_inner);
+
+        frame.render_widget(gauge, metric_chunks[0]);
+        frame.render_widget(Paragraph::new(overview_text), metric_chunks[1]);
+
+        let crit_label = format!("Critical ({crit})");
+        let high_label = format!("High ({high})");
+        let mod_label = format!("Moderate ({mod_cnt})");
+        let low_label = format!("Low ({other})");
+
+        let mut slices = Vec::new();
+        if crit > 0 { slices.push(PieSlice::new(&crit_label, crit as f64, app.theme().error)); }
+        if high > 0 { slices.push(PieSlice::new(&high_label, high as f64, Color::LightRed)); }
+        if mod_cnt > 0 { slices.push(PieSlice::new(&mod_label, mod_cnt as f64, app.theme().warning)); }
+        if other > 0 { slices.push(PieSlice::new(&low_label, other as f64, app.theme().secondary)); }
+        if slices.is_empty() { slices.push(PieSlice::new("None", 1.0, app.theme().success)); }
+        
+        let pie = PieChart::new(slices)
+            .resolution(Resolution::Braille)
+            .show_legend(overview_inner.width >= 30)
+            .legend_position(LegendPosition::Right)
+            .legend_alignment(LegendAlignment::Center)
+            .show_percentages(false);
+        
+        frame.render_widget(pie, metric_chunks[2]);
+    }
+
+    if let Some(vuln) = items.get(selection) {
+        let cve = vuln.cve.as_deref().unwrap_or("None");
+        let card_border_color = match vuln.severity.to_ascii_lowercase().as_str() {
+            "critical" => app.theme().error,
+            "high" => Color::LightRed,
+            "moderate" | "medium" => app.theme().warning,
+            "low" => app.theme().secondary,
+            _ => app.theme().text_muted,
+        };
+
+        let lines = vec![
+            Line::from(vec![
+                Span::styled("Package: ", Style::default().fg(app.theme().text_muted)),
+                Span::styled(&vuln.package, Style::default().fg(app.theme().text_normal).add_modifier(Modifier::BOLD)),
+            ]),
+            Line::from(vec![
+                Span::styled("Severity: ", Style::default().fg(app.theme().text_muted)),
+                Span::styled(&vuln.severity, severity_style(&vuln.severity, &app.theme())),
+            ]),
+            Line::from(vec![
+                Span::styled("CVE ID: ", Style::default().fg(app.theme().text_muted)),
+                Span::styled(cve, Style::default().fg(app.theme().primary)),
+            ]),
+            Line::from(vec![
+                Span::styled("Patched: ", Style::default().fg(app.theme().text_muted)),
+                Span::styled(&vuln.patched_version, Style::default().fg(app.theme().success)),
+            ]),
+            Line::from(vec![
+                Span::styled("Dep Path: ", Style::default().fg(app.theme().text_muted)),
+                Span::styled(
+                    if vuln.dependency_path.is_empty() { "Direct/Unknown".to_string() } else { vuln.dependency_path.join(" > ") },
+                    Style::default().fg(app.theme().primary),
+                ),
+            ]),
+            Line::from(""),
+            Line::from(Span::styled("Title / Description:", Style::default().fg(app.theme().text_muted))),
+            Line::from(Span::styled(&vuln.title, Style::default().fg(app.theme().text_normal))),
+        ];
+
+        let detail_card = Paragraph::new(lines)
+            .wrap(ratatui::widgets::Wrap { trim: true })
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Selected Vulnerability ")
+                    .border_style(Style::default().fg(card_border_color)),
+            );
+
+        frame.render_widget(detail_card, right_chunks[1]);
+    } else {
+        let empty_card = Paragraph::new("No item selected.").block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Selected Vulnerability "),
+        );
+        frame.render_widget(empty_card, right_chunks[1]);
     }
 }
 
@@ -2632,13 +2750,9 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
             .split(area);
 
-        let left_area = chunks[0];
-        let right_area = chunks[1];
-
-        // Draw Left Table
         render_item_table(
             frame,
-            left_area,
+            chunks[0],
             app,
             format!(" {tool} — Vulnerabilities ({}) ", items.len()),
             Style::default().fg(app.theme().error),
@@ -2648,173 +2762,26 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             bottom_msg.as_deref(),
         );
 
-        // Draw Right Stats and Detail Panel
-        let right_chunks = Layout::default()
+        render_vulnerability_detail_panels(frame, chunks[1], items, app.detail.selection, app, true);
+    } else if area.height >= 24 {
+        let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(12), Constraint::Min(1)])
-            .split(right_area);
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .split(area);
 
-        // Right Top: Scorecard with line gauge
-        let (crit, high, mod_cnt, other) = severity_counts(items);
-        let score = 100_usize
-            .saturating_sub(crit * 25 + high * 10 + mod_cnt * 5)
-            .clamp(0, 100) as u16;
-        let score_color = if score >= 90 {
-            app.theme().success
-        } else if score >= 70 {
-            app.theme().warning
-        } else {
-            app.theme().error
-        };
+        render_item_table(
+            frame,
+            chunks[0],
+            app,
+            format!(" {tool} — Vulnerabilities ({}) ", items.len()),
+            Style::default().fg(app.theme().error),
+            &["Package ", "Severity ", "CVE ", "Title ", "Patched In "],
+            &rows,
+            "security",
+            bottom_msg.as_deref(),
+        );
 
-        let gauge = LineGauge::default()
-            .block(Block::default().title(" Security Health Score "))
-            .filled_style(Style::default().fg(score_color))
-            .unfilled_style(Style::default().fg(app.theme().text_muted))
-            .ratio(score as f64 / 100.0);
-
-        let overview_text = vec![Line::from(vec![
-            Span::styled("Critical: ", Style::default().fg(app.theme().text_muted)),
-            Span::styled(
-                format!("{} ", crit),
-                Style::default()
-                    .fg(app.theme().error)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(" High: ", Style::default().fg(app.theme().text_muted)),
-            Span::styled(
-                format!("{} ", high),
-                Style::default()
-                    .fg(Color::LightRed)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(" Mod: ", Style::default().fg(app.theme().text_muted)),
-            Span::styled(
-                format!("{} ", mod_cnt),
-                Style::default()
-                    .fg(app.theme().warning)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(" Low: ", Style::default().fg(app.theme().text_muted)),
-            Span::styled(
-                format!("{} ", other),
-                Style::default()
-                    .fg(app.theme().secondary)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ])];
-
-        let overview_block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Security Scorecard ")
-            .border_style(Style::default().fg(app.theme().secondary));
-
-        let overview_inner = overview_block.inner(right_chunks[0]);
-        frame.render_widget(overview_block, right_chunks[0]);
-
-        if overview_inner.width > 0 && overview_inner.height > 0 {
-            let metric_chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Length(2), Constraint::Length(2), Constraint::Min(4)])
-                .split(overview_inner);
-
-            frame.render_widget(gauge, metric_chunks[0]);
-            frame.render_widget(Paragraph::new(overview_text), metric_chunks[1]);
-
-            let crit_label = format!("Critical ({crit})");
-            let high_label = format!("High ({high})");
-            let mod_label = format!("Moderate ({mod_cnt})");
-            let low_label = format!("Low ({other})");
-
-            let mut slices = Vec::new();
-            if crit > 0 { slices.push(PieSlice::new(&crit_label, crit as f64, app.theme().error)); }
-            if high > 0 { slices.push(PieSlice::new(&high_label, high as f64, Color::LightRed)); }
-            if mod_cnt > 0 { slices.push(PieSlice::new(&mod_label, mod_cnt as f64, app.theme().warning)); }
-            if other > 0 { slices.push(PieSlice::new(&low_label, other as f64, app.theme().secondary)); }
-            if slices.is_empty() { slices.push(PieSlice::new("None", 1.0, app.theme().success)); }
-            
-            let pie = PieChart::new(slices)
-                .resolution(Resolution::Braille)
-                .show_legend(overview_inner.width >= 30)
-                .legend_position(LegendPosition::Right)
-                .legend_alignment(LegendAlignment::Center)
-                .show_percentages(false);
-            
-            frame.render_widget(pie, metric_chunks[2]);
-        }
-
-        // Right Bottom: Dynamic Selection Card
-        if let Some(vuln) = items.get(app.detail.selection) {
-            let cve = vuln.cve.as_deref().unwrap_or("None");
-            let card_border_color = match vuln.severity.to_ascii_lowercase().as_str() {
-                "critical" => app.theme().error,
-                "high" => Color::LightRed,
-                "moderate" | "medium" => app.theme().warning,
-                "low" => app.theme().secondary,
-                _ => app.theme().text_muted,
-            };
-
-            let lines = vec![
-                Line::from(vec![
-                    Span::styled("Package: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(
-                        &vuln.package,
-                        Style::default()
-                            .fg(app.theme().text_normal)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                ]),
-                Line::from(vec![
-                    Span::styled("Severity: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(&vuln.severity, severity_style(&vuln.severity, &app.theme())),
-                ]),
-                Line::from(vec![
-                    Span::styled("CVE ID: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(cve, Style::default().fg(app.theme().primary)),
-                ]),
-                Line::from(vec![
-                    Span::styled("Patched: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(
-                        &vuln.patched_version,
-                        Style::default().fg(app.theme().success),
-                    ),
-                ]),
-                Line::from(vec![
-                    Span::styled("Dep Path: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(
-                        if vuln.dependency_path.is_empty() { "Direct/Unknown".to_string() } else { vuln.dependency_path.join(" > ") },
-                        Style::default().fg(app.theme().primary),
-                    ),
-                ]),
-                Line::from(""),
-                Line::from(Span::styled(
-                    "Title / Description:",
-                    Style::default().fg(app.theme().text_muted),
-                )),
-                Line::from(Span::styled(
-                    &vuln.title,
-                    Style::default().fg(app.theme().text_normal),
-                )),
-            ];
-
-            let detail_card = Paragraph::new(lines)
-                .wrap(ratatui::widgets::Wrap { trim: true })
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title(" Selected Vulnerability ")
-                        .border_style(Style::default().fg(card_border_color)),
-                );
-
-            frame.render_widget(detail_card, right_chunks[1]);
-        } else {
-            let empty_card = Paragraph::new("No item selected.").block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(" Selected Vulnerability "),
-            );
-            frame.render_widget(empty_card, right_chunks[1]);
-        }
+        render_vulnerability_detail_panels(frame, chunks[1], items, app.detail.selection, app, false);
     } else {
         // Fallback layout (narrow terminal)
         render_item_table(
@@ -2828,6 +2795,78 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             "security",
             bottom_msg.as_deref(),
         );
+    }
+}
+
+fn render_audit_detail_panels(
+    frame: &mut Frame,
+    area: Rect,
+    items: &[crate::toolchains::AuditItem],
+    selection: usize,
+    app: &App,
+    is_horizontal: bool,
+) {
+    let right_chunks = if is_horizontal {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(5), Constraint::Min(1)])
+            .split(area)
+    } else {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(area)
+    };
+
+    let alignment_score = 100_usize.saturating_sub(items.len() * 20).clamp(0, 100) as u16;
+    let gauge_color = if alignment_score >= 80 {
+        app.theme().success
+    } else if alignment_score >= 50 {
+        app.theme().warning
+    } else {
+        app.theme().error
+    };
+
+    let gauge = LineGauge::default()
+        .block(Block::default().title(" System Alignment Score "))
+        .filled_style(Style::default().fg(gauge_color))
+        .unfilled_style(Style::default().fg(app.theme().text_muted))
+        .ratio(alignment_score as f64 / 100.0);
+
+    frame.render_widget(gauge, right_chunks[0]);
+
+    if let Some(audit) = items.get(selection) {
+        let lines = vec![
+            Line::from(vec![
+                Span::styled("Audit Rule: ", Style::default().fg(app.theme().text_muted)),
+                Span::styled(&audit.name, Style::default().fg(app.theme().text_normal).add_modifier(Modifier::BOLD)),
+            ]),
+            Line::from(vec![
+                Span::styled("Current State: ", Style::default().fg(app.theme().text_muted)),
+                Span::styled(&audit.current, Style::default().fg(app.theme().warning)),
+            ]),
+            Line::from(""),
+            Line::from(Span::styled("Recommendation / Note:", Style::default().fg(app.theme().text_muted))),
+            Line::from(Span::styled(&audit.note, Style::default().fg(app.theme().text_normal))),
+        ];
+
+        let detail_card = Paragraph::new(lines)
+            .wrap(ratatui::widgets::Wrap { trim: true })
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Recommendation Detail ")
+                    .border_style(Style::default().fg(app.theme().warning)),
+            );
+
+        frame.render_widget(detail_card, right_chunks[1]);
+    } else {
+        let empty_card = Paragraph::new("No item selected.").block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Recommendation Detail "),
+        );
+        frame.render_widget(empty_card, right_chunks[1]);
     }
 }
 
@@ -2894,13 +2933,9 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
             .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
             .split(area);
 
-        let left_area = chunks[0];
-        let right_area = chunks[1];
-
-        // Draw Left Table
         render_item_table(
             frame,
-            left_area,
+            chunks[0],
             app,
             format!(" {tool} — Audit Items ({}) ", items.len()),
             Style::default().fg(app.theme().warning),
@@ -2910,78 +2945,26 @@ fn render_audit_items(frame: &mut Frame, area: Rect, tool: &str, app: &App) {
             bottom_msg.as_deref(),
         );
 
-        // Draw Right Stats and Detail Panel
-        let right_chunks = Layout::default()
+        render_audit_detail_panels(frame, chunks[1], items, app.detail.selection, app, true);
+    } else if area.height >= 24 {
+        let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(5), Constraint::Min(1)])
-            .split(right_area);
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .split(area);
 
-        // Right Top: Alignment meter with LineGauge
-        let alignment_score = 100_usize.saturating_sub(items.len() * 20).clamp(0, 100) as u16;
-        let gauge_color = if alignment_score >= 80 {
-            app.theme().success
-        } else if alignment_score >= 50 {
-            app.theme().warning
-        } else {
-            app.theme().error
-        };
+        render_item_table(
+            frame,
+            chunks[0],
+            app,
+            format!(" {tool} — Audit Items ({}) ", items.len()),
+            Style::default().fg(app.theme().warning),
+            &["Name ", "Current ", "Note "],
+            &rows,
+            "audit",
+            bottom_msg.as_deref(),
+        );
 
-        let gauge = LineGauge::default()
-            .block(Block::default().title(" System Alignment Score "))
-            .filled_style(Style::default().fg(gauge_color))
-            .unfilled_style(Style::default().fg(app.theme().text_muted))
-            .ratio(alignment_score as f64 / 100.0);
-
-        frame.render_widget(gauge, right_chunks[0]);
-
-        // Right Bottom: Dynamic Recommendation Card
-        if let Some(audit) = items.get(app.detail.selection) {
-            let lines = vec![
-                Line::from(vec![
-                    Span::styled("Audit Rule: ", Style::default().fg(app.theme().text_muted)),
-                    Span::styled(
-                        &audit.name,
-                        Style::default()
-                            .fg(app.theme().text_normal)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                ]),
-                Line::from(vec![
-                    Span::styled(
-                        "Current State: ",
-                        Style::default().fg(app.theme().text_muted),
-                    ),
-                    Span::styled(&audit.current, Style::default().fg(app.theme().warning)),
-                ]),
-                Line::from(""),
-                Line::from(Span::styled(
-                    "Recommendation / Note:",
-                    Style::default().fg(app.theme().text_muted),
-                )),
-                Line::from(Span::styled(
-                    &audit.note,
-                    Style::default().fg(app.theme().text_normal),
-                )),
-            ];
-
-            let detail_card = Paragraph::new(lines)
-                .wrap(ratatui::widgets::Wrap { trim: true })
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title(" Recommendation Detail ")
-                        .border_style(Style::default().fg(app.theme().warning)),
-                );
-
-            frame.render_widget(detail_card, right_chunks[1]);
-        } else {
-            let empty_card = Paragraph::new("No item selected.").block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(" Recommendation Detail "),
-            );
-            frame.render_widget(empty_card, right_chunks[1]);
-        }
+        render_audit_detail_panels(frame, chunks[1], items, app.detail.selection, app, false);
     } else {
         // Fallback layout (narrow terminal)
         render_item_table(
@@ -3159,15 +3142,128 @@ fn render_supply_chain_risks(frame: &mut Frame, area: Rect, tool: &str, app: &Ap
         Some("  [E] Export Report  |  [Esc] Back ".to_string())
     };
 
-    render_item_table(
-        frame,
-        area,
-        app,
-        format!(" {tool} — Supply Chain Risks ({}) ", items.len()),
-        Style::default().fg(app.theme().warning),
-        &["Package ", "Risk Type ", "Description "],
-        &rows,
-        "supply_chain",
-        bottom_msg.as_deref(),
-    );
+    if area.width >= 100 && area.height >= 8 {
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .split(area);
+
+        render_item_table(
+            frame,
+            chunks[0],
+            app,
+            format!(" {tool} — Supply Chain Risks ({}) ", items.len()),
+            Style::default().fg(app.theme().warning),
+            &["Package ", "Risk Type ", "Description "],
+            &rows,
+            "supply_chain",
+            bottom_msg.as_deref(),
+        );
+
+        render_supply_chain_detail_panels(frame, chunks[1], items, app.detail.selection, app, true);
+    } else if area.height >= 24 {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .split(area);
+
+        render_item_table(
+            frame,
+            chunks[0],
+            app,
+            format!(" {tool} — Supply Chain Risks ({}) ", items.len()),
+            Style::default().fg(app.theme().warning),
+            &["Package ", "Risk Type ", "Description "],
+            &rows,
+            "supply_chain",
+            bottom_msg.as_deref(),
+        );
+
+        render_supply_chain_detail_panels(frame, chunks[1], items, app.detail.selection, app, false);
+    } else {
+        // Fallback layout (narrow terminal)
+        render_item_table(
+            frame,
+            area,
+            app,
+            format!(" {tool} — Supply Chain Risks ({}) ", items.len()),
+            Style::default().fg(app.theme().warning),
+            &["Package ", "Risk Type ", "Description "],
+            &rows,
+            "supply_chain",
+            bottom_msg.as_deref(),
+        );
+    }
+}
+
+fn render_supply_chain_detail_panels(
+    frame: &mut Frame,
+    area: Rect,
+    items: &[crate::toolchains::SupplyChainRisk],
+    selection: usize,
+    app: &App,
+    is_horizontal: bool,
+) {
+    let right_chunks = if is_horizontal {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(5), Constraint::Min(1)])
+            .split(area)
+    } else {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(area)
+    };
+
+    let risk_score = 100_usize.saturating_sub(items.len() * 15).clamp(0, 100) as u16;
+    let gauge_color = if risk_score >= 80 {
+        app.theme().success
+    } else if risk_score >= 50 {
+        app.theme().warning
+    } else {
+        app.theme().error
+    };
+
+    let gauge = LineGauge::default()
+        .block(Block::default().title(" Supply Chain Health Score "))
+        .filled_style(Style::default().fg(gauge_color))
+        .unfilled_style(Style::default().fg(app.theme().text_muted))
+        .ratio(risk_score as f64 / 100.0);
+
+    frame.render_widget(gauge, right_chunks[0]);
+
+    if let Some(risk) = items.get(selection) {
+        let lines = vec![
+            Line::from(vec![
+                Span::styled("Package: ", Style::default().fg(app.theme().text_muted)),
+                Span::styled(&risk.package, Style::default().fg(app.theme().text_normal).add_modifier(Modifier::BOLD)),
+            ]),
+            Line::from(vec![
+                Span::styled("Risk Type: ", Style::default().fg(app.theme().text_muted)),
+                Span::styled(&risk.risk_type, Style::default().fg(app.theme().warning)),
+            ]),
+            Line::from(""),
+            Line::from(Span::styled("Description:", Style::default().fg(app.theme().text_muted))),
+            Line::from(Span::styled(&risk.description, Style::default().fg(app.theme().text_normal))),
+        ];
+
+        let detail_card = Paragraph::new(lines)
+            .wrap(ratatui::widgets::Wrap { trim: true })
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Risk Detail ")
+                    .border_style(Style::default().fg(app.theme().warning)),
+            );
+
+        frame.render_widget(detail_card, right_chunks[1]);
+    } else {
+        let empty_card = Paragraph::new("No item selected.").block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Risk Detail "),
+        );
+        frame.render_widget(empty_card, right_chunks[1]);
+    }
 }
