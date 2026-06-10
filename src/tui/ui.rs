@@ -660,17 +660,17 @@ fn detail_table_constraints(width: u16, kind: &str) -> Vec<Constraint> {
             Constraint::Length(10),
         ],
         "security" if width < 84 => vec![
-            Constraint::Min(12),
-            Constraint::Length(8),
+            Constraint::Percentage(25),
+            Constraint::Length(9),
             Constraint::Length(11),
-            Constraint::Min(14),
-            Constraint::Length(10),
+            Constraint::Percentage(35),
+            Constraint::Length(11),
         ],
         "security" => vec![
-            Constraint::Min(16),
+            Constraint::Percentage(25),
             Constraint::Length(10),
             Constraint::Length(15),
-            Constraint::Min(20),
+            Constraint::Percentage(40),
             Constraint::Length(14),
         ],
         "audit" if width < 64 => vec![
@@ -2355,7 +2355,7 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         // Draw Right Stats and Detail Panel
         let right_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(7), Constraint::Min(1)])
+            .constraints([Constraint::Length(12), Constraint::Min(1)])
             .split(right_area);
 
         // Right Top: Scorecard with line gauge
@@ -2419,11 +2419,32 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
         if overview_inner.width > 0 && overview_inner.height > 0 {
             let metric_chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Length(2), Constraint::Length(2)])
+                .constraints([Constraint::Length(2), Constraint::Length(2), Constraint::Min(4)])
                 .split(overview_inner);
 
             frame.render_widget(gauge, metric_chunks[0]);
             frame.render_widget(Paragraph::new(overview_text), metric_chunks[1]);
+
+            let crit_label = format!("Critical ({crit})");
+            let high_label = format!("High ({high})");
+            let mod_label = format!("Moderate ({mod_cnt})");
+            let low_label = format!("Low ({other})");
+
+            let mut slices = Vec::new();
+            if crit > 0 { slices.push(PieSlice::new(&crit_label, crit as f64, app.theme().error)); }
+            if high > 0 { slices.push(PieSlice::new(&high_label, high as f64, Color::LightRed)); }
+            if mod_cnt > 0 { slices.push(PieSlice::new(&mod_label, mod_cnt as f64, app.theme().warning)); }
+            if other > 0 { slices.push(PieSlice::new(&low_label, other as f64, app.theme().secondary)); }
+            if slices.is_empty() { slices.push(PieSlice::new("None", 1.0, app.theme().success)); }
+            
+            let pie = PieChart::new(slices)
+                .resolution(Resolution::Braille)
+                .show_legend(overview_inner.width >= 30)
+                .legend_position(LegendPosition::Right)
+                .legend_alignment(LegendAlignment::Center)
+                .show_percentages(false);
+            
+            frame.render_widget(pie, metric_chunks[2]);
         }
 
         // Right Bottom: Dynamic Selection Card
@@ -2460,6 +2481,13 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
                     Span::styled(
                         &vuln.patched_version,
                         Style::default().fg(app.theme().success),
+                    ),
+                ]),
+                Line::from(vec![
+                    Span::styled("Dep Path: ", Style::default().fg(app.theme().text_muted)),
+                    Span::styled(
+                        if vuln.dependency_path.is_empty() { "Direct/Unknown".to_string() } else { vuln.dependency_path.join(" > ") },
+                        Style::default().fg(app.theme().primary),
                     ),
                 ]),
                 Line::from(""),
