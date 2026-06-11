@@ -2,11 +2,17 @@ import { createFileRoute } from "@tanstack/react-router"
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card"
-import { Terminal, ScrollText, Filter, Download } from "lucide-react"
+import { Terminal, ScrollText, Filter, Download, Search, Check, Circle, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useState, useMemo } from "react"
 
 export const Route = createFileRoute("/logs")({ component: LogsPage })
 
@@ -18,9 +24,22 @@ const mockLogs = [
   { time: "10:15:38", level: "ERROR", message: "Security vulnerability found in 'regex' crate: CVE-2022-24713", source: "rust" },
   { time: "10:15:39", level: "INFO", message: "Detected Python project. Scanning requirements.txt...", source: "python" },
   { time: "10:15:40", level: "INFO", message: "Scan completed successfully. Generated report.", source: "system" },
+  { time: "10:15:42", level: "DEBUG", message: "Cleaning up temporary files...", source: "system" },
+  { time: "10:16:01", level: "INFO", message: "File change detected in src/main.rs. Re-running scanner...", source: "watcher" },
 ]
 
 function LogsPage() {
+  const [filterLevel, setFilterLevel] = useState<string>("ALL")
+  const [search, setSearch] = useState("")
+
+  const filteredLogs = useMemo(() => {
+    return mockLogs.filter(log => {
+      const matchesLevel = filterLevel === "ALL" || log.level === filterLevel
+      const matchesSearch = log.message.toLowerCase().includes(search.toLowerCase()) || 
+                            log.source.toLowerCase().includes(search.toLowerCase())
+      return matchesLevel && matchesSearch
+    })
+  }, [filterLevel, search])
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
@@ -33,41 +52,92 @@ function LogsPage() {
             Real-time event logs and diagnostic output from the scanning engine.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2 bg-popover text-foreground border-border hover:bg-muted/50">
-            <Filter className="w-4 h-4" /> Filter
+        <div className="flex gap-3 w-full md:w-auto">
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/60" />
+            <Input 
+              type="text" 
+              placeholder="Search logs..." 
+              className="pl-9 bg-background/50 border-border focus-visible:ring-blue-500" 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="inline-flex h-10 px-4 py-2 items-center justify-between rounded-md border border-border bg-popover text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-32 gap-2">
+              <Filter className="w-4 h-4 text-muted-foreground" /> 
+              {filterLevel === "ALL" ? "All Levels" : filterLevel}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40 bg-popover border-border">
+              {["ALL", "INFO", "WARN", "ERROR", "DEBUG"].map((level) => (
+                <DropdownMenuItem key={level} onClick={() => setFilterLevel(level)} className="justify-between cursor-pointer focus:bg-muted/50">
+                  {level === "ALL" ? "All Levels" : level}
+                  {filterLevel === level && <Check className="w-4 h-4 text-blue-500" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button variant="outline" size="icon" className="bg-popover text-foreground border-border hover:bg-muted/50 hover:text-red-400" title="Clear Logs">
+            <Trash2 className="w-4 h-4" />
           </Button>
-          <Button variant="outline" className="gap-2 bg-popover text-foreground border-border hover:bg-muted/50">
-            <Download className="w-4 h-4" /> Export
+          <Button variant="outline" size="icon" className="bg-popover text-foreground border-border hover:bg-muted/50" title="Export Logs">
+            <Download className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
-      <Card className="bg-card/50 border-border backdrop-blur-xl">
-        <CardHeader className="flex flex-row items-center gap-2 border-b border-border/50 pb-4">
-          <Terminal className="w-5 h-5 text-muted-foreground/80" />
-          <CardTitle className="text-lg">Scanner Output</CardTitle>
-        </CardHeader>
+      <Card className="bg-[#0A0A0A] border-border/50 shadow-2xl overflow-hidden backdrop-blur-xl">
+        {/* MacOS Style Terminal Header */}
+        <div className="flex items-center px-4 py-3 bg-[#111111] border-b border-white/5">
+          <div className="flex gap-2">
+            <Circle className="w-3 h-3 fill-red-500 text-red-500" />
+            <Circle className="w-3 h-3 fill-yellow-500 text-yellow-500" />
+            <Circle className="w-3 h-3 fill-green-500 text-green-500" />
+          </div>
+          <div className="flex-1 flex justify-center items-center gap-2 text-neutral-400">
+            <Terminal className="w-4 h-4" />
+            <span className="text-xs font-mono font-medium">envexa-daemon — tail -f /var/log/envexa.log</span>
+          </div>
+        </div>
         <CardContent className="p-0">
-          <div className="bg-[#0D0D0D] font-mono text-sm p-4 h-[600px] overflow-y-auto rounded-b-lg">
-            {mockLogs.map((log, i) => (
-              <div key={i} className="flex gap-4 py-1 hover:bg-white/5 px-2 rounded">
-                <span className="text-muted-foreground/60 w-20 shrink-0">{log.time}</span>
-                <span className={`w-16 shrink-0 font-semibold ${
-                  log.level === 'INFO' ? 'text-blue-400' : 
-                  log.level === 'WARN' ? 'text-yellow-400' : 
-                  'text-red-400'
-                }`}>
-                  [{log.level}]
-                </span>
-                <span className="text-purple-400 w-16 shrink-0">[{log.source}]</span>
-                <span className="text-neutral-300 whitespace-pre-wrap break-all">{log.message}</span>
+          <div className="font-mono text-[13px] leading-relaxed p-4 h-[600px] overflow-y-auto">
+            {filteredLogs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-neutral-600">
+                <Filter className="w-10 h-10 mb-4 opacity-20" />
+                <p>No logs match the current filters.</p>
               </div>
-            ))}
-            <div className="flex gap-4 py-1 px-2">
-              <span className="text-muted-foreground/60 w-20 shrink-0">...</span>
-              <span className="text-green-400 font-semibold animate-pulse">Waiting for new events...</span>
-            </div>
+            ) : (
+              <>
+                {filteredLogs.map((log, i) => (
+                  <div key={i} className="flex gap-4 py-1.5 hover:bg-white/[0.03] px-2 rounded-md transition-colors group">
+                    <span className="text-neutral-500 w-20 shrink-0 select-none group-hover:text-neutral-400 transition-colors">{log.time}</span>
+                    <span className={`w-14 shrink-0 font-bold select-none ${
+                      log.level === 'INFO' ? 'text-[#3b82f6]' : 
+                      log.level === 'WARN' ? 'text-[#eab308]' : 
+                      log.level === 'DEBUG' ? 'text-[#8b5cf6]' :
+                      'text-[#ef4444]'
+                    }`}>
+                      {log.level.padEnd(5)}
+                    </span>
+                    <span className="text-neutral-400 w-20 shrink-0 select-none hidden sm:block truncate">[{log.source}]</span>
+                    <span className={`whitespace-pre-wrap break-words ${
+                      log.level === 'ERROR' ? 'text-red-200' :
+                      log.level === 'WARN' ? 'text-yellow-100/80' :
+                      'text-neutral-300'
+                    }`}>
+                      {log.message}
+                    </span>
+                  </div>
+                ))}
+                <div className="flex gap-4 py-3 px-2 mt-2 border-t border-white/[0.02]">
+                  <span className="text-neutral-600 w-20 shrink-0">...</span>
+                  <div className="flex items-center gap-2 text-emerald-500/80 font-medium">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Watching for incoming events
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>

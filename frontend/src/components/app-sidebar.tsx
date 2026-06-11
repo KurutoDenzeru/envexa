@@ -23,7 +23,7 @@ const navItems = [
 export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-border bg-card/50 backdrop-blur-xl">
-      <SidebarHeader className="p-4 flex flex-row items-center gap-2 text-foreground group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center">
+      <SidebarHeader className="h-14 border-b border-border p-4 flex flex-row items-center gap-2 text-foreground group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center">
         <Hexagon className="h-6 w-6 shrink-0 text-blue-500" />
         <span className="font-bold text-lg tracking-tight group-data-[collapsible=icon]:hidden">Envexa</span>
       </SidebarHeader>
@@ -31,7 +31,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel className="text-muted-foreground/60 group-data-[collapsible=icon]:hidden">Dashboards</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1">
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 
@@ -73,10 +73,17 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
-          <div className="w-2 h-2 shrink-0 rounded-full bg-green-500 animate-pulse"></div>
-          <span className="group-data-[collapsible=icon]:hidden">Scanner Service Active</span>
-        </div>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton 
+              tooltip="Scanner Service Active"
+              className="flex w-full items-center gap-3 transition-colors duration-200 group-data-[collapsible=icon]:justify-center cursor-default hover:bg-muted/50"
+            >
+              <div className="w-2 h-2 shrink-0 rounded-full bg-green-500 animate-pulse group-data-[collapsible=icon]:w-2.5 group-data-[collapsible=icon]:h-2.5"></div>
+              <span className="group-data-[collapsible=icon]:hidden text-foreground">Scanner Service Active</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   )
