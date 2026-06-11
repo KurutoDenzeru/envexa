@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router"
 import {
-  Card,
   CardContent,
 } from "@/components/ui/card"
-import { Terminal, ScrollText, Filter, Download, Search, Check, Circle, Trash2 } from "lucide-react"
+import { Terminal, ScrollText, Filter, Download, Search, Check, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -64,9 +63,11 @@ function LogsPage() {
             />
           </div>
           <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex h-9 px-4 py-2 items-center justify-between rounded-md border border-border bg-popover text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-32 gap-2">
-              <Filter className="w-4 h-4 text-muted-foreground" /> 
-              {filterLevel === "ALL" ? "All Levels" : filterLevel}
+            <DropdownMenuTrigger className="inline-flex h-9 px-3 items-center justify-between rounded-md border border-border bg-popover text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring shadow-xs w-32 gap-2 cursor-pointer select-none">
+              <span className="flex items-center gap-2 truncate">
+                <Filter className="w-4 h-4 text-muted-foreground shrink-0" /> 
+                <span className="truncate">{filterLevel === "ALL" ? "All Levels" : filterLevel}</span>
+              </span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40 bg-popover border-border">
               {["ALL", "INFO", "WARN", "ERROR", "DEBUG"].map((level) => (
@@ -77,65 +78,88 @@ function LogsPage() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button variant="outline" size="icon" className="bg-popover text-foreground border-border hover:bg-muted/50 hover:text-red-400" title="Clear Logs">
+          <Button variant="outline" size="icon" className="bg-popover text-foreground border-border hover:bg-muted/50 hover:text-red-400 h-9 w-9 shadow-xs" title="Clear Logs">
             <Trash2 className="w-4 h-4" />
           </Button>
-          <Button variant="outline" size="icon" className="bg-popover text-foreground border-border hover:bg-muted/50" title="Export Logs">
+          <Button variant="outline" size="icon" className="bg-popover text-foreground border-border hover:bg-muted/50 h-9 w-9 shadow-xs" title="Export Logs">
             <Download className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
-      <Card className="bg-card border-border shadow-xs overflow-hidden backdrop-blur-xl">
-        {/* Sleek Terminal Header */}
-        <div className="flex items-center px-4 py-3 bg-muted/30 border-b border-border">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Terminal className="w-4 h-4" />
-            <span className="text-xs font-mono font-medium tracking-wider uppercase">System Console</span>
+      <div className="bg-[#0c0c0e] border border-zinc-800 shadow-2xl rounded-xl overflow-hidden font-mono">
+        {/* Authentic macOS Terminal Title Bar */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-[#18181b] border-b border-zinc-800/80 select-none">
+          {/* macOS window control buttons */}
+          <div className="flex items-center gap-2 w-20">
+            <span className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e] cursor-pointer hover:opacity-85 transition-opacity"></span>
+            <span className="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dab12d] cursor-pointer hover:opacity-85 transition-opacity"></span>
+            <span className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29] cursor-pointer hover:opacity-85 transition-opacity"></span>
+          </div>
+          {/* Center Monospace Session Title */}
+          <div className="flex items-center gap-1.5 text-xs font-sans font-medium text-zinc-400 tracking-wide">
+            <Terminal className="w-3.5 h-3.5 text-zinc-500" />
+            <span>envexa-system — logs — 80×24</span>
+          </div>
+          {/* Right indicator for balance */}
+          <div className="w-20 text-right text-[10px] text-zinc-600 font-mono tracking-wider">
+            bash
           </div>
         </div>
+
         <CardContent className="p-0">
-          <div className="font-mono text-[13px] leading-relaxed p-4 h-[600px] overflow-y-auto">
+          <div className="font-mono text-[13px] leading-relaxed p-4 h-[600px] overflow-y-auto bg-[#0c0c0e] text-zinc-100 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
             {filteredLogs.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                <Filter className="w-10 h-10 mb-4 opacity-20" />
-                <p>No logs match the current filters.</p>
+              <div className="flex flex-col items-center justify-center h-full text-zinc-500">
+                <Filter className="w-10 h-10 mb-4 opacity-20 text-zinc-400" />
+                <p className="font-sans text-sm">No logs match the current filters.</p>
               </div>
             ) : (
               <>
-                {filteredLogs.map((log, i) => (
-                  <div key={i} className="flex gap-4 py-1.5 hover:bg-muted/50 px-2 rounded-md transition-colors group">
-                    <span className="text-muted-foreground w-20 shrink-0 select-none group-hover:text-foreground transition-colors">{log.time}</span>
-                    <span className={`w-14 shrink-0 font-bold select-none ${
-                      log.level === 'INFO' ? 'text-blue-500' : 
-                      log.level === 'WARN' ? 'text-yellow-500' : 
-                      log.level === 'DEBUG' ? 'text-purple-500' :
-                      'text-red-500'
-                    }`}>
-                      {log.level.padEnd(5)}
-                    </span>
-                    <span className="text-muted-foreground w-20 shrink-0 select-none hidden sm:block truncate">[{log.source}]</span>
-                    <span className={`whitespace-pre-wrap break-words ${
-                      log.level === 'ERROR' ? 'text-red-500' :
-                      log.level === 'WARN' ? 'text-yellow-600' :
-                      'text-foreground'
-                    }`}>
-                      {log.message}
-                    </span>
-                  </div>
-                ))}
-                <div className="flex gap-4 py-3 px-2 mt-2 border-t border-border">
-                  <span className="text-muted-foreground w-20 shrink-0">...</span>
-                  <div className="flex items-center gap-2 text-green-500 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                    Watching for incoming events
+                {filteredLogs.map((log, i) => {
+                  const sourceColors: Record<string, string> = {
+                    rust: "text-[#ff7b72]",
+                    node: "text-[#7ee787]",
+                    python: "text-[#79c0ff]",
+                    system: "text-[#a5d6ff]",
+                    watcher: "text-[#d2a8ff]",
+                  }
+                  const sourceColor = sourceColors[log.source.toLowerCase()] || "text-zinc-500"
+                  return (
+                    <div key={i} className="flex gap-4 py-1.5 hover:bg-zinc-900/60 px-2 rounded transition-colors group">
+                      <span className="text-zinc-500 w-20 shrink-0 select-none group-hover:text-zinc-400 transition-colors font-mono">{log.time}</span>
+                      <span className={`w-14 shrink-0 font-bold select-none font-mono ${
+                        log.level === 'INFO' ? 'text-[#57ab5a]' : 
+                        log.level === 'WARN' ? 'text-[#e5c07b]' : 
+                        log.level === 'DEBUG' ? 'text-[#b392f0]' :
+                        'text-[#f85149]'
+                      }`}>
+                        {log.level.padEnd(5)}
+                      </span>
+                      <span className={`w-20 shrink-0 select-none hidden sm:block truncate font-mono ${sourceColor}`}>[{log.source}]</span>
+                      <span className={`whitespace-pre-wrap break-words font-mono ${
+                        log.level === 'ERROR' ? 'text-[#f85149] font-medium' :
+                        log.level === 'WARN' ? 'text-[#e5c07b]' :
+                        'text-zinc-200'
+                      }`}>
+                        {log.message}
+                      </span>
+                    </div>
+                  )
+                })}
+                <div className="flex gap-4 py-3 px-2 mt-2 border-t border-zinc-800/80">
+                  <span className="text-zinc-500 w-20 shrink-0 font-mono">...</span>
+                  <div className="flex items-center gap-2 text-emerald-400 font-medium font-mono">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span>envexa-daemon: watching incoming events</span>
+                    <span className="inline-block w-1.5 h-4 bg-emerald-400 animate-pulse ml-0.5"></span>
                   </div>
                 </div>
               </>
             )}
           </div>
         </CardContent>
-      </Card>
+      </div>
     </div>
   )
 }

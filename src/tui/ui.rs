@@ -882,7 +882,9 @@ fn render_project_tooling_panel(
     let project_status = project.map(|res| res.status.as_str()).unwrap_or("skipped");
     let security_status = security.map(|res| res.status.as_str()).unwrap_or("skipped");
     let audit_status = audit.map(|res| res.status.as_str()).unwrap_or("skipped");
-    let supply_chain_status = supply_chain.map(|res| res.status.as_str()).unwrap_or("skipped");
+    let supply_chain_status = supply_chain
+        .map(|res| res.status.as_str())
+        .unwrap_or("skipped");
 
     let vulnerabilities = security
         .map(|res| res.vulnerabilities.as_slice())
@@ -890,7 +892,9 @@ fn render_project_tooling_panel(
     let (critical, high, moderate, other) = severity_counts(vulnerabilities);
     let vuln_count = vulnerabilities.len();
     let audit_count = audit.map(|res| res.audit_items.len()).unwrap_or(0);
-    let risks = supply_chain.map(|res| res.supply_chain_risks.len()).unwrap_or(0);
+    let risks = supply_chain
+        .map(|res| res.supply_chain_risks.len())
+        .unwrap_or(0);
     let risk = project_tooling_risk(
         project_outdated,
         critical,
@@ -1520,9 +1524,21 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         state.select(Some(app.ui.outdated_selection));
         frame.render_stateful_widget(table, left_area, &mut state);
 
-        let out_items: Vec<crate::scanner::OutdatedItem> = items.iter().map(|(_, pkg)| pkg.clone()).collect();
-        let tool_name = items.get(app.ui.outdated_selection).map(|(t, _)| t.as_str()).unwrap_or("Unknown");
-        render_outdated_detail_panels(frame, right_area, tool_name, &out_items, app.ui.outdated_selection, app, true);
+        let out_items: Vec<crate::scanner::OutdatedItem> =
+            items.iter().map(|(_, pkg)| pkg.clone()).collect();
+        let tool_name = items
+            .get(app.ui.outdated_selection)
+            .map(|(t, _)| t.as_str())
+            .unwrap_or("Unknown");
+        render_outdated_detail_panels(
+            frame,
+            right_area,
+            tool_name,
+            &out_items,
+            app.ui.outdated_selection,
+            app,
+            true,
+        );
     } else if area.height >= 24 {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -1543,9 +1559,21 @@ fn render_outdated(frame: &mut Frame, area: Rect, app: &App) {
         state.select(Some(app.ui.outdated_selection));
         frame.render_stateful_widget(table, chunks[0], &mut state);
 
-        let out_items: Vec<crate::scanner::OutdatedItem> = items.iter().map(|(_, pkg)| pkg.clone()).collect();
-        let tool_name = items.get(app.ui.outdated_selection).map(|(t, _)| t.as_str()).unwrap_or("Unknown");
-        render_outdated_detail_panels(frame, chunks[1], tool_name, &out_items, app.ui.outdated_selection, app, false);
+        let out_items: Vec<crate::scanner::OutdatedItem> =
+            items.iter().map(|(_, pkg)| pkg.clone()).collect();
+        let tool_name = items
+            .get(app.ui.outdated_selection)
+            .map(|(t, _)| t.as_str())
+            .unwrap_or("Unknown");
+        render_outdated_detail_panels(
+            frame,
+            chunks[1],
+            tool_name,
+            &out_items,
+            app.ui.outdated_selection,
+            app,
+            false,
+        );
     } else {
         let table = Table::new(rows, outdated_table_constraints(area.width))
             .header(header)
@@ -2277,8 +2305,12 @@ fn update_type_counts(items: &[crate::scanner::OutdatedItem]) -> (usize, usize, 
     let mut unknown = 0;
 
     for item in items {
-        let cur = item.current.trim_start_matches(|c: char| !c.is_ascii_digit());
-        let lat = item.latest.trim_start_matches(|c: char| !c.is_ascii_digit());
+        let cur = item
+            .current
+            .trim_start_matches(|c: char| !c.is_ascii_digit());
+        let lat = item
+            .latest
+            .trim_start_matches(|c: char| !c.is_ascii_digit());
         let cur_parts: Vec<&str> = cur.split(['.', '-', '+']).collect();
         let lat_parts: Vec<&str> = lat.split(['.', '-', '+']).collect();
 
@@ -2320,13 +2352,33 @@ fn render_outdated_detail_panels(
 
     let overview_text = vec![Line::from(vec![
         Span::styled("Major: ", Style::default().fg(app.theme().text_muted)),
-        Span::styled(format!("{} ", maj), Style::default().fg(app.theme().error).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{} ", maj),
+            Style::default()
+                .fg(app.theme().error)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" Minor: ", Style::default().fg(app.theme().text_muted)),
-        Span::styled(format!("{} ", min), Style::default().fg(app.theme().warning).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{} ", min),
+            Style::default()
+                .fg(app.theme().warning)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" Patch: ", Style::default().fg(app.theme().text_muted)),
-        Span::styled(format!("{} ", pat), Style::default().fg(Color::LightCyan).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{} ", pat),
+            Style::default()
+                .fg(Color::LightCyan)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" Other: ", Style::default().fg(app.theme().text_muted)),
-        Span::styled(format!("{} ", unk), Style::default().fg(app.theme().secondary).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{} ", unk),
+            Style::default()
+                .fg(app.theme().secondary)
+                .add_modifier(Modifier::BOLD),
+        ),
     ])];
 
     let overview_block = Block::default()
@@ -2351,19 +2403,29 @@ fn render_outdated_detail_panels(
         let unk_label = format!("Other ({unk})");
 
         let mut slices = Vec::new();
-        if maj > 0 { slices.push(PieSlice::new(&maj_label, maj as f64, app.theme().error)); }
-        if min > 0 { slices.push(PieSlice::new(&min_label, min as f64, app.theme().warning)); }
-        if pat > 0 { slices.push(PieSlice::new(&pat_label, pat as f64, Color::LightCyan)); }
-        if unk > 0 { slices.push(PieSlice::new(&unk_label, unk as f64, app.theme().secondary)); }
-        if slices.is_empty() { slices.push(PieSlice::new("None", 1.0, app.theme().success)); }
-        
+        if maj > 0 {
+            slices.push(PieSlice::new(&maj_label, maj as f64, app.theme().error));
+        }
+        if min > 0 {
+            slices.push(PieSlice::new(&min_label, min as f64, app.theme().warning));
+        }
+        if pat > 0 {
+            slices.push(PieSlice::new(&pat_label, pat as f64, Color::LightCyan));
+        }
+        if unk > 0 {
+            slices.push(PieSlice::new(&unk_label, unk as f64, app.theme().secondary));
+        }
+        if slices.is_empty() {
+            slices.push(PieSlice::new("None", 1.0, app.theme().success));
+        }
+
         let pie = PieChart::new(slices)
             .resolution(Resolution::Braille)
             .show_legend(overview_inner.width >= 30)
             .legend_position(LegendPosition::Right)
             .legend_alignment(LegendAlignment::Center)
             .show_percentages(false);
-        
+
         frame.render_widget(pie, metric_chunks[1]);
     }
 
@@ -2378,7 +2440,12 @@ fn render_outdated_detail_panels(
         let lines = vec![
             Line::from(vec![
                 Span::styled("Package: ", Style::default().fg(app.theme().text_muted)),
-                Span::styled(&item.name, Style::default().fg(app.theme().text_normal).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    &item.name,
+                    Style::default()
+                        .fg(app.theme().text_normal)
+                        .add_modifier(Modifier::BOLD),
+                ),
             ]),
             Line::from(vec![
                 Span::styled("Source: ", Style::default().fg(app.theme().text_muted)),
@@ -2397,8 +2464,14 @@ fn render_outdated_detail_panels(
                 Span::styled(&item.size, Style::default().fg(app.theme().secondary)),
             ]),
             Line::from(""),
-            Line::from(Span::styled("Quick Update Command:", Style::default().fg(app.theme().text_muted))),
-            Line::from(Span::styled(update_cmd, Style::default().fg(app.theme().primary))),
+            Line::from(Span::styled(
+                "Quick Update Command:",
+                Style::default().fg(app.theme().text_muted),
+            )),
+            Line::from(Span::styled(
+                update_cmd,
+                Style::default().fg(app.theme().primary),
+            )),
         ];
 
         let detail_card = Paragraph::new(lines)
@@ -2502,7 +2575,15 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             sub.as_deref(),
         );
 
-        render_outdated_detail_panels(frame, chunks[1], tool, items, app.detail.selection, app, true);
+        render_outdated_detail_panels(
+            frame,
+            chunks[1],
+            tool,
+            items,
+            app.detail.selection,
+            app,
+            true,
+        );
     } else if area.height >= 24 {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -2521,7 +2602,15 @@ fn render_outdated_detail(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             sub.as_deref(),
         );
 
-        render_outdated_detail_panels(frame, chunks[1], tool, items, app.detail.selection, app, false);
+        render_outdated_detail_panels(
+            frame,
+            chunks[1],
+            tool,
+            items,
+            app.detail.selection,
+            app,
+            false,
+        );
     } else {
         render_item_table(
             frame,
@@ -2577,13 +2666,33 @@ fn render_vulnerability_detail_panels(
 
     let overview_text = vec![Line::from(vec![
         Span::styled("Critical: ", Style::default().fg(app.theme().text_muted)),
-        Span::styled(format!("{} ", crit), Style::default().fg(app.theme().error).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{} ", crit),
+            Style::default()
+                .fg(app.theme().error)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" High: ", Style::default().fg(app.theme().text_muted)),
-        Span::styled(format!("{} ", high), Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{} ", high),
+            Style::default()
+                .fg(Color::LightRed)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" Mod: ", Style::default().fg(app.theme().text_muted)),
-        Span::styled(format!("{} ", mod_cnt), Style::default().fg(app.theme().warning).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{} ", mod_cnt),
+            Style::default()
+                .fg(app.theme().warning)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" Low: ", Style::default().fg(app.theme().text_muted)),
-        Span::styled(format!("{} ", other), Style::default().fg(app.theme().secondary).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("{} ", other),
+            Style::default()
+                .fg(app.theme().secondary)
+                .add_modifier(Modifier::BOLD),
+        ),
     ])];
 
     let overview_block = Block::default()
@@ -2597,7 +2706,11 @@ fn render_vulnerability_detail_panels(
     if overview_inner.width > 0 && overview_inner.height > 0 {
         let metric_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(2), Constraint::Length(2), Constraint::Min(4)])
+            .constraints([
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Min(4),
+            ])
             .split(overview_inner);
 
         frame.render_widget(gauge, metric_chunks[0]);
@@ -2609,19 +2722,37 @@ fn render_vulnerability_detail_panels(
         let low_label = format!("Low ({other})");
 
         let mut slices = Vec::new();
-        if crit > 0 { slices.push(PieSlice::new(&crit_label, crit as f64, app.theme().error)); }
-        if high > 0 { slices.push(PieSlice::new(&high_label, high as f64, Color::LightRed)); }
-        if mod_cnt > 0 { slices.push(PieSlice::new(&mod_label, mod_cnt as f64, app.theme().warning)); }
-        if other > 0 { slices.push(PieSlice::new(&low_label, other as f64, app.theme().secondary)); }
-        if slices.is_empty() { slices.push(PieSlice::new("None", 1.0, app.theme().success)); }
-        
+        if crit > 0 {
+            slices.push(PieSlice::new(&crit_label, crit as f64, app.theme().error));
+        }
+        if high > 0 {
+            slices.push(PieSlice::new(&high_label, high as f64, Color::LightRed));
+        }
+        if mod_cnt > 0 {
+            slices.push(PieSlice::new(
+                &mod_label,
+                mod_cnt as f64,
+                app.theme().warning,
+            ));
+        }
+        if other > 0 {
+            slices.push(PieSlice::new(
+                &low_label,
+                other as f64,
+                app.theme().secondary,
+            ));
+        }
+        if slices.is_empty() {
+            slices.push(PieSlice::new("None", 1.0, app.theme().success));
+        }
+
         let pie = PieChart::new(slices)
             .resolution(Resolution::Braille)
             .show_legend(overview_inner.width >= 30)
             .legend_position(LegendPosition::Right)
             .legend_alignment(LegendAlignment::Center)
             .show_percentages(false);
-        
+
         frame.render_widget(pie, metric_chunks[2]);
     }
 
@@ -2638,7 +2769,12 @@ fn render_vulnerability_detail_panels(
         let lines = vec![
             Line::from(vec![
                 Span::styled("Package: ", Style::default().fg(app.theme().text_muted)),
-                Span::styled(&vuln.package, Style::default().fg(app.theme().text_normal).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    &vuln.package,
+                    Style::default()
+                        .fg(app.theme().text_normal)
+                        .add_modifier(Modifier::BOLD),
+                ),
             ]),
             Line::from(vec![
                 Span::styled("Severity: ", Style::default().fg(app.theme().text_muted)),
@@ -2650,18 +2786,31 @@ fn render_vulnerability_detail_panels(
             ]),
             Line::from(vec![
                 Span::styled("Patched: ", Style::default().fg(app.theme().text_muted)),
-                Span::styled(&vuln.patched_version, Style::default().fg(app.theme().success)),
+                Span::styled(
+                    &vuln.patched_version,
+                    Style::default().fg(app.theme().success),
+                ),
             ]),
             Line::from(vec![
                 Span::styled("Dep Path: ", Style::default().fg(app.theme().text_muted)),
                 Span::styled(
-                    if vuln.dependency_path.is_empty() { "Direct/Unknown".to_string() } else { vuln.dependency_path.join(" > ") },
+                    if vuln.dependency_path.is_empty() {
+                        "Direct/Unknown".to_string()
+                    } else {
+                        vuln.dependency_path.join(" > ")
+                    },
                     Style::default().fg(app.theme().primary),
                 ),
             ]),
             Line::from(""),
-            Line::from(Span::styled("Title / Description:", Style::default().fg(app.theme().text_muted))),
-            Line::from(Span::styled(&vuln.title, Style::default().fg(app.theme().text_normal))),
+            Line::from(Span::styled(
+                "Title / Description:",
+                Style::default().fg(app.theme().text_muted),
+            )),
+            Line::from(Span::styled(
+                &vuln.title,
+                Style::default().fg(app.theme().text_normal),
+            )),
         ];
 
         let detail_card = Paragraph::new(lines)
@@ -2762,7 +2911,14 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             bottom_msg.as_deref(),
         );
 
-        render_vulnerability_detail_panels(frame, chunks[1], items, app.detail.selection, app, true);
+        render_vulnerability_detail_panels(
+            frame,
+            chunks[1],
+            items,
+            app.detail.selection,
+            app,
+            true,
+        );
     } else if area.height >= 24 {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -2781,7 +2937,14 @@ fn render_vulnerabilities(frame: &mut Frame, area: Rect, tool: &str, app: &App) 
             bottom_msg.as_deref(),
         );
 
-        render_vulnerability_detail_panels(frame, chunks[1], items, app.detail.selection, app, false);
+        render_vulnerability_detail_panels(
+            frame,
+            chunks[1],
+            items,
+            app.detail.selection,
+            app,
+            false,
+        );
     } else {
         // Fallback layout (narrow terminal)
         render_item_table(
@@ -2839,15 +3002,29 @@ fn render_audit_detail_panels(
         let lines = vec![
             Line::from(vec![
                 Span::styled("Audit Rule: ", Style::default().fg(app.theme().text_muted)),
-                Span::styled(&audit.name, Style::default().fg(app.theme().text_normal).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    &audit.name,
+                    Style::default()
+                        .fg(app.theme().text_normal)
+                        .add_modifier(Modifier::BOLD),
+                ),
             ]),
             Line::from(vec![
-                Span::styled("Current State: ", Style::default().fg(app.theme().text_muted)),
+                Span::styled(
+                    "Current State: ",
+                    Style::default().fg(app.theme().text_muted),
+                ),
                 Span::styled(&audit.current, Style::default().fg(app.theme().warning)),
             ]),
             Line::from(""),
-            Line::from(Span::styled("Recommendation / Note:", Style::default().fg(app.theme().text_muted))),
-            Line::from(Span::styled(&audit.note, Style::default().fg(app.theme().text_normal))),
+            Line::from(Span::styled(
+                "Recommendation / Note:",
+                Style::default().fg(app.theme().text_muted),
+            )),
+            Line::from(Span::styled(
+                &audit.note,
+                Style::default().fg(app.theme().text_normal),
+            )),
         ];
 
         let detail_card = Paragraph::new(lines)
@@ -3179,7 +3356,14 @@ fn render_supply_chain_risks(frame: &mut Frame, area: Rect, tool: &str, app: &Ap
             bottom_msg.as_deref(),
         );
 
-        render_supply_chain_detail_panels(frame, chunks[1], items, app.detail.selection, app, false);
+        render_supply_chain_detail_panels(
+            frame,
+            chunks[1],
+            items,
+            app.detail.selection,
+            app,
+            false,
+        );
     } else {
         // Fallback layout (narrow terminal)
         render_item_table(
@@ -3237,15 +3421,26 @@ fn render_supply_chain_detail_panels(
         let lines = vec![
             Line::from(vec![
                 Span::styled("Package: ", Style::default().fg(app.theme().text_muted)),
-                Span::styled(&risk.package, Style::default().fg(app.theme().text_normal).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    &risk.package,
+                    Style::default()
+                        .fg(app.theme().text_normal)
+                        .add_modifier(Modifier::BOLD),
+                ),
             ]),
             Line::from(vec![
                 Span::styled("Risk Type: ", Style::default().fg(app.theme().text_muted)),
                 Span::styled(&risk.risk_type, Style::default().fg(app.theme().warning)),
             ]),
             Line::from(""),
-            Line::from(Span::styled("Description:", Style::default().fg(app.theme().text_muted))),
-            Line::from(Span::styled(&risk.description, Style::default().fg(app.theme().text_normal))),
+            Line::from(Span::styled(
+                "Description:",
+                Style::default().fg(app.theme().text_muted),
+            )),
+            Line::from(Span::styled(
+                &risk.description,
+                Style::default().fg(app.theme().text_normal),
+            )),
         ];
 
         let detail_card = Paragraph::new(lines)

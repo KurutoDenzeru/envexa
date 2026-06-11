@@ -18,7 +18,7 @@ pub async fn start(port: u16) {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     println!("Web Dashboard serving at http://localhost:{}", port);
-    
+
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }

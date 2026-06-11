@@ -55,7 +55,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-2 group-data-[collapsible=icon]:!p-2 border-t border-border text-xs text-muted-foreground/60 space-y-2">
+      <SidebarFooter className="p-2 group-data-[collapsible=icon]:!p-2 border-t border-border text-xs text-muted-foreground/60 flex flex-col gap-1">
         <SidebarMenu className="gap-1">
           <SidebarMenuItem>
             <SidebarMenuButton 
@@ -74,7 +74,7 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <Separator className="bg-border/50 my-1" />
+        <Separator className="bg-border/50 my-0.5" />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton 

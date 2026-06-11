@@ -165,8 +165,21 @@ pub fn tool_categories() -> [ToolCategory; 3] {
 
 pub fn tool_order() -> [&'static str; 15] {
     [
-        "brew", "npm", "pnpm", "yarn", "bun", "deno", "pip", "gem", "cargo", "docker", "project",
-        "security", "supply_chain", "audit", "ci",
+        "brew",
+        "npm",
+        "pnpm",
+        "yarn",
+        "bun",
+        "deno",
+        "pip",
+        "gem",
+        "cargo",
+        "docker",
+        "project",
+        "security",
+        "supply_chain",
+        "audit",
+        "ci",
     ]
 }
 
