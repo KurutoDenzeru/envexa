@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Home, ShieldAlert, Boxes, Settings, Hexagon, ScrollText } from "lucide-react"
 import { Link } from "@tanstack/react-router"
+import { Separator } from "@/components/ui/separator"
 
 const navItems = [
   { title: "Overview", url: "/", icon: Home },
@@ -24,7 +25,7 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-border bg-card/50 backdrop-blur-xl">
       <SidebarHeader className="h-14 border-b border-border p-4 flex flex-row items-center gap-2 text-foreground group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center">
-        <Hexagon className="h-6 w-6 shrink-0 text-blue-500" />
+        <Hexagon className="h-6 w-6 shrink-0 text-foreground" />
         <span className="font-bold text-lg tracking-tight group-data-[collapsible=icon]:hidden">Envexa</span>
       </SidebarHeader>
       <SidebarContent>
@@ -73,6 +74,7 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <Separator className="bg-border/50" />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton 

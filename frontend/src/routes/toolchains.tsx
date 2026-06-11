@@ -66,8 +66,8 @@ function Toolchains() {
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent flex items-center gap-3">
-            <Boxes className="w-8 h-8 text-blue-500" />
+          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+            <Boxes className="w-8 h-8 text-foreground" />
             Environment Toolchains
           </h1>
           <p className="text-muted-foreground mt-2">
@@ -87,11 +87,11 @@ function Toolchains() {
             const healthScore = Math.max(0, 100 - (tc.vulnCount * 15) - (tc.outdatedCount * 5))
             
             return (
-              <Card key={idx} className="bg-gradient-to-br from-neutral-900 to-neutral-950 border-border/50 shadow-xl hover:border-border transition-all duration-300">
-                <CardHeader className="pb-4">
+              <Card key={idx} className="bg-card border-border shadow-md hover:border-border/80 transition-all duration-300">
+                <CardHeader className="border-b border-border/50 pb-4 bg-muted/30">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-2xl capitalize text-foreground flex items-center gap-2">
-                      <Boxes className="w-5 h-5 text-muted-foreground/60" />
+                      <Boxes className="w-5 h-5 text-muted-foreground" />
                       {tc.name}
                     </CardTitle>
                     {tc.vulnCount > 0 ? (

@@ -153,7 +153,7 @@ export default function App() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <RefreshCw className="w-10 h-10 animate-spin text-blue-500/50" />
+              <RefreshCw className="w-10 h-10 animate-spin text-muted-foreground/50" />
               <Skeleton className="h-4 w-48 bg-muted" />
             </div>
           </CardContent>
@@ -165,7 +165,7 @@ export default function App() {
   if (!report) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
-        <ShieldAlert className="w-12 h-12 text-red-500" />
+        <ShieldAlert className="w-12 h-12 text-muted-foreground" />
         <h2 className="text-xl font-medium tracking-tight">Failed to load environment report</h2>
         <button onClick={fetchReport} className="text-sm bg-muted hover:bg-primary/20 px-4 py-2 rounded-md transition-colors">
           Retry Scan
@@ -180,11 +180,11 @@ export default function App() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-white to-neutral-400 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
             Workspace Overview
           </h1>
           <p className="text-muted-foreground mt-2 flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-green-500" />
+            <CheckCircle className="w-4 h-4 text-muted-foreground" />
             Project scanned at {new Date().toLocaleTimeString()}
           </p>
         </div>
@@ -199,10 +199,10 @@ export default function App() {
 
       {/* Top Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-gradient-to-br from-neutral-900 to-neutral-950 border-border/50 shadow-xl">
+        <Card className="bg-card border-border shadow-sm hover:border-border/80 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">System Health</CardTitle>
-            <Activity className="w-4 h-4 text-green-400" />
+            <Activity className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-foreground mb-2">{healthScore}%</div>
@@ -211,10 +211,10 @@ export default function App() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-neutral-900 to-neutral-950 border-border/50 shadow-xl">
+        <Card className="bg-card border-border shadow-sm hover:border-border/80 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Vulnerabilities</CardTitle>
-            <ShieldAlert className={vulnCount > 0 ? "w-4 h-4 text-red-400" : "w-4 h-4 text-neutral-600"} />
+            <ShieldAlert className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-foreground">{vulnCount}</div>
@@ -222,10 +222,10 @@ export default function App() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-neutral-900 to-neutral-950 border-border/50 shadow-xl">
+        <Card className="bg-card border-border shadow-sm hover:border-border/80 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Outdated Packages</CardTitle>
-            <Box className="w-4 h-4 text-blue-400" />
+            <Box className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-foreground">{outCount}</div>

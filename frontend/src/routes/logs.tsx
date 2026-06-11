@@ -45,7 +45,7 @@ function LogsPage() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent flex items-center gap-3">
-            <ScrollText className="w-8 h-8 text-blue-500" />
+            <ScrollText className="w-8 h-8 text-foreground" />
             System Logs
           </h1>
           <p className="text-muted-foreground mt-2">
@@ -86,15 +86,15 @@ function LogsPage() {
         </div>
       </div>
 
-      <Card className="bg-[#0A0A0A] border-border/50 shadow-2xl overflow-hidden backdrop-blur-xl">
+      <Card className="bg-card border-border shadow-sm overflow-hidden backdrop-blur-xl">
         {/* MacOS Style Terminal Header */}
-        <div className="flex items-center px-4 py-3 bg-[#111111] border-b border-white/5">
+        <div className="flex items-center px-4 py-3 bg-muted/50 border-b border-border">
           <div className="flex gap-2">
             <Circle className="w-3 h-3 fill-red-500 text-red-500" />
             <Circle className="w-3 h-3 fill-yellow-500 text-yellow-500" />
             <Circle className="w-3 h-3 fill-green-500 text-green-500" />
           </div>
-          <div className="flex-1 flex justify-center items-center gap-2 text-neutral-400">
+          <div className="flex-1 flex justify-center items-center gap-2 text-muted-foreground">
             <Terminal className="w-4 h-4" />
             <span className="text-xs font-mono font-medium">envexa-daemon — tail -f /var/log/envexa.log</span>
           </div>
@@ -102,37 +102,37 @@ function LogsPage() {
         <CardContent className="p-0">
           <div className="font-mono text-[13px] leading-relaxed p-4 h-[600px] overflow-y-auto">
             {filteredLogs.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-neutral-600">
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                 <Filter className="w-10 h-10 mb-4 opacity-20" />
                 <p>No logs match the current filters.</p>
               </div>
             ) : (
               <>
                 {filteredLogs.map((log, i) => (
-                  <div key={i} className="flex gap-4 py-1.5 hover:bg-white/[0.03] px-2 rounded-md transition-colors group">
-                    <span className="text-neutral-500 w-20 shrink-0 select-none group-hover:text-neutral-400 transition-colors">{log.time}</span>
+                  <div key={i} className="flex gap-4 py-1.5 hover:bg-muted/50 px-2 rounded-md transition-colors group">
+                    <span className="text-muted-foreground w-20 shrink-0 select-none group-hover:text-foreground transition-colors">{log.time}</span>
                     <span className={`w-14 shrink-0 font-bold select-none ${
-                      log.level === 'INFO' ? 'text-[#3b82f6]' : 
-                      log.level === 'WARN' ? 'text-[#eab308]' : 
-                      log.level === 'DEBUG' ? 'text-[#8b5cf6]' :
-                      'text-[#ef4444]'
+                      log.level === 'INFO' ? 'text-blue-500' : 
+                      log.level === 'WARN' ? 'text-yellow-500' : 
+                      log.level === 'DEBUG' ? 'text-purple-500' :
+                      'text-red-500'
                     }`}>
                       {log.level.padEnd(5)}
                     </span>
-                    <span className="text-neutral-400 w-20 shrink-0 select-none hidden sm:block truncate">[{log.source}]</span>
+                    <span className="text-muted-foreground w-20 shrink-0 select-none hidden sm:block truncate">[{log.source}]</span>
                     <span className={`whitespace-pre-wrap break-words ${
-                      log.level === 'ERROR' ? 'text-red-200' :
-                      log.level === 'WARN' ? 'text-yellow-100/80' :
-                      'text-neutral-300'
+                      log.level === 'ERROR' ? 'text-red-500' :
+                      log.level === 'WARN' ? 'text-yellow-600' :
+                      'text-foreground'
                     }`}>
                       {log.message}
                     </span>
                   </div>
                 ))}
-                <div className="flex gap-4 py-3 px-2 mt-2 border-t border-white/[0.02]">
-                  <span className="text-neutral-600 w-20 shrink-0">...</span>
-                  <div className="flex items-center gap-2 text-emerald-500/80 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <div className="flex gap-4 py-3 px-2 mt-2 border-t border-border">
+                  <span className="text-muted-foreground w-20 shrink-0">...</span>
+                  <div className="flex items-center gap-2 text-green-500 font-medium">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                     Watching for incoming events
                   </div>
                 </div>
