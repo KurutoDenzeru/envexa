@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, ShieldAlert, CheckCircle, Search } from "lucide-react"
+import { RefreshCw, ShieldAlert, CheckCircle, Search, Wrench } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
 
 export const Route = createFileRoute("/vulnerabilities")({ component: Vulnerabilities })
 
@@ -198,9 +199,10 @@ function Vulnerabilities() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">{v.description || "Security vulnerability found"}</TableCell>
                       <TableCell className="text-right">
-                        <button className="text-sm text-blue-400 hover:text-blue-300 underline underline-offset-4 transition-colors">
+                        <Button variant="outline" size="sm" className="gap-2 text-blue-500 hover:text-blue-400 hover:bg-blue-500/10 border-blue-500/20">
+                          <Wrench className="w-3.5 h-3.5" />
                           Remediate
-                        </button>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
