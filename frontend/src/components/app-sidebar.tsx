@@ -17,7 +17,6 @@ const navItems = [
   { title: "Overview", url: "/", icon: Home },
   { title: "Vulnerabilities", url: "/vulnerabilities", icon: ShieldAlert },
   { title: "Toolchains", url: "/toolchains", icon: Boxes },
-  { title: "Settings", url: "/settings", icon: Settings },
 ]
 
 export function AppSidebar() {
@@ -54,10 +53,28 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4 border-t border-white/10 text-xs text-neutral-500">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-          Scanner Service Active
+      <SidebarFooter className="p-4 border-t border-white/10 text-xs text-neutral-500 space-y-4">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton 
+              tooltip="Settings"
+              render={
+                <Link 
+                  to="/settings" 
+                  className="flex w-full items-center gap-3 transition-colors duration-200"
+                  activeProps={{ className: "bg-white/10 text-white font-medium" }}
+                  inactiveProps={{ className: "text-neutral-400 hover:bg-white/5 hover:text-white" }}
+                />
+              }
+            >
+              <Settings className="h-4 w-4 shrink-0" />
+              <span className="group-data-[collapsible=icon]:hidden">Settings</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+          <div className="w-2 h-2 shrink-0 rounded-full bg-green-500 animate-pulse"></div>
+          <span className="group-data-[collapsible=icon]:hidden">Scanner Service Active</span>
         </div>
       </SidebarFooter>
     </Sidebar>

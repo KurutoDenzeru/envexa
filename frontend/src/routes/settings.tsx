@@ -9,7 +9,8 @@ import {
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
-import { Settings as SettingsIcon, Bell, ShieldCheck, Database, Save } from "lucide-react"
+import { Settings as SettingsIcon, Bell, ShieldCheck, Database, Save, Sun, Moon, Monitor, Paintbrush } from "lucide-react"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export const Route = createFileRoute("/settings")({ component: SettingsPage })
 
@@ -80,6 +81,37 @@ function SettingsPage() {
                 <p className="text-sm text-neutral-500">Ignore package.json files.</p>
               </div>
               <Switch id="skip-npm" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-neutral-950/50 border-white/10 backdrop-blur-xl">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Paintbrush className="w-5 h-5 text-purple-500" />
+              <CardTitle>Appearance</CardTitle>
+            </div>
+            <CardDescription>Customize the look and feel of Envexa.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/10">
+              <div className="space-y-0.5">
+                <Label className="text-base text-neutral-200">Theme Preference</Label>
+                <p className="text-sm text-neutral-500">Select your preferred color theme.</p>
+              </div>
+              <Tabs defaultValue="auto" className="w-[200px]">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="light" title="Light Theme">
+                    <Sun className="h-4 w-4" />
+                  </TabsTrigger>
+                  <TabsTrigger value="dark" title="Dark Theme">
+                    <Moon className="h-4 w-4" />
+                  </TabsTrigger>
+                  <TabsTrigger value="auto" title="System Theme">
+                    <Monitor className="h-4 w-4" />
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
           </CardContent>
         </Card>

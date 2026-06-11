@@ -20,7 +20,15 @@ import {
   PaginationItem,
   PaginationNext,
   PaginationPrevious,
+  PaginationLink,
 } from "@/components/ui/pagination"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export const Route = createFileRoute("/")({ component: App })
 
@@ -29,7 +37,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [vulnPage, setVulnPage] = useState(1)
   const [outdatedPage, setOutdatedPage] = useState(1)
-  const ITEMS_PER_PAGE = 5
+  const [itemsPerPage, setItemsPerPage] = useState(5)
 
   const fetchReport = async () => {
     setLoading(true)
@@ -87,11 +95,40 @@ export default function App() {
   const outCount = allOutdated.length
   const healthScore = Math.max(0, 100 - (vulnCount * 10) - (outCount * 2))
 
-  const totalVulnPages = Math.ceil(vulnCount / ITEMS_PER_PAGE)
-  const paginatedVulns = allVulnerabilities.slice((vulnPage - 1) * ITEMS_PER_PAGE, vulnPage * ITEMS_PER_PAGE)
+  const totalVulnPages = Math.ceil(vulnCount / itemsPerPage)
+  const paginatedVulns = allVulnerabilities.slice((vulnPage - 1) * itemsPerPage, vulnPage * itemsPerPage)
 
-  const totalOutdatedPages = Math.ceil(outCount / ITEMS_PER_PAGE)
-  const paginatedOutdated = allOutdated.slice((outdatedPage - 1) * ITEMS_PER_PAGE, outdatedPage * ITEMS_PER_PAGE)
+  const totalOutdatedPages = Math.ceil(outCount / itemsPerPage)
+  const paginatedOutdated = allOutdated.slice((outdatedPage - 1) * itemsPerPage, outdatedPage * itemsPerPage)
+
+  const renderPageNumbers = (currentPage: number, totalPages: number, setPage: (p: number) => void) => {
+    const pages = []
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+        pages.push(
+          <PaginationItem key={i}>
+            <PaginationLink 
+              onClick={() => setPage(i)}
+              isActive={currentPage === i}
+              className={currentPage === i ? "bg-white/10" : "cursor-pointer hover:bg-white/5"}
+            >
+              {i}
+            </PaginationLink>
+          </PaginationItem>
+        )
+      } else if (i === currentPage - 2 || i === currentPage + 2) {
+        pages.push(
+          <PaginationItem key={i}>
+            <span className="px-2 text-neutral-500">...</span>
+          </PaginationItem>
+        )
+      }
+    }
+    // Remove duplicates from ...
+    return pages.filter((item, index, self) => 
+      item.key !== null && self.findIndex(t => t.key === item.key) === index
+    )
+  }
 
   if (loading) {
     return (
@@ -279,8 +316,22 @@ export default function App() {
                   </div>
                   
                   {totalVulnPages > 1 && (
-                    <div className="mt-4 pt-4 border-t border-white/5">
-                      <Pagination>
+                    <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-neutral-400">Rows per page</span>
+                        <Select value={itemsPerPage.toString()} onValueChange={(v) => setItemsPerPage(Number(v))}>
+                          <SelectTrigger className="w-[70px] h-8 bg-neutral-900 border-white/10 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-neutral-900 border-white/10">
+                            <SelectItem value="5">5</SelectItem>
+                            <SelectItem value="10">10</SelectItem>
+                            <SelectItem value="20">20</SelectItem>
+                            <SelectItem value="50">50</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Pagination className="mx-0 w-auto">
                         <PaginationContent>
                           <PaginationItem>
                             <PaginationPrevious 
@@ -288,11 +339,7 @@ export default function App() {
                               className={vulnPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"} 
                             />
                           </PaginationItem>
-                          <PaginationItem>
-                            <span className="text-sm text-neutral-400 px-4">
-                              Page {vulnPage} of {totalVulnPages}
-                            </span>
-                          </PaginationItem>
+                          {renderPageNumbers(vulnPage, totalVulnPages, setVulnPage)}
                           <PaginationItem>
                             <PaginationNext 
                               onClick={() => setVulnPage(p => Math.min(totalVulnPages, p + 1))}
@@ -352,8 +399,22 @@ export default function App() {
                   </div>
                   
                   {totalOutdatedPages > 1 && (
-                    <div className="mt-4 pt-4 border-t border-white/5">
-                      <Pagination>
+                    <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-neutral-400">Rows per page</span>
+                        <Select value={itemsPerPage.toString()} onValueChange={(v) => setItemsPerPage(Number(v))}>
+                          <SelectTrigger className="w-[70px] h-8 bg-neutral-900 border-white/10 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-neutral-900 border-white/10">
+                            <SelectItem value="5">5</SelectItem>
+                            <SelectItem value="10">10</SelectItem>
+                            <SelectItem value="20">20</SelectItem>
+                            <SelectItem value="50">50</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Pagination className="mx-0 w-auto">
                         <PaginationContent>
                           <PaginationItem>
                             <PaginationPrevious 
@@ -361,11 +422,7 @@ export default function App() {
                               className={outdatedPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"} 
                             />
                           </PaginationItem>
-                          <PaginationItem>
-                            <span className="text-sm text-neutral-400 px-4">
-                              Page {outdatedPage} of {totalOutdatedPages}
-                            </span>
-                          </PaginationItem>
+                          {renderPageNumbers(outdatedPage, totalOutdatedPages, setOutdatedPage)}
                           <PaginationItem>
                             <PaginationNext 
                               onClick={() => setOutdatedPage(p => Math.min(totalOutdatedPages, p + 1))}

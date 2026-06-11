@@ -18,7 +18,15 @@ import {
   PaginationItem,
   PaginationNext,
   PaginationPrevious,
+  PaginationLink,
 } from "@/components/ui/pagination"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export const Route = createFileRoute("/vulnerabilities")({ component: Vulnerabilities })
 
@@ -27,7 +35,7 @@ function Vulnerabilities() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
-  const ITEMS_PER_PAGE = 8
+  const [itemsPerPage, setItemsPerPage] = useState(8)
 
   const fetchReport = async () => {
     setLoading(true)
@@ -69,8 +77,39 @@ function Vulnerabilities() {
     setPage(1)
   }, [search])
 
-  const totalPages = Math.ceil(filteredVulnerabilities.length / ITEMS_PER_PAGE)
-  const paginatedVulnerabilities = filteredVulnerabilities.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(filteredVulnerabilities.length / itemsPerPage)
+  const paginatedVulnerabilities = filteredVulnerabilities.slice(
+    (page - 1) * itemsPerPage,
+    page * itemsPerPage
+  )
+
+  const renderPageNumbers = (currentPage: number, totalPages: number, setPage: (p: number) => void) => {
+    const pages = []
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+        pages.push(
+          <PaginationItem key={i}>
+            <PaginationLink 
+              onClick={() => setPage(i)}
+              isActive={currentPage === i}
+              className={currentPage === i ? "bg-white/10" : "cursor-pointer hover:bg-white/5"}
+            >
+              {i}
+            </PaginationLink>
+          </PaginationItem>
+        )
+      } else if (i === currentPage - 2 || i === currentPage + 2) {
+        pages.push(
+          <PaginationItem key={i}>
+            <span className="px-2 text-neutral-500">...</span>
+          </PaginationItem>
+        )
+      }
+    }
+    return pages.filter((item, index, self) => 
+      item.key !== null && self.findIndex(t => t.key === item.key) === index
+    )
+  }
 
   if (loading) {
     return (
@@ -170,8 +209,22 @@ function Vulnerabilities() {
             </div>
             
             {totalPages > 1 && (
-              <div className="mt-4 pt-4 border-t border-white/5">
-                <Pagination>
+              <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-neutral-400">Rows per page</span>
+                  <Select value={itemsPerPage.toString()} onValueChange={(v) => { setItemsPerPage(Number(v)); setPage(1); }}>
+                    <SelectTrigger className="w-[70px] h-8 bg-neutral-900 border-white/10 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-neutral-900 border-white/10">
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="8">8</SelectItem>
+                      <SelectItem value="15">15</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Pagination className="mx-0 w-auto">
                   <PaginationContent>
                     <PaginationItem>
                       <PaginationPrevious 
@@ -179,11 +232,7 @@ function Vulnerabilities() {
                         className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"} 
                       />
                     </PaginationItem>
-                    <PaginationItem>
-                      <span className="text-sm text-neutral-400 px-4">
-                        Page {page} of {totalPages}
-                      </span>
-                    </PaginationItem>
+                    {renderPageNumbers(page, totalPages, setPage)}
                     <PaginationItem>
                       <PaginationNext 
                         onClick={() => setPage(p => Math.min(totalPages, p + 1))}
