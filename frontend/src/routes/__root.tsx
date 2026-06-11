@@ -1,8 +1,9 @@
 import { createRootRoute, Outlet } from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ThemeProvider } from "@/components/theme-provider"
+import { ThemeProvider as NextThemesProvider } from "next-themes"
+import { Toaster } from "@/components/ui/sonner"
 
 export const Route = createRootRoute({
   component: () => {
@@ -13,7 +14,9 @@ export const Route = createRootRoute({
 
     return (
       <ThemeProvider defaultTheme="dark" storageKey="envexa-ui-theme">
-        <SidebarProvider defaultOpen={defaultOpen}>
+        <NextThemesProvider attribute="class" defaultTheme="dark" enableSystem>
+          <Toaster />
+          <SidebarProvider defaultOpen={defaultOpen}>
           <div className="flex min-h-screen w-full bg-background font-sans text-foreground">
           <AppSidebar />
           <main className="flex-1 flex flex-col relative overflow-hidden">
@@ -25,8 +28,8 @@ export const Route = createRootRoute({
             </div>
           </main>
         </div>
-        <TanStackRouterDevtools />
       </SidebarProvider>
+        </NextThemesProvider>
     </ThemeProvider>
     );
   },

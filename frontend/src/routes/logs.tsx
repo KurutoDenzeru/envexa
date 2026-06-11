@@ -5,6 +5,7 @@ import {
 import { Terminal, ScrollText, Filter, Download, Search, Check, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,8 +70,26 @@ function LogsPage() {
     })
   }, [logs, filterLevel, search])
 
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto flex flex-col gap-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
+          <div>
+            <Skeleton className="h-10 w-48 bg-muted" />
+            <Skeleton className="h-4 w-80 mt-3 bg-muted" />
+          </div>
+          <div className="flex gap-3">
+            <Skeleton className="h-9 w-52 bg-muted" />
+            <Skeleton className="h-9 w-32 bg-muted" />
+          </div>
+        </div>
+        <Skeleton className="h-[400px] w-full rounded-xl bg-muted/50" />
+      </div>
+    )
+  }
+
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="max-w-6xl mx-auto flex flex-col gap-6">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
