@@ -87,7 +87,7 @@ function Toolchains() {
             const healthScore = Math.max(0, 100 - (tc.vulnCount * 15) - (tc.outdatedCount * 5))
             
             return (
-              <Card key={idx} className="bg-card border-border shadow-md hover:border-border/80 transition-all duration-300">
+              <Card key={idx} className="bg-card border-border shadow-xs hover:border-border/80 transition-all duration-300">
                 <CardHeader className="border-b border-border/50 pb-4 bg-muted/30">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-2xl capitalize text-foreground flex items-center gap-2">

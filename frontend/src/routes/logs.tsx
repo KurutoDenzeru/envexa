@@ -44,7 +44,7 @@ function LogsPage() {
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent flex items-center gap-3">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
             <ScrollText className="w-8 h-8 text-foreground" />
             System Logs
           </h1>
@@ -64,7 +64,7 @@ function LogsPage() {
             />
           </div>
           <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex h-10 px-4 py-2 items-center justify-between rounded-md border border-border bg-popover text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-32 gap-2">
+            <DropdownMenuTrigger className="inline-flex h-9 px-4 py-2 items-center justify-between rounded-md border border-border bg-popover text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-32 gap-2">
               <Filter className="w-4 h-4 text-muted-foreground" /> 
               {filterLevel === "ALL" ? "All Levels" : filterLevel}
             </DropdownMenuTrigger>
@@ -86,7 +86,7 @@ function LogsPage() {
         </div>
       </div>
 
-      <Card className="bg-card border-border shadow-sm overflow-hidden backdrop-blur-xl">
+      <Card className="bg-card border-border shadow-xs overflow-hidden backdrop-blur-xl">
         {/* MacOS Style Terminal Header */}
         <div className="flex items-center px-4 py-3 bg-muted/50 border-b border-border">
           <div className="flex gap-2">

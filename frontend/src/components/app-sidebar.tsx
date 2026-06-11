@@ -10,7 +10,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { Home, ShieldAlert, Boxes, Settings, Hexagon, ScrollText } from "lucide-react"
+import { Home, ShieldAlert, Boxes, Settings, ScrollText } from "lucide-react"
 import { Link } from "@tanstack/react-router"
 import { Separator } from "@/components/ui/separator"
 
@@ -25,7 +25,7 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-border bg-card/50 backdrop-blur-xl">
       <SidebarHeader className="h-14 border-b border-border p-4 flex flex-row items-center gap-2 text-foreground group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center">
-        <Hexagon className="h-6 w-6 shrink-0 text-foreground" />
+        <img src="/bulldozer.png" alt="Envexa Logo" className="h-6 w-6 shrink-0 object-contain" />
         <span className="font-bold text-lg tracking-tight group-data-[collapsible=icon]:hidden">Envexa</span>
       </SidebarHeader>
       <SidebarContent>
@@ -55,8 +55,8 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4 group-data-[collapsible=icon]:!p-2 border-t border-border text-xs text-muted-foreground/60 space-y-4">
-        <SidebarMenu>
+      <SidebarFooter className="p-2 group-data-[collapsible=icon]:!p-2 border-t border-border text-xs text-muted-foreground/60 space-y-2">
+        <SidebarMenu className="gap-1">
           <SidebarMenuItem>
             <SidebarMenuButton 
               tooltip="Settings"
@@ -74,7 +74,7 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <Separator className="bg-border/50" />
+        <Separator className="bg-border/50 my-1" />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton 

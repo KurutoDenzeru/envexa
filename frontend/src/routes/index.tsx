@@ -190,7 +190,7 @@ export default function App() {
         </div>
         <button
           onClick={fetchReport}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-foreground px-4 py-2 rounded-md transition-all font-medium text-sm shadow-[0_0_20px_-5px_rgba(59,130,246,0.5)]"
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-foreground px-4 py-2 rounded-md transition-all font-medium text-sm shadow-xs"
         >
           <RefreshCw className="w-4 h-4" />
           Rescan Now
@@ -199,7 +199,7 @@ export default function App() {
 
       {/* Top Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-card border-border shadow-sm hover:border-border/80 transition-all">
+        <Card className="bg-card border-border shadow-xs hover:border-border/80 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">System Health</CardTitle>
             <Activity className="w-4 h-4 text-muted-foreground" />
@@ -211,7 +211,7 @@ export default function App() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border shadow-sm hover:border-border/80 transition-all">
+        <Card className="bg-card border-border shadow-xs hover:border-border/80 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Vulnerabilities</CardTitle>
             <ShieldAlert className="w-4 h-4 text-muted-foreground" />
@@ -222,7 +222,7 @@ export default function App() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border shadow-sm hover:border-border/80 transition-all">
+        <Card className="bg-card border-border shadow-xs hover:border-border/80 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Outdated Packages</CardTitle>
             <Box className="w-4 h-4 text-muted-foreground" />
