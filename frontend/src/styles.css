@@ -132,3 +132,8 @@
     @apply font-sans;
     }
 }
+
+/* Fix sonner toast description color — sonner hardcodes #3f3f3f (light) and hsl(0,0%,91%) (dark) */
+[data-sonner-toast][data-styled='true'] [data-description] {
+  color: var(--popover-foreground) !important;
+}
