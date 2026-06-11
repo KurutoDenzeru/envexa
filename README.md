@@ -42,6 +42,7 @@ git clone https://github.com/KurutoDenzeru/envexa.git && cd envexa && cargo inst
 ```bash
 envexa             # Launch the interactive TUI dashboard
 envexa scan        # Generate a comprehensive markdown report
+envexa serve       # Launch the interactive Web Dashboard (port 8080)
 envexa update      # Update to the latest release
 ```
 
@@ -62,6 +63,7 @@ envexa update      # Update to the latest release
 ```bash
 cargo run           # Launch interactive TUI in terminal
 cargo run -- scan   # Run CLI report mode
+cargo run -- serve  # Launch Web Dashboard on port 8080
 cargo watch -x run  # Live reloading for TUI
 ```
 

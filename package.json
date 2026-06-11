@@ -1,0 +1,1 @@
+{"name":"envexa-root","private":true,"scripts":{"dev":"bunx concurrently \"cargo run -- serve\" \"cd frontend && bun run dev\""}}

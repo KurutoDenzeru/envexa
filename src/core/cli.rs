@@ -36,6 +36,11 @@ enum Commands {
         #[arg(long, default_value = "14400")]
         interval: u64,
     },
+    #[command(about = "Serve the Web Dashboard")]
+    Serve {
+        #[arg(long, default_value = "8080")]
+        port: u16,
+    },
 }
 
 pub async fn with_spinner<F, T>(label: &str, future: F) -> T
@@ -130,6 +135,9 @@ async fn run_cmd(cmd: Commands) -> Result<(), anyhow::Error> {
         }
         Commands::Daemon { interval } => {
             run_daemon(interval).await;
+        }
+        Commands::Serve { port } => {
+            crate::server::start(port).await;
         }
     }
     Ok(())
