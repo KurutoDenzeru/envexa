@@ -21,14 +21,14 @@ const navItems = [
 
 export function AppSidebar() {
   return (
-    <Sidebar collapsible="icon" className="border-r border-white/10 bg-neutral-950/50 backdrop-blur-xl">
-      <SidebarHeader className="p-4 flex flex-row items-center gap-2 text-neutral-100 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center">
+    <Sidebar collapsible="icon" className="border-r border-border bg-card/50 backdrop-blur-xl">
+      <SidebarHeader className="p-4 flex flex-row items-center gap-2 text-foreground group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center">
         <Hexagon className="h-6 w-6 shrink-0 text-blue-500" />
         <span className="font-bold text-lg tracking-tight group-data-[collapsible=icon]:hidden">Envexa</span>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-neutral-500 group-data-[collapsible=icon]:hidden">Dashboards</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-muted-foreground/60 group-data-[collapsible=icon]:hidden">Dashboards</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => (
@@ -39,8 +39,8 @@ export function AppSidebar() {
                       <Link 
                         to={item.url} 
                         className="flex w-full items-center gap-3 transition-colors duration-200 group-data-[collapsible=icon]:justify-center"
-                        activeProps={{ className: "bg-white/10 text-white font-medium" }}
-                        inactiveProps={{ className: "text-neutral-400 hover:bg-white/5 hover:text-white" }}
+                        activeProps={{ className: "bg-muted text-foreground font-medium" }}
+                        inactiveProps={{ className: "text-muted-foreground hover:bg-muted/50 hover:text-foreground" }}
                       />
                     }
                   >
@@ -53,7 +53,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4 border-t border-white/10 text-xs text-neutral-500 space-y-4">
+      <SidebarFooter className="p-4 group-data-[collapsible=icon]:!p-2 border-t border-border text-xs text-muted-foreground/60 space-y-4">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton 
@@ -62,8 +62,8 @@ export function AppSidebar() {
                 <Link 
                   to="/settings" 
                   className="flex w-full items-center gap-3 transition-colors duration-200 group-data-[collapsible=icon]:justify-center"
-                  activeProps={{ className: "bg-white/10 text-white font-medium" }}
-                  inactiveProps={{ className: "text-neutral-400 hover:bg-white/5 hover:text-white" }}
+                  activeProps={{ className: "bg-muted text-foreground font-medium" }}
+                  inactiveProps={{ className: "text-muted-foreground hover:bg-muted/50 hover:text-foreground" }}
                 />
               }
             >

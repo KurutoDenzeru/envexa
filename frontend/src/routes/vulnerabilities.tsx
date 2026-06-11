@@ -92,7 +92,7 @@ function Vulnerabilities() {
             <PaginationLink 
               onClick={() => setPage(i)}
               isActive={currentPage === i}
-              className={currentPage === i ? "bg-white/10" : "cursor-pointer hover:bg-white/5"}
+              className={currentPage === i ? "bg-muted" : "cursor-pointer hover:bg-muted/50"}
             >
               {i}
             </PaginationLink>
@@ -101,7 +101,7 @@ function Vulnerabilities() {
       } else if (i === currentPage - 2 || i === currentPage + 2) {
         pages.push(
           <PaginationItem key={i}>
-            <span className="px-2 text-neutral-500">...</span>
+            <span className="px-2 text-muted-foreground/60">...</span>
           </PaginationItem>
         )
       }
@@ -114,21 +114,21 @@ function Vulnerabilities() {
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
           <div>
-            <Skeleton className="h-10 w-64 bg-white/10" />
-            <Skeleton className="h-4 w-96 mt-3 bg-white/10" />
+            <Skeleton className="h-10 w-64 bg-muted" />
+            <Skeleton className="h-4 w-96 mt-3 bg-muted" />
           </div>
         </div>
-        <Card className="bg-neutral-950/50 border-white/10 backdrop-blur-xl">
+        <Card className="bg-card/50 border-border backdrop-blur-xl">
           <CardHeader>
-            <Skeleton className="h-6 w-48 bg-white/10" />
-            <Skeleton className="h-4 w-64 mt-2 bg-white/10" />
+            <Skeleton className="h-6 w-48 bg-muted" />
+            <Skeleton className="h-4 w-64 mt-2 bg-muted" />
           </CardHeader>
           <CardContent>
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <RefreshCw className="w-10 h-10 animate-spin text-red-500/50" />
-              <Skeleton className="h-4 w-48 bg-white/10" />
+              <Skeleton className="h-4 w-48 bg-muted" />
             </div>
           </CardContent>
         </Card>
@@ -138,30 +138,30 @@ function Vulnerabilities() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-red-400 to-red-600 bg-clip-text text-transparent flex items-center gap-3">
             <ShieldAlert className="w-8 h-8 text-red-500" />
             Security Vulnerabilities
           </h1>
-          <p className="text-neutral-400 mt-2">
+          <p className="text-muted-foreground mt-2">
             Detailed view of all security flaws found in your dependencies.
           </p>
         </div>
       </div>
 
-      <Card className="bg-neutral-950/50 border-white/10 backdrop-blur-xl">
+      <Card className="bg-card/50 border-border backdrop-blur-xl">
         <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <CardTitle>Identified Flaws</CardTitle>
             <CardDescription>Review and address these issues to secure your workspace.</CardDescription>
           </div>
           <div className="relative w-full md:w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-neutral-500" />
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/60" />
             <Input 
               type="text" 
               placeholder="Search packages..." 
-              className="pl-9 bg-black/50 border-white/10 focus-visible:ring-red-500" 
+              className="pl-9 bg-background/50 border-border focus-visible:ring-red-500" 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -169,16 +169,16 @@ function Vulnerabilities() {
         </CardHeader>
         <CardContent>
           {filteredVulnerabilities.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-neutral-500">
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60">
               <CheckCircle className="w-12 h-12 mb-4 text-green-500/50" />
               <p>{search ? "No vulnerabilities match your search." : "No vulnerabilities detected! Your project is secure."}</p>
             </div>
           ) : (
             <>
-              <div className="rounded-md border border-white/10 overflow-hidden">
+              <div className="rounded-md border border-border overflow-hidden">
                 <Table>
-                <TableHeader className="bg-white/5">
-                  <TableRow className="border-white/10 hover:bg-transparent">
+                <TableHeader className="bg-muted/50">
+                  <TableRow className="border-border hover:bg-transparent">
                     <TableHead className="w-[100px]">Toolchain</TableHead>
                     <TableHead className="w-[200px]">Package</TableHead>
                     <TableHead className="w-[100px]">Severity</TableHead>
@@ -188,15 +188,15 @@ function Vulnerabilities() {
                 </TableHeader>
                 <TableBody>
                   {paginatedVulnerabilities.map((v, idx) => (
-                    <TableRow key={idx} className="border-white/10 hover:bg-white/5">
-                      <TableCell className="font-medium capitalize text-neutral-300">{v.toolchain}</TableCell>
-                      <TableCell className="font-mono text-sm text-neutral-100">{v.name || v.package || "Unknown"}</TableCell>
+                    <TableRow key={idx} className="border-border hover:bg-muted/50">
+                      <TableCell className="font-medium capitalize text-muted-foreground/80">{v.toolchain}</TableCell>
+                      <TableCell className="font-mono text-sm text-foreground">{v.name || v.package || "Unknown"}</TableCell>
                       <TableCell>
                         <Badge variant="destructive" className="bg-red-500/10 text-red-500 border-red-500/20 shadow-none">
                           {v.severity || "High"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-neutral-400">{v.description || "Security vulnerability found"}</TableCell>
+                      <TableCell className="text-muted-foreground">{v.description || "Security vulnerability found"}</TableCell>
                       <TableCell className="text-right">
                         <button className="text-sm text-blue-400 hover:text-blue-300 underline underline-offset-4 transition-colors">
                           Remediate
@@ -209,14 +209,14 @@ function Vulnerabilities() {
             </div>
             
             {totalPages > 1 && (
-              <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+              <div className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-neutral-400">Rows per page</span>
+                  <span className="text-sm text-muted-foreground">Rows per page</span>
                   <Select value={itemsPerPage.toString()} onValueChange={(v) => { setItemsPerPage(Number(v)); setPage(1); }}>
-                    <SelectTrigger className="w-[70px] h-8 bg-neutral-900 border-white/10 text-xs">
+                    <SelectTrigger className="w-[70px] h-8 bg-popover border-border text-xs">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-neutral-900 border-white/10">
+                    <SelectContent className="bg-popover border-border">
                       <SelectItem value="5">5</SelectItem>
                       <SelectItem value="8">8</SelectItem>
                       <SelectItem value="15">15</SelectItem>

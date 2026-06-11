@@ -19,23 +19,23 @@ function SettingsPage() {
   const { theme, setTheme } = useTheme()
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-neutral-200 to-neutral-500 bg-clip-text text-transparent flex items-center gap-3">
-            <SettingsIcon className="w-8 h-8 text-neutral-400" />
+            <SettingsIcon className="w-8 h-8 text-muted-foreground" />
             Scanner Settings
           </h1>
-          <p className="text-neutral-400 mt-2">
+          <p className="text-muted-foreground mt-2">
             Configure how Envexa scans and reports on your environments.
           </p>
         </div>
-        <Button className="gap-2 bg-white text-black hover:bg-neutral-200 shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)]">
+        <Button className="gap-2 bg-primary text-primary-foreground hover:bg-neutral-200 shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)]">
           <Save className="w-4 h-4" /> Save Changes
         </Button>
       </div>
 
       <div className="grid gap-6">
-        <Card className="bg-neutral-950/50 border-white/10 backdrop-blur-xl">
+        <Card className="bg-card/50 border-border backdrop-blur-xl">
           <CardHeader>
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-green-500" />
@@ -44,24 +44,24 @@ function SettingsPage() {
             <CardDescription>Configure vulnerability thresholds and auto-auditing behaviors.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center justify-between space-x-4 rounded-lg border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/10">
+            <div className="flex items-center justify-between space-x-4 rounded-lg border border-border/50 bg-muted/50 p-4 transition-colors hover:bg-muted">
               <div className="space-y-0.5">
-                <Label className="text-base text-neutral-200">Strict Mode</Label>
-                <p className="text-sm text-neutral-500">Fail builds immediately if critical vulnerabilities are detected.</p>
+                <Label className="text-base text-foreground/90">Strict Mode</Label>
+                <p className="text-sm text-muted-foreground/60">Fail builds immediately if critical vulnerabilities are detected.</p>
               </div>
               <Switch id="strict-mode" defaultChecked />
             </div>
-            <div className="flex items-center justify-between space-x-4 rounded-lg border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/10">
+            <div className="flex items-center justify-between space-x-4 rounded-lg border border-border/50 bg-muted/50 p-4 transition-colors hover:bg-muted">
               <div className="space-y-0.5">
-                <Label className="text-base text-neutral-200">Include Dev Dependencies</Label>
-                <p className="text-sm text-neutral-500">Scan toolchains for issues in development dependencies.</p>
+                <Label className="text-base text-foreground/90">Include Dev Dependencies</Label>
+                <p className="text-sm text-muted-foreground/60">Scan toolchains for issues in development dependencies.</p>
               </div>
               <Switch id="dev-deps" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-neutral-950/50 border-white/10 backdrop-blur-xl">
+        <Card className="bg-card/50 border-border backdrop-blur-xl">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Database className="w-5 h-5 text-blue-500" />
@@ -70,24 +70,24 @@ function SettingsPage() {
             <CardDescription>Select which package managers Envexa should skip scanning.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center justify-between space-x-4 rounded-lg border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/10">
+            <div className="flex items-center justify-between space-x-4 rounded-lg border border-border/50 bg-muted/50 p-4 transition-colors hover:bg-muted">
               <div className="space-y-0.5">
-                <Label className="text-base text-neutral-200">Skip Python (pip)</Label>
-                <p className="text-sm text-neutral-500">Ignore requirements.txt and pip envs entirely.</p>
+                <Label className="text-base text-foreground/90">Skip Python (pip)</Label>
+                <p className="text-sm text-muted-foreground/60">Ignore requirements.txt and pip envs entirely.</p>
               </div>
               <Switch id="skip-pip" />
             </div>
-            <div className="flex items-center justify-between space-x-4 rounded-lg border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/10">
+            <div className="flex items-center justify-between space-x-4 rounded-lg border border-border/50 bg-muted/50 p-4 transition-colors hover:bg-muted">
               <div className="space-y-0.5">
-                <Label className="text-base text-neutral-200">Skip Node (npm/bun)</Label>
-                <p className="text-sm text-neutral-500">Ignore package.json files.</p>
+                <Label className="text-base text-foreground/90">Skip Node (npm/bun)</Label>
+                <p className="text-sm text-muted-foreground/60">Ignore package.json files.</p>
               </div>
               <Switch id="skip-npm" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-neutral-950/50 border-white/10 backdrop-blur-xl">
+        <Card className="bg-card/50 border-border backdrop-blur-xl">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Paintbrush className="w-5 h-5 text-purple-500" />
@@ -96,10 +96,10 @@ function SettingsPage() {
             <CardDescription>Customize the look and feel of Envexa.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg border border-border/50 bg-muted/50 p-4 transition-colors hover:bg-muted">
               <div className="space-y-0.5">
-                <Label className="text-base text-neutral-200">Theme Preference</Label>
-                <p className="text-sm text-neutral-500">Select your preferred color theme.</p>
+                <Label className="text-base text-foreground/90">Theme Preference</Label>
+                <p className="text-sm text-muted-foreground/60">Select your preferred color theme.</p>
               </div>
               <Tabs value={theme} onValueChange={(v) => setTheme(v as any)} className="w-[200px]">
                 <TabsList className="grid w-full grid-cols-3">
@@ -118,7 +118,7 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-neutral-950/50 border-white/10 backdrop-blur-xl">
+        <Card className="bg-card/50 border-border backdrop-blur-xl">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Bell className="w-5 h-5 text-yellow-500" />
@@ -127,10 +127,10 @@ function SettingsPage() {
             <CardDescription>How you want to be alerted about scanning results.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center justify-between space-x-4 rounded-lg border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/10">
+            <div className="flex items-center justify-between space-x-4 rounded-lg border border-border/50 bg-muted/50 p-4 transition-colors hover:bg-muted">
               <div className="space-y-0.5">
-                <Label className="text-base text-neutral-200">System Notifications</Label>
-                <p className="text-sm text-neutral-500">Show OS level notifications when background scans complete.</p>
+                <Label className="text-base text-foreground/90">System Notifications</Label>
+                <p className="text-sm text-muted-foreground/60">Show OS level notifications when background scans complete.</p>
               </div>
               <Switch id="sys-notifs" defaultChecked />
             </div>
