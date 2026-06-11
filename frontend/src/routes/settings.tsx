@@ -100,7 +100,7 @@ function SettingsPage() {
   })
 
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 800)
+    const timer = setTimeout(() => setLoading(false), 100)
     return () => clearTimeout(timer)
   }, [])
 

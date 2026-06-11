@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ShieldAlert, CheckCircle, Search, RefreshCw } from "lucide-react"
+import { ShieldAlert, CheckCircle, Search } from "lucide-react"
 import {
   Table,
   TableBody,
@@ -34,6 +34,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts"
 
 export const Route = createFileRoute("/vulnerabilities")({
   component: Vulnerabilities,
@@ -90,6 +103,14 @@ function severityColor(s: string): string {
     default:
       return "bg-muted text-muted-foreground border-border"
   }
+}
+
+const SEVERITY_COLORS: Record<string, string> = {
+  critical: "#ef4444",
+  high: "#f97316",
+  medium: "#eab308",
+  low: "#3b82f6",
+  other: "#71717a",
 }
 
 function Vulnerabilities() {
@@ -169,6 +190,29 @@ function Vulnerabilities() {
     return counts
   }, [allVulnerabilities])
 
+  // Pie chart data
+  const pieData = useMemo(() => {
+    return Object.entries(severityCounts)
+      .filter(([, count]) => count > 0)
+      .map(([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value,
+        fill: SEVERITY_COLORS[name] || SEVERITY_COLORS.other,
+      }))
+  }, [severityCounts])
+
+  // Bar chart data: vulns per toolchain
+  const toolchainBarData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const v of allVulnerabilities) {
+      counts[v.toolchain] = (counts[v.toolchain] || 0) + 1
+    }
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+  }, [allVulnerabilities])
+
   const totalPages = Math.ceil(filteredVulnerabilities.length / itemsPerPage)
   const paginatedVulnerabilities = filteredVulnerabilities.slice(
     (page - 1) * itemsPerPage,
@@ -193,7 +237,9 @@ function Vulnerabilities() {
               onClick={() => setP(i)}
               isActive={currentPage === i}
               className={
-                currentPage === i ? "bg-muted" : "cursor-pointer hover:bg-muted/50"
+                currentPage === i
+                  ? "bg-muted"
+                  : "cursor-pointer hover:bg-muted/50"
               }
             >
               {i}
@@ -217,7 +263,7 @@ function Vulnerabilities() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto flex flex-col gap-6 animate-in fade-in duration-700">
+      <div className="max-w-7xl mx-auto flex flex-col gap-6">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
           <div>
             <Skeleton className="h-10 w-64 bg-muted" />
@@ -230,17 +276,11 @@ function Vulnerabilities() {
           <Skeleton className="h-24 w-full rounded-xl bg-muted/50" />
           <Skeleton className="h-24 w-full rounded-xl bg-muted/50" />
         </div>
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-48 bg-muted" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <RefreshCw className="w-10 h-10 animate-spin text-muted-foreground/50" />
-              <Skeleton className="h-4 w-48 bg-muted" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Skeleton className="h-[300px] w-full rounded-xl bg-muted/50" />
+          <Skeleton className="h-[300px] w-full rounded-xl bg-muted/50" />
+        </div>
+        <Skeleton className="h-[400px] w-full rounded-xl bg-muted/50" />
       </div>
     )
   }
@@ -249,7 +289,6 @@ function Vulnerabilities() {
   const critical = severityCounts["critical"] || 0
   const high = severityCounts["high"] || 0
   const medium = severityCounts["medium"] || 0
-
 
   return (
     <div className="max-w-7xl mx-auto flex flex-col gap-6">
@@ -337,6 +376,126 @@ function Vulnerabilities() {
         </Card>
       </div>
 
+      {/* Charts Section */}
+      {total > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Severity Distribution Donut */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Severity Distribution</CardTitle>
+              <CardDescription>
+                Breakdown of vulnerabilities by severity level.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[260px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={3}
+                      dataKey="value"
+                      stroke="hsl(var(--background))"
+                      strokeWidth={2}
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={index} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                        color: "hsl(var(--foreground))",
+                      }}
+                    />
+                    <Legend
+                      verticalAlign="bottom"
+                      height={36}
+                      formatter={(value: string) => (
+                        <span className="text-xs text-muted-foreground">
+                          {value}
+                        </span>
+                      )}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Vulnerabilities by Toolchain */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                By Toolchain
+              </CardTitle>
+              <CardDescription>
+                Top toolchains with the most vulnerabilities.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[260px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={toolchainBarData}
+                    layout="vertical"
+                    margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="hsl(var(--border))"
+                      horizontal={false}
+                    />
+                    <XAxis
+                      type="number"
+                      stroke="#a1a1aa"
+                      tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      stroke="#a1a1aa"
+                      tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={90}
+                      tickFormatter={(v: string) =>
+                        v.length > 10 ? v.slice(0, 10) + "..." : v
+                      }
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                        color: "hsl(var(--foreground))",
+                      }}
+                      cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                    />
+                    <Bar
+                      dataKey="count"
+                      name="Vulnerabilities"
+                      fill="#ef4444"
+                      radius={[0, 4, 4, 0]}
+                      maxBarSize={24}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Vulnerability Table */}
       <Card>
         <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -357,7 +516,10 @@ function Vulnerabilities() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <Select value={toolchainFilter} onValueChange={(v) => setToolchainFilter(v ?? "all")}>
+            <Select
+              value={toolchainFilter}
+              onValueChange={(v) => setToolchainFilter(v ?? "all")}
+            >
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="All toolchains" />
               </SelectTrigger>
@@ -393,12 +555,17 @@ function Vulnerabilities() {
                       <TableHead className="w-[100px]">Severity</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead className="w-[130px]">CVE</TableHead>
-                      <TableHead className="w-[120px]">Patched Version</TableHead>
+                      <TableHead className="w-[120px]">
+                        Patched Version
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedVulnerabilities.map((v, idx) => (
-                      <TableRow key={idx} className="border-border hover:bg-muted/50">
+                      <TableRow
+                        key={idx}
+                        className="border-border hover:bg-muted/50"
+                      >
                         <TableCell className="font-medium capitalize text-muted-foreground/80">
                           {v.toolchain}
                         </TableCell>

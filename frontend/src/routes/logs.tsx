@@ -46,7 +46,7 @@ function LogsPage() {
         setLogs(data.logs)
         setLogsPath(data.path)
         const elapsed = Date.now() - start
-        const remaining = Math.max(0, 800 - elapsed)
+        const remaining = Math.max(0, 100 - elapsed)
         setTimeout(() => setLoading(false), remaining)
       })
       .catch((err) => {
@@ -60,7 +60,7 @@ function LogsPage() {
         setLogs(parsedMock)
         setLogsPath("~/.local/share/envexa/logs.json")
         const elapsed = Date.now() - start
-        const remaining = Math.max(0, 800 - elapsed)
+        const remaining = Math.max(0, 100 - elapsed)
         setTimeout(() => setLoading(false), remaining)
       })
   }, [])

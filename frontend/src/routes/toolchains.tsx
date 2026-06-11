@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { useEffect, useState, useMemo } from "react"
+import { useTheme } from "@/components/theme-provider"
+import { cn } from "@/lib/utils"
 import {
   Card,
   CardContent,
@@ -8,12 +10,12 @@ import {
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
-  Boxes,
   PackageOpen,
   CheckCircle,
-  Terminal,
-  Cpu,
   RefreshCw,
+  Shield,
+  FileSearch,
+  Boxes,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
@@ -25,7 +27,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
   TableBody,
@@ -35,6 +36,20 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  siDocker,
+  siNpm,
+  siPnpm,
+  siYarn,
+  siBun,
+  siDeno,
+  siPython,
+  siRubygems,
+  siRust,
+  siHomebrew,
+  siApple,
+  siGithub,
+} from "simple-icons"
 
 export const Route = createFileRoute("/toolchains")({ component: Toolchains })
 
@@ -95,15 +110,62 @@ interface ToolCategory {
 
 const CATEGORIES: ToolCategory[] = [
   { name: "System & Runtime", tools: ["brew", "cargo", "docker", "pip", "gem"] },
-  {
-    name: "Web Development",
-    tools: ["npm", "pnpm", "yarn", "bun", "deno"],
-  },
+  { name: "Web Development", tools: ["npm", "pnpm", "yarn", "bun", "deno"] },
   {
     name: "Project Tooling",
     tools: ["project", "security", "supply_chain", "audit", "ci"],
   },
 ]
+
+function ToolIcon({
+  icon,
+  className = "w-5 h-5",
+  color,
+  invertInDark = false,
+}: {
+  icon: { path: string; hex: string }
+  className?: string
+  color?: string
+  invertInDark?: boolean
+}) {
+  const { theme } = useTheme()
+  const isDark =
+    invertInDark &&
+    (theme === "dark" ||
+      (theme === "system" &&
+        typeof window !== "undefined" &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches))
+
+  return (
+    <svg
+      role="img"
+      viewBox="0 0 24 24"
+      className={cn(className, isDark && "invert brightness-200")}
+      fill={color || `#${icon.hex}`}
+    >
+      <path d={icon.path} />
+    </svg>
+  )
+}
+
+// Map tool names to simple-icons
+const TOOL_ICONS: Record<string, { icon: { path: string; hex: string }; fallback?: React.ReactNode; invertInDark?: boolean }> = {
+  brew: { icon: siHomebrew },
+  cargo: { icon: siRust, invertInDark: true },
+  docker: { icon: siDocker },
+  pip: { icon: siPython },
+  gem: { icon: siRubygems },
+  npm: { icon: siNpm },
+  pnpm: { icon: siPnpm },
+  yarn: { icon: siYarn },
+  bun: { icon: siBun, invertInDark: true },
+  deno: { icon: siDeno, invertInDark: true },
+  project: { icon: siApple, invertInDark: true },
+  security: { icon: { path: Shield.prototype ? "" : "M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z", hex: "71717a" }, fallback: <Shield className="w-5 h-5 text-muted-foreground" /> },
+  supply_chain: { icon: { path: "M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z", hex: "71717a" }, fallback: <Boxes className="w-5 h-5 text-muted-foreground" /> },
+  audit: { icon: { path: "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z", hex: "71717a" }, fallback: <FileSearch className="w-5 h-5 text-muted-foreground" /> },
+  ci: { icon: siGithub, invertInDark: true },
+}
 
 function displayName(tool: string): string {
   const names: Record<string, string> = {
@@ -150,7 +212,10 @@ function statusBadge(status: string) {
   }
   if (s.includes("skip") || s.includes("not found")) {
     return (
-      <Badge variant="outline" className="border-border text-muted-foreground shadow-none">
+      <Badge
+        variant="outline"
+        className="border-border text-muted-foreground shadow-none"
+      >
         SKIP
       </Badge>
     )
@@ -183,17 +248,20 @@ function getPrimaryVersion(tc: ToolchainResult): string {
 function getVersionFields(tc: ToolchainResult): Array<{ label: string; value: string }> {
   const fields: Array<{ label: string; value: string }> = []
   if (tc.version) fields.push({ label: "Version", value: tc.version })
-  if (tc.node_version) fields.push({ label: "Node Version", value: tc.node_version })
+  if (tc.node_version)
+    fields.push({ label: "Node Version", value: tc.node_version })
   if (tc.python_version)
     fields.push({ label: "Python Version", value: tc.python_version })
-  if (tc.ruby_version) fields.push({ label: "Ruby Version", value: tc.ruby_version })
+  if (tc.ruby_version)
+    fields.push({ label: "Ruby Version", value: tc.ruby_version })
   if (tc.rustc_version)
     fields.push({ label: "Rustc Version", value: tc.rustc_version })
   if (tc.cargo_version)
     fields.push({ label: "Cargo Version", value: tc.cargo_version })
   if (tc.pnpm_version)
     fields.push({ label: "pnpm Version", value: tc.pnpm_version })
-  if (tc.bun_version) fields.push({ label: "Bun Version", value: tc.bun_version })
+  if (tc.bun_version)
+    fields.push({ label: "Bun Version", value: tc.bun_version })
   if (tc.deno_version)
     fields.push({ label: "Deno Version", value: tc.deno_version })
   if (tc.installed_count !== undefined)
@@ -204,16 +272,26 @@ function getVersionFields(tc: ToolchainResult): Array<{ label: string; value: st
   return fields
 }
 
+function getToolIcon(tool: string) {
+  const entry = TOOL_ICONS[tool]
+  if (!entry) return <Boxes className="w-5 h-5 text-muted-foreground" />
+  if (entry.fallback) return entry.fallback
+  return <ToolIcon icon={entry.icon} className="w-5 h-5" invertInDark={entry.invertInDark} />
+}
+
 function ToolchainCard({ tc }: { tc: ToolchainResult }) {
   const vulnCount = tc.vulnerabilities?.length || 0
   const outdatedCount = tc.outdated?.length || 0
+  const [activeTab, setActiveTab] = useState<"security" | "updates" | "specs">(
+    vulnCount > 0 ? "security" : outdatedCount > 0 ? "updates" : "specs",
+  )
 
   return (
     <Card className="bg-card border-border shadow-xs hover:border-border/80 transition-all duration-300 flex flex-col justify-between">
       <CardHeader className="border-b border-border/50 pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg capitalize text-foreground flex items-center gap-2">
-            <Boxes className="w-4 h-4 text-muted-foreground" />
+            {getToolIcon(tc.tool)}
             {displayName(tc.tool)}
           </CardTitle>
           {statusBadge(tc.status)}
@@ -222,7 +300,6 @@ function ToolchainCard({ tc }: { tc: ToolchainResult }) {
 
       <CardContent className="pt-4 flex-1 flex flex-col gap-4">
         <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground/80 bg-muted/30 p-2.5 rounded-md border border-border/40">
-          <Cpu className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
           <span className="text-foreground">{getPrimaryVersion(tc)}</span>
         </div>
 
@@ -252,14 +329,13 @@ function ToolchainCard({ tc }: { tc: ToolchainResult }) {
         <div className="flex justify-end pt-2 border-t border-border/30">
           <Dialog>
             <DialogTrigger className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-popover px-4 text-xs font-semibold text-foreground transition-all hover:bg-muted/50 hover:text-foreground cursor-pointer select-none shadow-xs gap-1.5">
-              <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
               View Details
             </DialogTrigger>
             <DialogContent className="sm:max-w-2xl bg-card border border-border p-6 shadow-xl max-h-[90vh] flex flex-col">
               <DialogHeader className="pb-4 border-b border-border/50">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-muted/60 border border-border/60">
-                    <Boxes className="w-6 h-6 text-foreground capitalize" />
+                    {getToolIcon(tc.tool)}
                   </div>
                   <div>
                     <DialogTitle className="text-2xl capitalize font-bold text-foreground">
@@ -299,37 +375,38 @@ function ToolchainCard({ tc }: { tc: ToolchainResult }) {
                     <span className="text-xs text-muted-foreground block mb-1">
                       Status
                     </span>
-                    <div className="flex justify-center">{statusBadge(tc.status)}</div>
+                    <div className="flex justify-center">
+                      {statusBadge(tc.status)}
+                    </div>
                   </div>
                 </div>
 
-                <Tabs
-                  defaultValue={
-                    vulnCount > 0
-                      ? "security"
-                      : outdatedCount > 0
-                        ? "updates"
-                        : "specs"
-                  }
-                  className="w-full"
-                >
-                  <TabsList className="grid w-full grid-cols-3 bg-muted/50 p-1 rounded-lg border border-border/40">
-                    <TabsTrigger value="security" className="text-xs py-1.5">
-                      Security ({vulnCount})
-                    </TabsTrigger>
-                    <TabsTrigger value="updates" className="text-xs py-1.5">
-                      Updates ({outdatedCount})
-                    </TabsTrigger>
-                    <TabsTrigger value="specs" className="text-xs py-1.5">
-                      Specs
-                    </TabsTrigger>
-                  </TabsList>
+                {/* Segmented Tab Buttons */}
+                <div className="flex rounded-lg border border-border/40 bg-muted/30 p-1 gap-1">
+                  {(
+                    [
+                      { key: "security", label: `Security (${vulnCount})` },
+                      { key: "updates", label: `Updates (${outdatedCount})` },
+                      { key: "specs", label: "Specs" },
+                    ] as const
+                  ).map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`flex-1 text-xs py-2 px-3 rounded-md transition-all cursor-pointer font-medium ${
+                        activeTab === tab.key
+                          ? "bg-background text-foreground shadow-xs border border-border/50"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
 
-                  {/* Security Tab */}
-                  <TabsContent
-                    value="security"
-                    className="mt-4 focus-visible:outline-none"
-                  >
+                {/* Tab Content */}
+                {activeTab === "security" && (
+                  <div>
                     {vulnCount === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-border/40 rounded-xl bg-muted/10">
                         <CheckCircle className="w-10 h-10 mb-3 text-green-500/60" />
@@ -345,11 +422,21 @@ function ToolchainCard({ tc }: { tc: ToolchainResult }) {
                         <Table>
                           <TableHeader className="bg-muted/50 sticky top-0 z-10">
                             <TableRow className="border-border hover:bg-transparent">
-                              <TableHead className="text-xs h-9">Package</TableHead>
-                              <TableHead className="text-xs h-9">Title</TableHead>
-                              <TableHead className="text-xs h-9">CVE</TableHead>
-                              <TableHead className="text-xs h-9">Severity</TableHead>
-                              <TableHead className="text-xs h-9">Patched</TableHead>
+                              <TableHead className="text-xs h-9">
+                                Package
+                              </TableHead>
+                              <TableHead className="text-xs h-9">
+                                Title
+                              </TableHead>
+                              <TableHead className="text-xs h-9">
+                                CVE
+                              </TableHead>
+                              <TableHead className="text-xs h-9">
+                                Severity
+                              </TableHead>
+                              <TableHead className="text-xs h-9">
+                                Patched
+                              </TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -386,13 +473,11 @@ function ToolchainCard({ tc }: { tc: ToolchainResult }) {
                         </Table>
                       </ScrollArea>
                     )}
-                  </TabsContent>
+                  </div>
+                )}
 
-                  {/* Updates Tab */}
-                  <TabsContent
-                    value="updates"
-                    className="mt-4 focus-visible:outline-none"
-                  >
+                {activeTab === "updates" && (
+                  <div>
                     {outdatedCount === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-border/40 rounded-xl bg-muted/10">
                         <CheckCircle className="w-10 h-10 mb-3 text-green-500/60" />
@@ -400,7 +485,8 @@ function ToolchainCard({ tc }: { tc: ToolchainResult }) {
                           All Dependencies Up to Date
                         </h4>
                         <p className="text-xs text-muted-foreground max-w-sm mt-1">
-                          This toolchain uses the latest available package releases.
+                          This toolchain uses the latest available package
+                          releases.
                         </p>
                       </div>
                     ) : (
@@ -408,8 +494,12 @@ function ToolchainCard({ tc }: { tc: ToolchainResult }) {
                         <Table>
                           <TableHeader className="bg-muted/50 sticky top-0 z-10">
                             <TableRow className="border-border hover:bg-transparent">
-                              <TableHead className="text-xs h-9">Package</TableHead>
-                              <TableHead className="text-xs h-9">Current</TableHead>
+                              <TableHead className="text-xs h-9">
+                                Package
+                              </TableHead>
+                              <TableHead className="text-xs h-9">
+                                Current
+                              </TableHead>
                               <TableHead className="text-xs h-9 text-right">
                                 Latest
                               </TableHead>
@@ -441,34 +531,30 @@ function ToolchainCard({ tc }: { tc: ToolchainResult }) {
                         </Table>
                       </ScrollArea>
                     )}
-                  </TabsContent>
+                  </div>
+                )}
 
-                  {/* Specs Tab */}
-                  <TabsContent
-                    value="specs"
-                    className="mt-4 focus-visible:outline-none"
-                  >
-                    <div className="border border-border/40 rounded-lg overflow-hidden bg-muted/10">
-                      <Table>
-                        <TableBody>
-                          {getVersionFields(tc).map((v, vIdx) => (
-                            <TableRow
-                              key={vIdx}
-                              className="border-border hover:bg-muted/30"
-                            >
-                              <TableCell className="font-medium text-xs text-muted-foreground">
-                                {v.label}
-                              </TableCell>
-                              <TableCell className="text-xs text-right font-mono text-foreground">
-                                {v.value}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                {activeTab === "specs" && (
+                  <div className="border border-border/40 rounded-lg overflow-hidden bg-muted/10">
+                    <Table>
+                      <TableBody>
+                        {getVersionFields(tc).map((v, vIdx) => (
+                          <TableRow
+                            key={vIdx}
+                            className="border-border hover:bg-muted/30"
+                          >
+                            <TableCell className="font-medium text-xs text-muted-foreground">
+                              {v.label}
+                            </TableCell>
+                            <TableCell className="text-xs text-right font-mono text-foreground">
+                              {v.value}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </div>
             </DialogContent>
           </Dialog>
@@ -524,7 +610,7 @@ function Toolchains() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto flex flex-col gap-6 animate-in fade-in duration-700">
+      <div className="max-w-7xl mx-auto flex flex-col gap-6">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
           <div>
             <Skeleton className="h-10 w-64 bg-muted" />
@@ -551,7 +637,11 @@ function Toolchains() {
             Package managers and runtimes detected in your environment.
           </p>
         </div>
-        <Button variant="outline" className="gap-2 shadow-xs" onClick={fetchReport}>
+        <Button
+          variant="outline"
+          className="gap-2 shadow-xs"
+          onClick={fetchReport}
+        >
           <RefreshCw className="w-4 h-4" /> Rescan
         </Button>
       </div>
