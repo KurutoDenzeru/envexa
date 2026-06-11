@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Home, ShieldAlert, Boxes, Settings, ScrollText } from "lucide-react"
 import { Link } from "@tanstack/react-router"
-import { Separator } from "@/components/ui/separator"
+
 
 const navItems = [
   { title: "Overview", url: "/", icon: Home },
@@ -74,7 +74,7 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <Separator className="bg-border my-1 group-data-[collapsible=icon]:h-4 group-data-[collapsible=icon]:w-px group-data-[collapsible=icon]:mx-auto" />
+        <div className="bg-border my-1 h-px w-full group-data-[collapsible=icon]:h-4 group-data-[collapsible=icon]:w-px group-data-[collapsible=icon]:mx-auto" />
         <SidebarMenu className="gap-1">
 
           <SidebarMenuItem>
