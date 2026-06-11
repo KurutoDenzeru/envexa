@@ -15,7 +15,7 @@ export const Route = createRootRoute({
     return (
       <ThemeProvider defaultTheme="dark" storageKey="envexa-ui-theme">
         <NextThemesProvider attribute="class" defaultTheme="dark" enableSystem>
-          <Toaster />
+          <Toaster position="top-right" />
           <SidebarProvider defaultOpen={defaultOpen}>
           <div className="flex min-h-screen w-full bg-background font-sans text-foreground">
           <AppSidebar />

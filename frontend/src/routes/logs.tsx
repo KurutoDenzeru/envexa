@@ -36,6 +36,7 @@ function LogsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const start = Date.now()
     fetch("/api/logs")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch logs")
@@ -44,11 +45,12 @@ function LogsPage() {
       .then((data) => {
         setLogs(data.logs)
         setLogsPath(data.path)
-        setLoading(false)
+        const elapsed = Date.now() - start
+        const remaining = Math.max(0, 800 - elapsed)
+        setTimeout(() => setLoading(false), remaining)
       })
       .catch((err) => {
         console.error(err)
-        // Fallback to parsed mock logs
         const parsedMock = mockLogs.map(log => ({
           time: log.time,
           level: log.level,
@@ -57,7 +59,9 @@ function LogsPage() {
         }))
         setLogs(parsedMock)
         setLogsPath("~/.local/share/envexa/logs.json")
-        setLoading(false)
+        const elapsed = Date.now() - start
+        const remaining = Math.max(0, 800 - elapsed)
+        setTimeout(() => setLoading(false), remaining)
       })
   }, [])
 

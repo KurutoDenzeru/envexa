@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Card,
   CardContent,
@@ -87,7 +87,7 @@ function FieldRow({
 
 function SettingsPage() {
   const { theme, setTheme } = useTheme()
-  const [loading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [settings, setSettings] = useState<SettingsState>({
     autoScan: false,
     scanTimeout: "30",
@@ -98,6 +98,11 @@ function SettingsPage() {
     verboseLogs: false,
     logRetention: "7",
   })
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 800)
+    return () => clearTimeout(timer)
+  }, [])
 
   const toggleScanner = (id: string) => {
     setSettings((prev) => ({
