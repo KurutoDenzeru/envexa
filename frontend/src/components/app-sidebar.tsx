@@ -74,19 +74,6 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <div className="bg-border my-1 h-px w-full group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:mx-auto" />
-        <SidebarMenu className="gap-1">
-
-          <SidebarMenuItem>
-            <SidebarMenuButton 
-              tooltip="Scanner Service Active"
-              className="flex w-full items-center gap-3 transition-colors duration-200 group-data-[collapsible=icon]:justify-center cursor-default hover:bg-muted/50"
-            >
-              <div className="w-2 h-2 shrink-0 rounded-full bg-green-500 animate-pulse group-data-[collapsible=icon]:w-2.5 group-data-[collapsible=icon]:h-2.5"></div>
-              <span className="group-data-[collapsible=icon]:hidden text-foreground">Scanner Service Active</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   )

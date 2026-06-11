@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ThemeProvider as NextThemesProvider } from "next-themes"
 import { Toaster } from "@/components/ui/sonner"
+import { ProjectPathSelector } from "@/components/project-path-selector"
 
 export const Route = createRootRoute({
   component: () => {
@@ -19,9 +20,18 @@ export const Route = createRootRoute({
           <SidebarProvider defaultOpen={defaultOpen}>
           <div className="flex min-h-screen w-full bg-background font-sans text-foreground">
           <AppSidebar />
-          <main className="flex-1 flex flex-col relative overflow-hidden">
+            <main className="flex-1 flex flex-col relative overflow-hidden">
             <header className="h-14 border-b border-border flex items-center px-4 bg-background/80 backdrop-blur-md sticky top-0 z-10">
-              <SidebarTrigger />
+              <div className="flex items-center">
+                <SidebarTrigger />
+              </div>
+              <div className="flex-1 flex justify-center">
+                <ProjectPathSelector onPathChanged={() => window.location.reload()} />
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span>Scanner Service Active</span>
+              </div>
             </header>
             <div className="flex-1 overflow-auto p-4 md:p-8">
               <Outlet />
