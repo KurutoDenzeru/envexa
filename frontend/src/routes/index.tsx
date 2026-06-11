@@ -13,12 +13,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ShieldAlert, RefreshCw, Box, CheckCircle, Activity } from "lucide-react"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 export const Route = createFileRoute("/")({ component: App })
 
 export default function App() {
   const [report, setReport] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [vulnPage, setVulnPage] = useState(1)
+  const [outdatedPage, setOutdatedPage] = useState(1)
+  const ITEMS_PER_PAGE = 5
 
   const fetchReport = async () => {
     setLoading(true)
@@ -72,34 +83,59 @@ export default function App() {
     return out
   }, [report])
 
+  const vulnCount = allVulnerabilities.length
+  const outCount = allOutdated.length
+  const healthScore = Math.max(0, 100 - (vulnCount * 10) - (outCount * 2))
+
+  const totalVulnPages = Math.ceil(vulnCount / ITEMS_PER_PAGE)
+  const paginatedVulns = allVulnerabilities.slice((vulnPage - 1) * ITEMS_PER_PAGE, vulnPage * ITEMS_PER_PAGE)
+
+  const totalOutdatedPages = Math.ceil(outCount / ITEMS_PER_PAGE)
+  const paginatedOutdated = allOutdated.slice((outdatedPage - 1) * ITEMS_PER_PAGE, outdatedPage * ITEMS_PER_PAGE)
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[80vh]">
-        <div className="flex flex-col items-center gap-4">
-          <RefreshCw className="w-12 h-12 animate-spin text-blue-500" />
-          <h2 className="text-xl font-medium tracking-tight text-neutral-400">Analyzing Workspace...</h2>
+      <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">
+          <div>
+            <Skeleton className="h-10 w-64 bg-white/10" />
+            <Skeleton className="h-4 w-96 mt-3 bg-white/10" />
+          </div>
         </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Skeleton className="h-32 w-full rounded-xl bg-white/5" />
+          <Skeleton className="h-32 w-full rounded-xl bg-white/5" />
+          <Skeleton className="h-32 w-full rounded-xl bg-white/5" />
+        </div>
+
+        <Card className="bg-neutral-950/50 border-white/10 backdrop-blur-xl">
+          <CardHeader>
+            <Skeleton className="h-6 w-48 bg-white/10" />
+            <Skeleton className="h-4 w-64 mt-2 bg-white/10" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <RefreshCw className="w-10 h-10 animate-spin text-blue-500/50" />
+              <Skeleton className="h-4 w-48 bg-white/10" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   if (!report) {
     return (
-      <div className="flex items-center justify-center min-h-[80vh]">
-        <div className="flex flex-col items-center gap-4">
-          <ShieldAlert className="w-12 h-12 text-red-500" />
-          <h2 className="text-xl font-medium tracking-tight">Failed to load environment report</h2>
-          <button onClick={fetchReport} className="text-sm bg-white/10 hover:bg-white/20 px-4 py-2 rounded-md transition-colors">
-            Retry Scan
-          </button>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+        <ShieldAlert className="w-12 h-12 text-red-500" />
+        <h2 className="text-xl font-medium tracking-tight">Failed to load environment report</h2>
+        <button onClick={fetchReport} className="text-sm bg-white/10 hover:bg-white/20 px-4 py-2 rounded-md transition-colors">
+          Retry Scan
+        </button>
       </div>
     )
   }
-
-  const vulnCount = allVulnerabilities.length
-  const outCount = allOutdated.length
-  const healthScore = Math.max(0, 100 - (vulnCount * 10) - (outCount * 2))
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -214,32 +250,60 @@ export default function App() {
                   <p>No vulnerabilities detected! Great job.</p>
                 </div>
               ) : (
-                <div className="rounded-md border border-white/10">
-                  <Table>
-                    <TableHeader className="bg-white/5">
-                      <TableRow className="border-white/10 hover:bg-transparent">
-                        <TableHead>Toolchain</TableHead>
-                        <TableHead>Package</TableHead>
-                        <TableHead>Severity</TableHead>
-                        <TableHead>Description</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {allVulnerabilities.map((v, idx) => (
-                        <TableRow key={idx} className="border-white/10 hover:bg-white/5">
-                          <TableCell className="font-medium capitalize">{v.toolchain}</TableCell>
-                          <TableCell>{v.name || v.package || "Unknown"}</TableCell>
-                          <TableCell>
-                            <Badge variant="destructive" className="bg-red-500/10 text-red-500 border-red-500/20 shadow-none">
-                              {v.severity || "High"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-neutral-400">{v.description || "Security vulnerability found"}</TableCell>
+                <>
+                  <div className="rounded-md border border-white/10">
+                    <Table>
+                      <TableHeader className="bg-white/5">
+                        <TableRow className="border-white/10 hover:bg-transparent">
+                          <TableHead>Toolchain</TableHead>
+                          <TableHead>Package</TableHead>
+                          <TableHead>Severity</TableHead>
+                          <TableHead>Description</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedVulns.map((v, idx) => (
+                          <TableRow key={idx} className="border-white/10 hover:bg-white/5">
+                            <TableCell className="font-medium capitalize">{v.toolchain}</TableCell>
+                            <TableCell>{v.name || v.package || "Unknown"}</TableCell>
+                            <TableCell>
+                              <Badge variant="destructive" className="bg-red-500/10 text-red-500 border-red-500/20 shadow-none">
+                                {v.severity || "High"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-neutral-400">{v.description || "Security vulnerability found"}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  
+                  {totalVulnPages > 1 && (
+                    <div className="mt-4 pt-4 border-t border-white/5">
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious 
+                              onClick={() => setVulnPage(p => Math.max(1, p - 1))}
+                              className={vulnPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"} 
+                            />
+                          </PaginationItem>
+                          <PaginationItem>
+                            <span className="text-sm text-neutral-400 px-4">
+                              Page {vulnPage} of {totalVulnPages}
+                            </span>
+                          </PaginationItem>
+                          <PaginationItem>
+                            <PaginationNext 
+                              onClick={() => setVulnPage(p => Math.min(totalVulnPages, p + 1))}
+                              className={vulnPage === totalVulnPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -259,32 +323,60 @@ export default function App() {
                   <p>All dependencies are up to date.</p>
                 </div>
               ) : (
-                <div className="rounded-md border border-white/10">
-                  <Table>
-                    <TableHeader className="bg-white/5">
-                      <TableRow className="border-white/10 hover:bg-transparent">
-                        <TableHead>Toolchain</TableHead>
-                        <TableHead>Package</TableHead>
-                        <TableHead>Current</TableHead>
-                        <TableHead>Latest</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {allOutdated.map((o, idx) => (
-                        <TableRow key={idx} className="border-white/10 hover:bg-white/5">
-                          <TableCell className="font-medium capitalize">{o.toolchain}</TableCell>
-                          <TableCell>{o.name}</TableCell>
-                          <TableCell className="text-neutral-400">{o.version}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10">
-                              {o.latest}
-                            </Badge>
-                          </TableCell>
+                <>
+                  <div className="rounded-md border border-white/10">
+                    <Table>
+                      <TableHeader className="bg-white/5">
+                        <TableRow className="border-white/10 hover:bg-transparent">
+                          <TableHead>Toolchain</TableHead>
+                          <TableHead>Package</TableHead>
+                          <TableHead>Current</TableHead>
+                          <TableHead>Latest</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedOutdated.map((o, idx) => (
+                          <TableRow key={idx} className="border-white/10 hover:bg-white/5">
+                            <TableCell className="font-medium capitalize">{o.toolchain}</TableCell>
+                            <TableCell>{o.name}</TableCell>
+                            <TableCell className="text-neutral-400">{o.version}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10">
+                                {o.latest}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  
+                  {totalOutdatedPages > 1 && (
+                    <div className="mt-4 pt-4 border-t border-white/5">
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious 
+                              onClick={() => setOutdatedPage(p => Math.max(1, p - 1))}
+                              className={outdatedPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"} 
+                            />
+                          </PaginationItem>
+                          <PaginationItem>
+                            <span className="text-sm text-neutral-400 px-4">
+                              Page {outdatedPage} of {totalOutdatedPages}
+                            </span>
+                          </PaginationItem>
+                          <PaginationItem>
+                            <PaginationNext 
+                              onClick={() => setOutdatedPage(p => Math.min(totalOutdatedPages, p + 1))}
+                              className={outdatedPage === totalOutdatedPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

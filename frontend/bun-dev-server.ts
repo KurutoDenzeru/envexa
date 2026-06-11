@@ -1,5 +1,5 @@
 import { spawn } from "bun";
-import { createServer } from "vite";
+// import { createServer } from "vite"; // Not needed, running via CLI
 
 async function startDevServer() {
   console.log("🚀 Starting Envexa Unified Dev Server...");
@@ -7,8 +7,17 @@ async function startDevServer() {
   // 1. Start the Rust backend on port 8080 in the background
   console.log("🦀 Starting Rust Backend (cargo run -- serve) on port 8080...");
   const rustProcess = spawn({
-    cmd: ["cargo", "run", "--", "serve"],
+    cmd: ["cargo", "run", "--features", "debug-embed", "--", "serve"],
     cwd: "..", // Run from the envexa root directory
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+
+  // 2. Start Vite in Watch Mode
+  console.log("⚡ Compiling Vite Frontend (watch mode)...");
+  const viteProcess = spawn({
+    cmd: ["bun", "run", "vite", "build", "--watch"],
+    cwd: import.meta.dir,
     stdout: "inherit",
     stderr: "inherit",
   });
@@ -17,26 +26,9 @@ async function startDevServer() {
   process.on("SIGINT", () => {
     console.log("🛑 Stopping Dev Server...");
     rustProcess.kill();
+    viteProcess.kill();
     process.exit(0);
   });
-
-  // 2. Start Vite Dev Server on port 3000
-  console.log("⚡ Starting Vite Frontend on port 3000...");
-  const viteServer = await createServer({
-    server: {
-      port: 3000,
-      proxy: {
-        // Proxy API requests to the Rust backend
-        '/api': {
-          target: 'http://localhost:8080',
-          changeOrigin: true,
-        },
-      },
-    },
-  });
-
-  await viteServer.listen();
-  viteServer.printUrls();
 }
 
 startDevServer().catch((err) => {

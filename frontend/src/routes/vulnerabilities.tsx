@@ -11,6 +11,14 @@ import { Badge } from "@/components/ui/badge"
 import { RefreshCw, ShieldAlert, CheckCircle, Search } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 export const Route = createFileRoute("/vulnerabilities")({ component: Vulnerabilities })
 
@@ -18,6 +26,8 @@ function Vulnerabilities() {
   const [report, setReport] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+  const ITEMS_PER_PAGE = 8
 
   const fetchReport = async () => {
     setLoading(true)
@@ -55,13 +65,34 @@ function Vulnerabilities() {
     v.toolchain?.toLowerCase().includes(search.toLowerCase())
   )
 
+  useEffect(() => {
+    setPage(1)
+  }, [search])
+
+  const totalPages = Math.ceil(filteredVulnerabilities.length / ITEMS_PER_PAGE)
+  const paginatedVulnerabilities = filteredVulnerabilities.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[80vh]">
-        <div className="flex flex-col items-center gap-4">
-          <RefreshCw className="w-12 h-12 animate-spin text-blue-500" />
-          <h2 className="text-xl font-medium tracking-tight text-neutral-400">Loading Vulnerabilities...</h2>
+      <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">
+          <div>
+            <Skeleton className="h-10 w-64 bg-white/10" />
+            <Skeleton className="h-4 w-96 mt-3 bg-white/10" />
+          </div>
         </div>
+        <Card className="bg-neutral-950/50 border-white/10 backdrop-blur-xl">
+          <CardHeader>
+            <Skeleton className="h-6 w-48 bg-white/10" />
+            <Skeleton className="h-4 w-64 mt-2 bg-white/10" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <RefreshCw className="w-10 h-10 animate-spin text-red-500/50" />
+              <Skeleton className="h-4 w-48 bg-white/10" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -104,8 +135,9 @@ function Vulnerabilities() {
               <p>{search ? "No vulnerabilities match your search." : "No vulnerabilities detected! Your project is secure."}</p>
             </div>
           ) : (
-            <div className="rounded-md border border-white/10 overflow-hidden">
-              <Table>
+            <>
+              <div className="rounded-md border border-white/10 overflow-hidden">
+                <Table>
                 <TableHeader className="bg-white/5">
                   <TableRow className="border-white/10 hover:bg-transparent">
                     <TableHead className="w-[100px]">Toolchain</TableHead>
@@ -116,7 +148,7 @@ function Vulnerabilities() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredVulnerabilities.map((v, idx) => (
+                  {paginatedVulnerabilities.map((v, idx) => (
                     <TableRow key={idx} className="border-white/10 hover:bg-white/5">
                       <TableCell className="font-medium capitalize text-neutral-300">{v.toolchain}</TableCell>
                       <TableCell className="font-mono text-sm text-neutral-100">{v.name || v.package || "Unknown"}</TableCell>
@@ -136,6 +168,33 @@ function Vulnerabilities() {
                 </TableBody>
               </Table>
             </div>
+            
+            {totalPages > 1 && (
+              <div className="mt-4 pt-4 border-t border-white/5">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"} 
+                      />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <span className="text-sm text-neutral-400 px-4">
+                        Page {page} of {totalPages}
+                      </span>
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationNext 
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+          </>
           )}
         </CardContent>
       </Card>

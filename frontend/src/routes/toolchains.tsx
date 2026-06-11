@@ -8,8 +8,9 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, Boxes, PackageOpen, AlertTriangle } from "lucide-react"
+import { Boxes, PackageOpen, AlertTriangle } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export const Route = createFileRoute("/toolchains")({ component: Toolchains })
 
@@ -46,10 +47,16 @@ function Toolchains() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[80vh]">
-        <div className="flex flex-col items-center gap-4">
-          <RefreshCw className="w-12 h-12 animate-spin text-blue-500" />
-          <h2 className="text-xl font-medium tracking-tight text-neutral-400">Loading Toolchains...</h2>
+      <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">
+          <div>
+            <Skeleton className="h-10 w-64 bg-white/10" />
+            <Skeleton className="h-4 w-96 mt-3 bg-white/10" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Skeleton className="h-56 w-full rounded-xl bg-white/5" />
+          <Skeleton className="h-56 w-full rounded-xl bg-white/5" />
         </div>
       </div>
     )
