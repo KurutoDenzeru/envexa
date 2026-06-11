@@ -6,6 +6,7 @@ import {
   ChevronUp,
   Folder,
   CornerDownLeft,
+  Star,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils"
 interface ProjectData {
   current: string
   recent: string[]
+  favorites: string[]
 }
 
 interface DirEntry {
@@ -67,6 +69,7 @@ export function ProjectPathSelector({
       // silently fail
     }
   }, [])
+
   const fetchDirs = useCallback(async (path: string) => {
     const cached = dirCache.current.get(path)
     if (cached) {
@@ -150,6 +153,22 @@ export function ProjectPathSelector({
     setInputValue(path)
   }
 
+  const toggleFavorite = async (path: string) => {
+    try {
+      const res = await fetch("/api/project/favorite", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path }),
+      })
+      if (res.ok) {
+        const data: ProjectData = await res.json()
+        setProject(data)
+      }
+    } catch {
+      // silently fail
+    }
+  }
+
   const display = project?.current ?? "…"
 
   return (
@@ -171,7 +190,7 @@ export function ProjectPathSelector({
         <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="truncate">{shortenPath(display)}</span>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Project Path</DialogTitle>
         </DialogHeader>
@@ -252,7 +271,7 @@ export function ProjectPathSelector({
           </div>
 
           {/* Directory entries */}
-          <div className="max-h-[200px] overflow-y-auto">
+          <div className="max-h-[280px] overflow-y-auto">
             {dirsLoading ? (
               <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
                 Loading…
@@ -301,7 +320,67 @@ export function ProjectPathSelector({
           </div>
         </div>
 
-        {/* Recent paths */}
+        {/* Favorite projects */}
+        {project && project.favorites.length > 0 && (
+          <div>
+            <p className="text-xs font-medium text-muted-foreground mb-1.5 px-1 flex items-center gap-1.5">
+              <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+              Favorites
+            </p>
+            <div className="divide-y divide-border/50 rounded-lg border border-border/50 overflow-hidden">
+              {project.favorites.map((p) => {
+                const isActive = p === project.current
+                const isSwitching = switching === p
+                return (
+                  <div
+                    key={p}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2",
+                      "hover:bg-muted/50 transition-colors",
+                      "border-b border-border/30 last:border-0",
+                      isActive && "bg-muted/30"
+                    )}
+                  >
+                    <button
+                      onClick={() => !isActive && handleSwitch(p)}
+                      disabled={isActive || isSwitching}
+                      className={cn(
+                        "flex-1 flex items-center gap-2 text-left min-w-0",
+                        "disabled:cursor-default"
+                      )}
+                      title={p}
+                    >
+                      <FolderOpen
+                        className={cn(
+                          "h-4 w-4 shrink-0",
+                          isActive ? "text-green-500" : "text-yellow-500"
+                        )}
+                      />
+                      <span className="text-sm font-mono truncate">
+                        {shortenPath(p)}
+                      </span>
+                      {isActive && (
+                        <Check className="h-3.5 w-3.5 shrink-0 text-green-500" />
+                      )}
+                      {isSwitching && (
+                        <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => toggleFavorite(p)}
+                      className="p-1 rounded hover:bg-muted transition-colors shrink-0"
+                      title="Remove from favorites"
+                    >
+                      <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Recent projects */}
         {project && project.recent.length > 0 && (
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-1.5 px-1">
@@ -311,35 +390,57 @@ export function ProjectPathSelector({
               {project.recent.map((p) => {
                 const isActive = p === project.current
                 const isSwitching = switching === p
+                const isFavorited = project.favorites.includes(p)
                 return (
-                  <button
+                  <div
                     key={p}
-                    onClick={() => !isActive && handleSwitch(p)}
-                    disabled={isActive || isSwitching}
                     className={cn(
-                      "w-full flex items-center gap-2 px-3 py-2 text-left",
+                      "flex items-center gap-2 px-3 py-2",
                       "hover:bg-muted/50 transition-colors",
-                      "disabled:cursor-default",
+                      "border-b border-border/30 last:border-0",
                       isActive && "bg-muted/30"
                     )}
-                    title={p}
                   >
-                    <FolderOpen
+                    <button
+                      onClick={() => !isActive && handleSwitch(p)}
+                      disabled={isActive || isSwitching}
                       className={cn(
-                        "h-4 w-4 shrink-0",
-                        isActive ? "text-green-500" : "text-muted-foreground"
+                        "flex-1 flex items-center gap-2 text-left min-w-0",
+                        "disabled:cursor-default"
                       )}
-                    />
-                    <span className="text-sm font-mono truncate flex-1">
-                      {shortenPath(p)}
-                    </span>
-                    {isActive && (
-                      <Check className="h-3.5 w-3.5 shrink-0 text-green-500" />
-                    )}
-                    {isSwitching && (
-                      <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-                    )}
-                  </button>
+                      title={p}
+                    >
+                      <FolderOpen
+                        className={cn(
+                          "h-4 w-4 shrink-0",
+                          isActive ? "text-green-500" : "text-muted-foreground"
+                        )}
+                      />
+                      <span className="text-sm font-mono truncate">
+                        {shortenPath(p)}
+                      </span>
+                      {isActive && (
+                        <Check className="h-3.5 w-3.5 shrink-0 text-green-500" />
+                      )}
+                      {isSwitching && (
+                        <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => toggleFavorite(p)}
+                      className="p-1 rounded hover:bg-muted transition-colors shrink-0"
+                      title={isFavorited ? "Remove from favorites" : "Add to favorites"}
+                    >
+                      <Star
+                        className={cn(
+                          "h-3.5 w-3.5",
+                          isFavorited
+                            ? "fill-yellow-500 text-yellow-500"
+                            : "text-muted-foreground"
+                        )}
+                      />
+                    </button>
+                  </div>
                 )
               })}
             </div>
