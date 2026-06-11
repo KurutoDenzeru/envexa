@@ -74,7 +74,7 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <Separator className="bg-border/50 my-0.5 group-data-[collapsible=icon]:hidden" />
+        <Separator className="bg-border/50 my-0.5" />
         <SidebarMenu className="gap-1">
 
           <SidebarMenuItem>
