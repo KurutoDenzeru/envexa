@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 
 export const Route = createFileRoute("/logs")({ component: LogsPage })
 
@@ -30,15 +30,45 @@ const mockLogs = [
 function LogsPage() {
   const [filterLevel, setFilterLevel] = useState<string>("ALL")
   const [search, setSearch] = useState("")
+  const [logs, setLogs] = useState<any[]>([])
+  const [logsPath, setLogsPath] = useState<string>("envexa-system.log")
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch("/api/logs")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch logs")
+        return res.json()
+      })
+      .then((data) => {
+        setLogs(data.logs)
+        setLogsPath(data.path)
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error(err)
+        // Fallback to parsed mock logs
+        const parsedMock = mockLogs.map(log => ({
+          time: log.time,
+          level: log.level,
+          message: log.message,
+          source: log.source
+        }))
+        setLogs(parsedMock)
+        setLogsPath("~/.local/share/envexa/logs.json")
+        setLoading(false)
+      })
+  }, [])
 
   const filteredLogs = useMemo(() => {
-    return mockLogs.filter(log => {
+    return logs.filter(log => {
       const matchesLevel = filterLevel === "ALL" || log.level === filterLevel
       const matchesSearch = log.message.toLowerCase().includes(search.toLowerCase()) || 
                             log.source.toLowerCase().includes(search.toLowerCase())
       return matchesLevel && matchesSearch
     })
-  }, [filterLevel, search])
+  }, [logs, filterLevel, search])
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
@@ -52,12 +82,12 @@ function LogsPage() {
           </p>
         </div>
         <div className="flex gap-3 w-full md:w-auto">
-          <div className="relative w-full md:w-64">
+          <div className="relative w-full md:w-52">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/60" />
             <Input 
               type="text" 
               placeholder="Search logs..." 
-              className="pl-9 bg-background/50 border-border focus-visible:ring-blue-500" 
+              className="pl-9 h-9 bg-background/50 border-border focus-visible:ring-blue-500 w-full" 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -97,9 +127,9 @@ function LogsPage() {
             <span className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29] cursor-pointer hover:opacity-85 transition-opacity"></span>
           </div>
           {/* Center Monospace Session Title */}
-          <div className="flex items-center gap-1.5 text-xs font-sans font-medium text-zinc-400 tracking-wide">
-            <Terminal className="w-3.5 h-3.5 text-zinc-500" />
-            <span>envexa-system — logs — 80×24</span>
+          <div className="flex items-center gap-1.5 text-xs font-sans font-medium text-zinc-400 tracking-wide max-w-[60%] truncate">
+            <Terminal className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+            <span className="truncate">{logsPath}</span>
           </div>
           {/* Right indicator for balance */}
           <div className="w-20 text-right text-[10px] text-zinc-600 font-mono tracking-wider">
@@ -109,7 +139,12 @@ function LogsPage() {
 
         <CardContent className="p-0">
           <div className="font-mono text-[13px] leading-relaxed p-4 h-[600px] overflow-y-auto bg-[#0c0c0e] text-zinc-100 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-            {filteredLogs.length === 0 ? (
+            {loading ? (
+              <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-4">
+                <span className="w-6 h-6 rounded-full border-2 border-zinc-600 border-t-zinc-200 animate-spin"></span>
+                <p className="font-sans text-sm">Loading real-time logs...</p>
+              </div>
+            ) : filteredLogs.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-zinc-500">
                 <Filter className="w-10 h-10 mb-4 opacity-20 text-zinc-400" />
                 <p className="font-sans text-sm">No logs match the current filters.</p>

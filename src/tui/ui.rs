@@ -1762,26 +1762,94 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 
 fn render_logs(frame: &mut Frame, area: Rect, app: &App) {
     let mut log_items = Vec::new();
-    for (time, action) in &app.logs {
-        let time_str = time.format("----%B %d, %Y %H:%M----").to_string();
+    let theme = app.theme();
 
-        log_items.push(Line::from(vec![Span::styled(
-            time_str,
-            Style::default().fg(app.theme().text_muted),
-        )]));
-        log_items.push(Line::from(vec![Span::styled(
-            action.clone(),
-            Style::default().fg(app.theme().text_normal),
-        )]));
-        log_items.push(Line::from(vec![]));
+    for (time, action) in &app.logs {
+        let mut level = "INFO";
+        let mut source = "system";
+        let mut message = action.as_str();
+
+        if message.starts_with("INFO: ") {
+            level = "INFO";
+            message = &message["INFO: ".len()..];
+        } else if message.starts_with("WARN: ") {
+            level = "WARN";
+            message = &message["WARN: ".len()..];
+        } else if message.starts_with("ERROR: ") {
+            level = "ERROR";
+            message = &message["ERROR: ".len()..];
+        } else if message.starts_with("DEBUG: ") {
+            level = "DEBUG";
+            message = &message["DEBUG: ".len()..];
+        }
+
+        let mut msg_owned = message.to_string();
+        if let Some(start_idx) = msg_owned.rfind('[') {
+            if let Some(end_idx) = msg_owned.rfind(']') {
+                if start_idx < end_idx {
+                    source = &message[start_idx + 1..end_idx];
+                    msg_owned = message[..start_idx].trim().to_string();
+                }
+            }
+        }
+
+        let time_str = time.format("%H:%M:%S").to_string();
+
+        let level_color = match level {
+            "INFO" => theme.success,
+            "WARN" => theme.warning,
+            "ERROR" => theme.error,
+            "DEBUG" => theme.primary,
+            _ => theme.text_normal,
+        };
+
+        let source_color = match source.to_lowercase().as_str() {
+            "rust" => Color::Rgb(255, 123, 114),    // #ff7b72
+            "node" => Color::Rgb(126, 231, 135),    // #7ee787
+            "python" => Color::Rgb(121, 192, 255),  // #79c0ff
+            "system" => Color::Rgb(165, 214, 255),  // #a5d6ff
+            "watcher" => Color::Rgb(210, 168, 255), // #d2a8ff
+            _ => theme.text_muted,
+        };
+
+        let msg_color = match level {
+            "ERROR" => theme.error,
+            "WARN" => theme.warning,
+            _ => theme.text_normal,
+        };
+
+        log_items.push(Line::from(vec![
+            Span::styled(
+                format!("{:<10}", time_str),
+                Style::default().fg(theme.text_muted),
+            ),
+            Span::styled(
+                format!("{:<7}", level),
+                Style::default()
+                    .fg(level_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(format!("[{}] ", source), Style::default().fg(source_color)),
+            Span::styled(msg_owned, Style::default().fg(msg_color)),
+        ]));
     }
+
+    let logs_path = crate::core::config::logs_path()
+        .to_string_lossy()
+        .to_string();
+    let title = format!(" Terminal — {} ", logs_path);
 
     let paragraph = Paragraph::new(log_items)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" Application Logs ")
-                .border_style(Style::default().fg(app.theme().primary)),
+                .title(Span::styled(
+                    title,
+                    Style::default()
+                        .fg(theme.text_normal)
+                        .add_modifier(Modifier::BOLD),
+                ))
+                .border_style(Style::default().fg(theme.primary)),
         )
         .wrap(ratatui::widgets::Wrap { trim: true })
         .scroll((app.ui.logs_scroll, 0));

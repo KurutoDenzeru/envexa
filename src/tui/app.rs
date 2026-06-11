@@ -170,7 +170,7 @@ impl App {
     pub fn new() -> Self {
         let config = config::load_config();
         let report = config::read_cache().map(|e| e.report);
-        let logs = config::read_logs(config.log_retention_days);
+        let logs = config::read_logs(0);
         Self {
             config,
             report,
