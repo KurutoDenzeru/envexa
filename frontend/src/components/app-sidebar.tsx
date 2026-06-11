@@ -22,7 +22,7 @@ const navItems = [
 export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-white/10 bg-neutral-950/50 backdrop-blur-xl">
-      <SidebarHeader className="p-4 flex flex-row items-center gap-2 text-neutral-100">
+      <SidebarHeader className="p-4 flex flex-row items-center gap-2 text-neutral-100 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center">
         <Hexagon className="h-6 w-6 shrink-0 text-blue-500" />
         <span className="font-bold text-lg tracking-tight group-data-[collapsible=icon]:hidden">Envexa</span>
       </SidebarHeader>
@@ -38,7 +38,7 @@ export function AppSidebar() {
                     render={
                       <Link 
                         to={item.url} 
-                        className="flex w-full items-center gap-3 transition-colors duration-200"
+                        className="flex w-full items-center gap-3 transition-colors duration-200 group-data-[collapsible=icon]:justify-center"
                         activeProps={{ className: "bg-white/10 text-white font-medium" }}
                         inactiveProps={{ className: "text-neutral-400 hover:bg-white/5 hover:text-white" }}
                       />
@@ -61,7 +61,7 @@ export function AppSidebar() {
               render={
                 <Link 
                   to="/settings" 
-                  className="flex w-full items-center gap-3 transition-colors duration-200"
+                  className="flex w-full items-center gap-3 transition-colors duration-200 group-data-[collapsible=icon]:justify-center"
                   activeProps={{ className: "bg-white/10 text-white font-medium" }}
                   inactiveProps={{ className: "text-neutral-400 hover:bg-white/5 hover:text-white" }}
                 />

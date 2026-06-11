@@ -11,10 +11,12 @@ import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { Settings as SettingsIcon, Bell, ShieldCheck, Database, Save, Sun, Moon, Monitor, Paintbrush } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useTheme } from "@/components/theme-provider"
 
 export const Route = createFileRoute("/settings")({ component: SettingsPage })
 
 function SettingsPage() {
+  const { theme, setTheme } = useTheme()
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">
@@ -99,7 +101,7 @@ function SettingsPage() {
                 <Label className="text-base text-neutral-200">Theme Preference</Label>
                 <p className="text-sm text-neutral-500">Select your preferred color theme.</p>
               </div>
-              <Tabs defaultValue="auto" className="w-[200px]">
+              <Tabs value={theme} onValueChange={(v) => setTheme(v as any)} className="w-[200px]">
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="light" title="Light Theme">
                     <Sun className="h-4 w-4" />
