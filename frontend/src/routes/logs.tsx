@@ -87,16 +87,11 @@ function LogsPage() {
       </div>
 
       <Card className="bg-card border-border shadow-xs overflow-hidden backdrop-blur-xl">
-        {/* MacOS Style Terminal Header */}
-        <div className="flex items-center px-4 py-3 bg-muted/50 border-b border-border">
-          <div className="flex gap-2">
-            <Circle className="w-3 h-3 fill-red-500 text-red-500" />
-            <Circle className="w-3 h-3 fill-yellow-500 text-yellow-500" />
-            <Circle className="w-3 h-3 fill-green-500 text-green-500" />
-          </div>
-          <div className="flex-1 flex justify-center items-center gap-2 text-muted-foreground">
+        {/* Sleek Terminal Header */}
+        <div className="flex items-center px-4 py-3 bg-muted/30 border-b border-border">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <Terminal className="w-4 h-4" />
-            <span className="text-xs font-mono font-medium">envexa-daemon — tail -f /var/log/envexa.log</span>
+            <span className="text-xs font-mono font-medium tracking-wider uppercase">System Console</span>
           </div>
         </div>
         <CardContent className="p-0">

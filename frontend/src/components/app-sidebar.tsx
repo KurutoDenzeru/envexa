@@ -24,8 +24,8 @@ const navItems = [
 export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-border bg-card/50 backdrop-blur-xl">
-      <SidebarHeader className="h-14 border-b border-border p-4 flex flex-row items-center gap-2 text-foreground group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center">
-        <img src="/bulldozer.png" alt="Envexa Logo" className="h-6 w-6 shrink-0 object-contain" />
+      <SidebarHeader className="h-14 border-b border-border p-4 flex flex-row items-center gap-3 text-foreground group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center">
+        <img src="/bulldozer.png" alt="Envexa Logo" className="h-8 w-8 shrink-0 object-contain" />
         <span className="font-bold text-lg tracking-tight group-data-[collapsible=icon]:hidden">Envexa</span>
       </SidebarHeader>
       <SidebarContent>

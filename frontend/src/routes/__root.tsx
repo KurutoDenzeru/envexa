@@ -5,10 +5,16 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { ThemeProvider } from "@/components/theme-provider"
 
 export const Route = createRootRoute({
-  component: () => (
-    <ThemeProvider defaultTheme="dark" storageKey="envexa-ui-theme">
-      <SidebarProvider>
-        <div className="flex min-h-screen w-full bg-background font-sans text-foreground">
+  component: () => {
+    const defaultOpen = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("sidebar_state="))
+      ?.split("=")[1] !== "false";
+
+    return (
+      <ThemeProvider defaultTheme="dark" storageKey="envexa-ui-theme">
+        <SidebarProvider defaultOpen={defaultOpen}>
+          <div className="flex min-h-screen w-full bg-background font-sans text-foreground">
           <AppSidebar />
           <main className="flex-1 flex flex-col relative overflow-hidden">
             <header className="h-14 border-b border-border flex items-center px-4 bg-background/80 backdrop-blur-md sticky top-0 z-10">
@@ -22,7 +28,8 @@ export const Route = createRootRoute({
         <TanStackRouterDevtools />
       </SidebarProvider>
     </ThemeProvider>
-  ),
+    );
+  },
   notFoundComponent: () => (
     <div className="flex items-center justify-center min-h-screen bg-background text-foreground">
       <div className="text-center">
