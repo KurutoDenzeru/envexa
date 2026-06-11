@@ -13,10 +13,10 @@ async function startDevServer() {
     stderr: "inherit",
   });
 
-  // 2. Start Vite in Watch Mode
-  console.log("⚡ Compiling Vite Frontend (watch mode)...");
+  // 2. Start Vite Dev Server with HMR (port 5173, proxies /api to 8080)
+  console.log("⚡ Starting Vite Dev Server (HMR enabled)...");
   const viteProcess = spawn({
-    cmd: ["bun", "run", "vite", "build", "--watch"],
+    cmd: ["bun", "run", "vite"],
     cwd: import.meta.dir,
     stdout: "inherit",
     stderr: "inherit",
