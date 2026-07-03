@@ -212,6 +212,17 @@ function Vulnerabilities() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10)
   }, [allVulnerabilities])
+  // Bar chart data: vulns per package
+  const packageBarData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const v of allVulnerabilities) {
+      counts[v.package] = (counts[v.package] || 0) + 1
+    }
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+  }, [allVulnerabilities])
 
   const totalPages = Math.ceil(filteredVulnerabilities.length / itemsPerPage)
   const paginatedVulnerabilities = filteredVulnerabilities.slice(
@@ -276,7 +287,8 @@ function Vulnerabilities() {
           <Skeleton className="h-24 w-full rounded-xl bg-muted/50" />
           <Skeleton className="h-24 w-full rounded-xl bg-muted/50" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Skeleton className="h-[300px] w-full rounded-xl bg-muted/50" />
           <Skeleton className="h-[300px] w-full rounded-xl bg-muted/50" />
           <Skeleton className="h-[300px] w-full rounded-xl bg-muted/50" />
         </div>
@@ -378,7 +390,7 @@ function Vulnerabilities() {
 
       {/* Charts Section */}
       {total > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Severity Distribution Donut */}
           <Card>
             <CardHeader>
@@ -500,6 +512,70 @@ function Vulnerabilities() {
                       dataKey="count"
                       name="Vulnerabilities"
                       fill="#ef4444"
+                      radius={[0, 4, 4, 0]}
+                      maxBarSize={24}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+          {/* Vulnerabilities by Package */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                By Package
+              </CardTitle>
+              <CardDescription>
+                Top packages with the most vulnerabilities.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[260px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={packageBarData}
+                    layout="vertical"
+                    margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="hsl(var(--border))"
+                      horizontal={false}
+                    />
+                    <XAxis
+                      type="number"
+                      stroke="#a1a1aa"
+                      tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      stroke="#a1a1aa"
+                      tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={90}
+                      tickFormatter={(v: string) =>
+                        v.length > 10 ? v.slice(0, 10) + "..." : v
+                      }
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                        color: "hsl(var(--foreground))",
+                      }}
+                      cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                    />
+                    <Bar
+                      dataKey="count"
+                      name="Vulnerabilities"
+                      fill="#3b82f6"
                       radius={[0, 4, 4, 0]}
                       maxBarSize={24}
                     />
