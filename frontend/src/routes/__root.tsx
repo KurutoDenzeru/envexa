@@ -20,8 +20,8 @@ export const Route = createRootRoute({
           <SidebarProvider defaultOpen={defaultOpen}>
           <div className="flex min-h-screen w-full bg-background font-sans text-foreground">
           <AppSidebar />
-            <main className="flex-1 flex flex-col relative overflow-hidden">
-            <header className="h-14 border-b border-border flex items-center px-4 bg-background/80 backdrop-blur-md sticky top-0 z-10">
+            <main className="flex-1 flex flex-col min-h-0">
+            <header className="h-14 shrink-0 border-b border-border flex items-center px-4 bg-background/80 backdrop-blur-md sticky top-0 z-10">
               <div className="flex items-center">
                 <SidebarTrigger />
               </div>
