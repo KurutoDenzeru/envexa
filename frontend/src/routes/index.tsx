@@ -186,11 +186,14 @@ function statusBadge(status: string) {
 function severityColor(s: string): string {
   switch (s.toLowerCase()) {
     case "critical":
-      return "bg-red-500/10 text-red-500 border-red-500/20"
+      return "bg-red-500/10 text-red-600 border-red-500/20 dark:bg-red-500/15 dark:text-red-400 dark:border-red-500/25"
     case "high":
-      return "bg-orange-500/10 text-orange-500 border-orange-500/20"
+      return "bg-orange-500/10 text-orange-600 border-orange-500/20 dark:bg-orange-500/15 dark:text-orange-400 dark:border-orange-500/25"
     case "medium":
-      return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+    case "moderate":
+      return "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/25"
+    case "low":
+      return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/25"
     default:
       return "bg-muted text-muted-foreground border-border"
   }
@@ -822,7 +825,7 @@ function App() {
                         </TableCell>
                         <TableCell>
                           <Badge
-                            variant="destructive"
+                            variant="outline"
                             className={`shadow-none ${severityColor(v.severity)}`}
                           >
                             {v.severity}

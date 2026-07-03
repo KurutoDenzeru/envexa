@@ -94,13 +94,14 @@ function severityOrder(s: string): number {
 function severityColor(s: string): string {
   switch (s.toLowerCase()) {
     case "critical":
-      return "bg-red-500/10 text-red-500 border-red-500/20"
+      return "bg-red-500/10 text-red-600 border-red-500/20 dark:bg-red-500/15 dark:text-red-400 dark:border-red-500/25"
     case "high":
-      return "bg-orange-500/10 text-orange-500 border-orange-500/20"
+      return "bg-orange-500/10 text-orange-600 border-orange-500/20 dark:bg-orange-500/15 dark:text-orange-400 dark:border-orange-500/25"
     case "medium":
-      return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+    case "moderate":
+      return "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/25"
     case "low":
-      return "bg-blue-500/10 text-blue-500 border-blue-500/20"
+      return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/25"
     default:
       return "bg-muted text-muted-foreground border-border"
   }
@@ -109,8 +110,9 @@ function severityColor(s: string): string {
 const SEVERITY_COLORS: Record<string, string> = {
   critical: "#ef4444",
   high: "#f97316",
-  medium: "#eab308",
-  low: "#3b82f6",
+  medium: "#d97706",
+  moderate: "#d97706",
+  low: "#10b981",
   other: "#71717a",
 }
 
@@ -655,7 +657,7 @@ function Vulnerabilities() {
                         </TableCell>
                         <TableCell>
                           <Badge
-                            variant="destructive"
+                            variant="outline"
                             className={`shadow-none ${severityColor(v.severity)}`}
                           >
                             {v.severity}
