@@ -403,16 +403,31 @@ function Vulnerabilities() {
                       strokeWidth={2}
                     >
                       {pieData.map((entry, index) => (
-                        <Cell key={index} fill={entry.fill} />
+                        <Cell
+                          key={index}
+                          fill={entry.fill}
+                          className="transition-opacity hover:opacity-80 cursor-pointer outline-none"
+                        />
                       ))}
                     </Pie>
                     <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                        color: "hsl(var(--foreground))",
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null
+                        const data = payload[0].payload
+                        return (
+                          <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground shadow-md">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
+                                style={{ backgroundColor: data.fill }}
+                              />
+                              <span className="font-medium">{data.name}</span>
+                              <span className="text-muted-foreground ml-1">: {data.value}</span>
+                            </div>
+                          </div>
+                        )
                       }}
+                      cursor={false}
                     />
                     <Legend
                       verticalAlign="bottom"
