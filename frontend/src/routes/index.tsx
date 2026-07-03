@@ -25,6 +25,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts"
+import { SimpleChartTooltip } from "@/components/ui/chart"
 import {
   Table,
   TableBody,
@@ -659,13 +660,8 @@ function App() {
                   />
 
                   <Tooltip
+                    content={<SimpleChartTooltip />}
                     cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                      color: "hsl(var(--foreground))",
-                    }}
                   />
                   <Bar
                     dataKey="value"

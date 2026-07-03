@@ -47,6 +47,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts"
+import { SimpleChartTooltip } from "@/components/ui/chart"
 
 export const Route = createFileRoute("/vulnerabilities")({
   component: Vulnerabilities,
@@ -427,10 +428,10 @@ function Vulnerabilities() {
                         if (!active || !payload?.length) return null
                         const data = payload[0].payload
                         return (
-                          <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground shadow-md">
+                          <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground shadow-xs">
                             <div className="flex items-center gap-2">
                               <span
-                                className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
+                                className="inline-block h-2 w-2 rounded-full shrink-0"
                                 style={{ backgroundColor: data.fill }}
                               />
                               <span className="font-medium">{data.name}</span>
@@ -500,12 +501,7 @@ function Vulnerabilities() {
                       }
                     />
                     <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                        color: "hsl(var(--foreground))",
-                      }}
+                      content={<SimpleChartTooltip />}
                       cursor={{ fill: "rgba(255,255,255,0.05)" }}
                     />
                     <Bar
@@ -564,13 +560,7 @@ function Vulnerabilities() {
                       }
                     />
                     <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                        color: "hsl(var(--foreground))",
-                      }}
-                      cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                      content={<SimpleChartTooltip />}
                     />
                     <Bar
                       dataKey="count"

@@ -361,6 +361,38 @@ function getPayloadConfigFromPayload(
   return configLabelKey in config ? config[configLabelKey] : config[key]
 }
 
+/**
+ * Lightweight chart tooltip that works without ChartProvider context.
+ * Uses Tailwind classes for proper light/dark mode support.
+ */
+function SimpleChartTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean
+  payload?: Array<{ name: string; value: number; color?: string; payload?: { fill?: string } }>
+  label?: string
+}) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground shadow-xs">
+      {label && <p className="font-medium mb-1">{label}</p>}
+      <div className="grid gap-1">
+        {payload.map((item, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span
+              className="inline-block h-2 w-2 rounded-full shrink-0"
+              style={{ backgroundColor: item.color ?? item.payload?.fill }}
+            />
+            <span className="text-muted-foreground">{item.name}:</span>
+            <span className="font-medium">{item.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 export {
   ChartContainer,
   ChartTooltip,
@@ -368,4 +400,5 @@ export {
   ChartLegend,
   ChartLegendContent,
   ChartStyle,
+  SimpleChartTooltip,
 }
