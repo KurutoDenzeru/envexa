@@ -1,4 +1,5 @@
 import { createRootRoute, Outlet } from '@tanstack/react-router'
+import { useState, useEffect } from 'react'
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -6,12 +7,27 @@ import { ThemeProvider as NextThemesProvider } from "next-themes"
 import { Toaster } from "@/components/ui/sonner"
 import { ProjectPathSelector } from "@/components/project-path-selector"
 
+type ScannerStatus = "warming" | "active" | "error"
+
+const STATUS_CONFIG: Record<ScannerStatus, { color: string; label: string }> = {
+  warming: { color: "bg-orange-500", label: "Warming up..." },
+  active: { color: "bg-emerald-500", label: "Scanner Service Active" },
+  error: { color: "bg-red-500", label: "Failed to load environment report" },
+}
+
 export const Route = createRootRoute({
   component: () => {
+    const [status, setStatus] = useState<ScannerStatus>("warming")
     const defaultOpen = document.cookie
       .split("; ")
       .find((row) => row.startsWith("sidebar_state="))
       ?.split("=")[1] !== "false";
+
+    useEffect(() => {
+      const handler = (e: CustomEvent<ScannerStatus>) => setStatus(e.detail)
+      window.addEventListener("scanner-status", handler as EventListener)
+      return () => window.removeEventListener("scanner-status", handler as EventListener)
+    }, [])
 
     return (
       <ThemeProvider defaultTheme="dark" storageKey="envexa-ui-theme">
@@ -29,8 +45,8 @@ export const Route = createRootRoute({
                 <ProjectPathSelector onPathChanged={() => window.location.reload()} />
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span>Scanner Service Active</span>
+                <div className={`w-2 h-2 rounded-full animate-pulse ${STATUS_CONFIG[status].color}`} />
+                <span>{STATUS_CONFIG[status].label}</span>
               </div>
             </header>
             <div className="flex-1 overflow-auto p-4 md:p-8">

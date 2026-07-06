@@ -222,12 +222,15 @@ function App() {
 
   const fetchReport = async () => {
     setLoading(true)
+    window.dispatchEvent(new CustomEvent("scanner-status", { detail: "warming" }))
     try {
       const res = await fetch("/api/scan")
       const data: unknown = await res.json()
       setReport(data as ScanReport)
+      window.dispatchEvent(new CustomEvent("scanner-status", { detail: "active" }))
     } catch (e) {
       console.error("Failed to fetch report", e)
+      window.dispatchEvent(new CustomEvent("scanner-status", { detail: "error" }))
     } finally {
       setLoading(false)
     }
