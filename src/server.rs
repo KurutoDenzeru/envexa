@@ -34,18 +34,36 @@ struct ScanQuery {
 }
 
 async fn api_scan(Query(query): Query<ScanQuery>) -> Json<crate::scanner::Report> {
-    // Check cache unless forced
-    if query.force != Some(true) {
-        if let Some(entry) = crate::core::config::read_cache() {
-            if !crate::core::config::cache_expired(&entry) {
-                return Json(entry.report);
-            }
-        }
-    }
-
     let mut logs = crate::core::config::read_logs(0);
     let now = chrono::Local::now();
-    logs.push((now, "INFO: Web API scan triggered [system]".to_string()));
+
+    // Check cache unless forced
+    if query.force == Some(true) {
+        logs.push((
+            now,
+            "INFO: Web API scan forced, bypassing cache [system]".to_string(),
+        ));
+    } else if let Some(entry) = crate::core::config::read_cache() {
+        if !crate::core::config::cache_expired(&entry) {
+            logs.push((
+                now,
+                "INFO: Web API scan cache hit, returning cached report [system]".to_string(),
+            ));
+            let _ = crate::core::config::write_logs(&logs);
+            return Json(entry.report);
+        } else {
+            logs.push((
+                now,
+                "INFO: Web API scan cache expired, running fresh scan [system]".to_string(),
+            ));
+        }
+    } else {
+        logs.push((
+            now,
+            "INFO: Web API scan cache miss, running fresh scan [system]".to_string(),
+        ));
+    }
+
     logs.push((
         now,
         "INFO: Running multi-language scan engine... [system]".to_string(),
@@ -66,7 +84,14 @@ async fn api_scan(Query(query): Query<ScanQuery>) -> Json<crate::scanner::Report
     };
 
     let ttl = crate::core::config::load_config().cache_ttl_minutes;
-    let _ = crate::core::config::write_cache(&report, ttl);
+    if let Err(e) = crate::core::config::write_cache(&report, ttl) {
+        let mut logs = crate::core::config::read_logs(0);
+        logs.push((
+            now_done,
+            format!("ERROR: Failed to write scan cache: {} [system]", e),
+        ));
+        let _ = crate::core::config::write_logs(&logs);
+    }
 
     Json(report)
 }

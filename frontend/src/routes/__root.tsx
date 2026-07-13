@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { ThemeProvider as NextThemesProvider } from "next-themes"
 import { Toaster } from "@/components/ui/sonner"
 import { ProjectPathSelector } from "@/components/project-path-selector"
+import { ScanDataProvider } from "@/components/scan-data-context"
 
 type ScannerStatus = "warming" | "active" | "error"
 
@@ -32,30 +33,32 @@ export const Route = createRootRoute({
     return (
       <ThemeProvider defaultTheme="dark" storageKey="envexa-ui-theme">
         <NextThemesProvider attribute="class" defaultTheme="dark" enableSystem>
-          <Toaster position="top-right" />
-          <SidebarProvider defaultOpen={defaultOpen}>
-          <div className="flex min-h-screen w-full bg-background font-sans text-foreground">
-          <AppSidebar />
-            <main className="flex-1 flex flex-col min-h-0">
-            <header className="h-14 shrink-0 border-b border-border flex items-center px-4 bg-background/80 backdrop-blur-md sticky top-0 z-10">
-              <div className="flex items-center">
-                <SidebarTrigger />
+          <ScanDataProvider>
+            <Toaster position="top-right" />
+            <SidebarProvider defaultOpen={defaultOpen}>
+            <div className="flex min-h-screen w-full bg-background font-sans text-foreground">
+            <AppSidebar />
+              <main className="flex-1 flex flex-col min-h-0">
+              <header className="h-14 shrink-0 border-b border-border flex items-center px-4 bg-background/80 backdrop-blur-md sticky top-0 z-10">
+                <div className="flex items-center">
+                  <SidebarTrigger />
+                </div>
+                <div className="flex-1 flex justify-center">
+                  <ProjectPathSelector onPathChanged={() => window.location.reload()} />
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
+                  <div className={`w-2 h-2 rounded-full animate-pulse ${STATUS_CONFIG[status].color}`} />
+                  <span>{STATUS_CONFIG[status].label}</span>
+                </div>
+              </header>
+              <div className="flex-1 overflow-auto p-4 md:p-8">
+                <Outlet />
               </div>
-              <div className="flex-1 flex justify-center">
-                <ProjectPathSelector onPathChanged={() => window.location.reload()} />
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
-                <div className={`w-2 h-2 rounded-full animate-pulse ${STATUS_CONFIG[status].color}`} />
-                <span>{STATUS_CONFIG[status].label}</span>
-              </div>
-            </header>
-            <div className="flex-1 overflow-auto p-4 md:p-8">
-              <Outlet />
-            </div>
-          </main>
-        </div>
-      </SidebarProvider>
-        </NextThemesProvider>
+            </main>
+          </div>
+        </SidebarProvider>
+      </ScanDataProvider>
+    </NextThemesProvider>
     </ThemeProvider>
     );
   },

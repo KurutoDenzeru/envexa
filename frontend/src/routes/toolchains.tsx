@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { useEffect, useState, useMemo } from "react"
+import { useState, useMemo } from "react"
+import { useScanData } from "@/components/scan-data-context"
 import { useTheme } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
 import {
@@ -99,9 +100,6 @@ interface ToolchainResult {
   }>
 }
 
-interface ScanReport {
-  results?: Record<string, ToolchainResult>
-}
 
 interface ToolCategory {
   name: string
@@ -565,29 +563,7 @@ function ToolchainCard({ tc }: { tc: ToolchainResult }) {
 }
 
 function Toolchains() {
-  const [report, setReport] = useState<ScanReport | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  const fetchReport = async (force = false) => {
-    setLoading(true)
-    window.dispatchEvent(new CustomEvent("scanner-status", { detail: "warming" }))
-    try {
-      const url = force ? "/api/scan?force=true" : "/api/scan"
-      const res = await fetch(url)
-      const data: unknown = await res.json()
-      setReport(data as ScanReport)
-      window.dispatchEvent(new CustomEvent("scanner-status", { detail: "active" }))
-    } catch (e) {
-      console.error("Failed to fetch report", e)
-      window.dispatchEvent(new CustomEvent("scanner-status", { detail: "error" }))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchReport()
-  }, [])
+  const { report, loading, refetch: fetchReport } = useScanData()
 
   const toolchainMap = useMemo(() => {
     if (!report?.results) return new Map<string, ToolchainResult>()

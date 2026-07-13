@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { useEffect, useState, useMemo } from "react"
+import { useState, useMemo } from "react"
+import { useScanData } from "@/components/scan-data-context"
 import {
   Card,
   CardContent,
@@ -68,46 +69,8 @@ interface VulnerabilityInfo {
   patched_version?: string
 }
 
-interface SupplyChainRisk {
-  package: string
-  risk_type: string
-  description: string
-}
 
-interface AuditItem {
-  name: string
-  current: string
-  note: string
-}
 
-interface ScanResult {
-  tool: string
-  status: string
-  version?: string
-  node_version?: string
-  python_version?: string
-  ruby_version?: string
-  rustc_version?: string
-  cargo_version?: string
-  pnpm_version?: string
-  bun_version?: string
-  deno_version?: string
-  installed_count?: number
-  outdated_formulae?: PackageInfo[]
-  outdated_casks?: PackageInfo[]
-  outdated?: PackageInfo[]
-  outdated_global?: PackageInfo[]
-  issues?: string[]
-  project_type?: string
-  vulnerabilities?: VulnerabilityInfo[]
-  supply_chain_risks?: SupplyChainRisk[]
-  audit_items?: AuditItem[]
-}
-
-interface ScanReport {
-  timestamp?: string
-  results?: Record<string, ScanResult>
-}
 
 interface ToolCategory {
   name: string
@@ -215,39 +178,17 @@ function severityOrder(s: string): number {
 }
 
 function App() {
-  const [report, setReport] = useState<ScanReport | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { report, loading, refetch: fetchReport } = useScanData()
   const [vulnPage, setVulnPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
-
-  const fetchReport = async (force = false) => {
-    setLoading(true)
-    window.dispatchEvent(new CustomEvent("scanner-status", { detail: "warming" }))
-    try {
-      const url = force ? "/api/scan?force=true" : "/api/scan"
-      const res = await fetch(url)
-      const data: unknown = await res.json()
-      setReport(data as ScanReport)
-      window.dispatchEvent(new CustomEvent("scanner-status", { detail: "active" }))
-    } catch (e) {
-      console.error("Failed to fetch report", e)
-      window.dispatchEvent(new CustomEvent("scanner-status", { detail: "error" }))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchReport()
-  }, [])
 
   // Aggregate all vulnerabilities
   const allVulnerabilities = useMemo(() => {
     if (!report?.results) return []
     const vulns: Array<VulnerabilityInfo & { toolchain: string }> = []
-    Object.entries(report.results).forEach(([toolchain, data]) => {
+    Object.entries(report.results).forEach(([toolchain, data]: [string, any]) => {
       if (data.vulnerabilities) {
-        data.vulnerabilities.forEach((v) => {
+        data.vulnerabilities.forEach((v: VulnerabilityInfo) => {
           vulns.push({ ...v, toolchain })
         })
       }
@@ -261,9 +202,9 @@ function App() {
   const allOutdated = useMemo(() => {
     if (!report?.results) return []
     const out: Array<PackageInfo & { toolchain: string }> = []
-    Object.entries(report.results).forEach(([toolchain, data]) => {
+    Object.entries(report.results).forEach(([toolchain, data]: [string, any]) => {
       if (data.outdated) {
-        data.outdated.forEach((o) => {
+        data.outdated.forEach((o: PackageInfo) => {
           out.push({ ...o, toolchain })
         })
       }

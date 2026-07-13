@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { useEffect, useState, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { useScanData } from "@/components/scan-data-context"
 import {
   Card,
   CardContent,
@@ -62,19 +63,7 @@ interface VulnEntry {
   toolchain: string
 }
 
-interface ScanResult {
-  vulnerabilities?: Array<{
-    package: string
-    severity: string
-    title: string
-    cve?: string | null
-    patched_version?: string
-  }>
-}
 
-interface ScanReport {
-  results?: Record<string, ScanResult>
-}
 
 function severityOrder(s: string): number {
   switch (s.toLowerCase()) {
@@ -117,40 +106,18 @@ const SEVERITY_COLORS: Record<string, string> = {
 }
 
 function Vulnerabilities() {
-  const [report, setReport] = useState<ScanReport | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { report, loading } = useScanData()
   const [search, setSearch] = useState("")
   const [toolchainFilter, setToolchainFilter] = useState<string>("all")
   const [page, setPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(8)
 
-  const fetchReport = async (force = false) => {
-    setLoading(true)
-    window.dispatchEvent(new CustomEvent("scanner-status", { detail: "warming" }))
-    try {
-      const url = force ? "/api/scan?force=true" : "/api/scan"
-      const res = await fetch(url)
-      const data: unknown = await res.json()
-      setReport(data as ScanReport)
-      window.dispatchEvent(new CustomEvent("scanner-status", { detail: "active" }))
-    } catch (e) {
-      console.error("Failed to fetch report", e)
-      window.dispatchEvent(new CustomEvent("scanner-status", { detail: "error" }))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchReport()
-  }, [])
-
   const allVulnerabilities = useMemo((): VulnEntry[] => {
     if (!report?.results) return []
     const vulns: VulnEntry[] = []
-    Object.entries(report.results).forEach(([toolchain, data]) => {
+    Object.entries(report.results).forEach(([toolchain, data]: [string, any]) => {
       if (data.vulnerabilities) {
-        data.vulnerabilities.forEach((v) => {
+        data.vulnerabilities.forEach((v: any) => {
           vulns.push({
             package: v.package,
             severity: v.severity,
