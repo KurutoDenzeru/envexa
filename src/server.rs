@@ -28,7 +28,21 @@ pub async fn start(port: u16) {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn api_scan() -> Json<crate::scanner::Report> {
+#[derive(serde::Deserialize)]
+struct ScanQuery {
+    force: Option<bool>,
+}
+
+async fn api_scan(Query(query): Query<ScanQuery>) -> Json<crate::scanner::Report> {
+    // Check cache unless forced
+    if query.force != Some(true) {
+        if let Some(entry) = crate::core::config::read_cache() {
+            if !crate::core::config::cache_expired(&entry) {
+                return Json(entry.report);
+            }
+        }
+    }
+
     let mut logs = crate::core::config::read_logs(0);
     let now = chrono::Local::now();
     logs.push((now, "INFO: Web API scan triggered [system]".to_string()));
@@ -50,6 +64,10 @@ async fn api_scan() -> Json<crate::scanner::Report> {
         timestamp: now_done.format("%Y-%m-%dT%H:%M:%S").to_string(),
         results,
     };
+
+    let ttl = crate::core::config::load_config().cache_ttl_minutes;
+    let _ = crate::core::config::write_cache(&report, ttl);
+
     Json(report)
 }
 

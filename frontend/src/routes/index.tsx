@@ -220,11 +220,12 @@ function App() {
   const [vulnPage, setVulnPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
 
-  const fetchReport = async () => {
+  const fetchReport = async (force = false) => {
     setLoading(true)
     window.dispatchEvent(new CustomEvent("scanner-status", { detail: "warming" }))
     try {
-      const res = await fetch("/api/scan")
+      const url = force ? "/api/scan?force=true" : "/api/scan"
+      const res = await fetch(url)
       const data: unknown = await res.json()
       setReport(data as ScanReport)
       window.dispatchEvent(new CustomEvent("scanner-status", { detail: "active" }))
@@ -468,7 +469,7 @@ function App() {
         <h2 className="text-xl font-medium tracking-tight">
           Failed to load environment report
         </h2>
-        <Button variant="outline" onClick={fetchReport} className="gap-2">
+        <Button variant="outline" onClick={() => fetchReport(true)} className="gap-2">
           <RefreshCw className="w-4 h-4" />
           Retry Scan
         </Button>
@@ -495,7 +496,7 @@ function App() {
         <Button
           variant="outline"
           className="gap-2 shadow-xs"
-          onClick={fetchReport}
+          onClick={() => fetchReport(true)}
         >
           <RefreshCw className="w-4 h-4" />
           Rescan Now

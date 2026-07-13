@@ -124,11 +124,12 @@ function Vulnerabilities() {
   const [page, setPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(8)
 
-  const fetchReport = async () => {
+  const fetchReport = async (force = false) => {
     setLoading(true)
     window.dispatchEvent(new CustomEvent("scanner-status", { detail: "warming" }))
     try {
-      const res = await fetch("/api/scan")
+      const url = force ? "/api/scan?force=true" : "/api/scan"
+      const res = await fetch(url)
       const data: unknown = await res.json()
       setReport(data as ScanReport)
       window.dispatchEvent(new CustomEvent("scanner-status", { detail: "active" }))
