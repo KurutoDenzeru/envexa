@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as VulnerabilitiesRouteImport } from './routes/vulnerabilities'
 import { Route as ToolchainsRouteImport } from './routes/toolchains'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as OutdatedRouteImport } from './routes/outdated'
 import { Route as LogsRouteImport } from './routes/logs'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -30,6 +31,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OutdatedRoute = OutdatedRouteImport.update({
+  id: '/outdated',
+  path: '/outdated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LogsRoute = LogsRouteImport.update({
   id: '/logs',
   path: '/logs',
@@ -44,6 +50,7 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/logs': typeof LogsRoute
+  '/outdated': typeof OutdatedRoute
   '/settings': typeof SettingsRoute
   '/toolchains': typeof ToolchainsRoute
   '/vulnerabilities': typeof VulnerabilitiesRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/logs': typeof LogsRoute
+  '/outdated': typeof OutdatedRoute
   '/settings': typeof SettingsRoute
   '/toolchains': typeof ToolchainsRoute
   '/vulnerabilities': typeof VulnerabilitiesRoute
@@ -59,19 +67,33 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/logs': typeof LogsRoute
+  '/outdated': typeof OutdatedRoute
   '/settings': typeof SettingsRoute
   '/toolchains': typeof ToolchainsRoute
   '/vulnerabilities': typeof VulnerabilitiesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/logs' | '/settings' | '/toolchains' | '/vulnerabilities'
+  fullPaths:
+    | '/'
+    | '/logs'
+    | '/outdated'
+    | '/settings'
+    | '/toolchains'
+    | '/vulnerabilities'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/logs' | '/settings' | '/toolchains' | '/vulnerabilities'
+  to:
+    | '/'
+    | '/logs'
+    | '/outdated'
+    | '/settings'
+    | '/toolchains'
+    | '/vulnerabilities'
   id:
     | '__root__'
     | '/'
     | '/logs'
+    | '/outdated'
     | '/settings'
     | '/toolchains'
     | '/vulnerabilities'
@@ -80,6 +102,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LogsRoute: typeof LogsRoute
+  OutdatedRoute: typeof OutdatedRoute
   SettingsRoute: typeof SettingsRoute
   ToolchainsRoute: typeof ToolchainsRoute
   VulnerabilitiesRoute: typeof VulnerabilitiesRoute
@@ -108,6 +131,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/outdated': {
+      id: '/outdated'
+      path: '/outdated'
+      fullPath: '/outdated'
+      preLoaderRoute: typeof OutdatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/logs': {
       id: '/logs'
       path: '/logs'
@@ -128,6 +158,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LogsRoute: LogsRoute,
+  OutdatedRoute: OutdatedRoute,
   SettingsRoute: SettingsRoute,
   ToolchainsRoute: ToolchainsRoute,
   VulnerabilitiesRoute: VulnerabilitiesRoute,

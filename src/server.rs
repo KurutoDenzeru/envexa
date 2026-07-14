@@ -5,8 +5,9 @@ use axum::{
     routing::{get, put},
     Json, Router,
 };
-use rust_embed::RustEmbed;
-use std::net::SocketAddr;
+use crate::core::config::{load_config, save_config, UserConfig};
+ use rust_embed::RustEmbed;
+ use std::net::SocketAddr;
 
 #[derive(RustEmbed)]
 #[folder = "frontend/dist/"]
@@ -19,6 +20,7 @@ pub async fn start(port: u16) {
         .route("/api/project", get(api_project_get).put(api_project_set))
         .route("/api/project/dirs", get(api_project_dirs))
         .route("/api/project/favorite", put(api_project_favorite))
+        .route("/api/config", get(api_config_get).put(api_config_put))
         .fallback(static_handler);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
@@ -312,6 +314,18 @@ async fn api_project_dirs(
         entries,
     }))
 }
+
+async fn api_config_get() -> Json<UserConfig> {
+    Json(load_config())
+}
+
+async fn api_config_put(
+    Json(cfg): Json<UserConfig>,
+) -> Result<Json<UserConfig>, (StatusCode, String)> {
+    save_config(&cfg).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(load_config()))
+}
+
 
 fn parse_log_line(time: chrono::DateTime<chrono::Local>, msg: String) -> LogEntry {
     let mut level = "INFO".to_string();

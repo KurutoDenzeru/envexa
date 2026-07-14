@@ -18,13 +18,10 @@ import {
   Boxes,
   Database,
   Save,
-  Sun,
-  Moon,
-  Monitor,
   Info,
   ExternalLink,
 } from "lucide-react"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   Select,
   SelectContent,
@@ -53,6 +50,21 @@ const ALL_SCANNERS = [
   { id: "audit", label: "Audit" },
   { id: "ci", label: "CI/CD" },
 ]
+
+interface UserConfig {
+  cache_ttl_minutes: number
+  project_path: string | null
+  recent_project_paths: string[]
+  favorite_project_paths: string[]
+  auto_scan_on_startup: boolean
+  theme: string
+  verbose_logs: boolean
+  scan_timeout_secs: number
+  daemon_interval_secs: number
+  export_format: string
+  enabled_scanners: string[] | null
+  log_retention_days: number
+}
 
 interface SettingsState {
   autoScan: boolean
@@ -88,6 +100,7 @@ function FieldRow({
 function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState<SettingsState>({
     autoScan: false,
     scanTimeout: "30",
@@ -99,9 +112,31 @@ function SettingsPage() {
     logRetention: "7",
   })
 
+  const loadConfig = async () => {
+    try {
+      const res = await fetch("/api/config")
+      if (!res.ok) throw new Error("Failed to load config")
+      const cfg: UserConfig = await res.json()
+      setSettings({
+        autoScan: cfg.auto_scan_on_startup ?? false,
+        scanTimeout: String(cfg.scan_timeout_secs ?? 30),
+        daemonInterval: String(cfg.daemon_interval_secs ?? 14400),
+        cacheTtl: String(cfg.cache_ttl_minutes ?? 30),
+        enabledScanners: cfg.enabled_scanners ?? ALL_SCANNERS.map((s) => s.id),
+        exportFormat: cfg.export_format ?? "markdown",
+        verboseLogs: cfg.verbose_logs ?? false,
+        logRetention: String(cfg.log_retention_days ?? 7),
+      })
+      if (cfg.theme && ["dark", "light", "system"].includes(cfg.theme)) setTheme(cfg.theme as "dark" | "light" | "system")
+    } catch (e) {
+      console.error("Failed to load config:", e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 100)
-    return () => clearTimeout(timer)
+    loadConfig()
   }, [])
 
   const toggleScanner = (id: string) => {
@@ -112,10 +147,39 @@ function SettingsPage() {
         : [...prev.enabledScanners, id],
     }))
   }
-  const handleSave = () => {
-    toast.success("Settings saved", {
-      description: "Configuration updated. Backend persistence coming soon.",
-    })
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch("/api/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cache_ttl_minutes: Number(settings.cacheTtl),
+          project_path: null,
+          recent_project_paths: [],
+          favorite_project_paths: [],
+          auto_scan_on_startup: settings.autoScan,
+          theme: theme,
+          verbose_logs: settings.verboseLogs,
+          scan_timeout_secs: Number(settings.scanTimeout),
+          daemon_interval_secs: Number(settings.daemonInterval),
+          export_format: settings.exportFormat,
+          enabled_scanners: settings.enabledScanners,
+          log_retention_days: Number(settings.logRetention),
+        }),
+      })
+      if (!res.ok) throw new Error("Failed to save")
+      toast.success("Settings saved", {
+        description: "Configuration updated successfully.",
+      })
+    } catch (e) {
+      toast.error("Failed to save", {
+        description: e instanceof Error ? e.message : "Unknown error",
+      })
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleCheckUpdates = () => {
@@ -159,261 +223,304 @@ function SettingsPage() {
             Configure Envexa scanner behavior.
           </p>
         </div>
-        <Button
-          variant="outline"
-          className="gap-2 shadow-xs"
-          onClick={handleSave}
-        >
-          <Save className="w-4 h-4" /> Save Changes
+        <Button onClick={handleSave} disabled={saving} className="gap-2" size="lg">
+          <Save className="w-4 h-4" />
+          {saving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Sun className="w-5 h-5 text-muted-foreground" />
-            <CardTitle>Appearance</CardTitle>
-          </div>
-          <CardDescription>Customize the look and feel of Envexa.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg border border-border/50 bg-muted/50 p-4 transition-colors hover:bg-muted">
-            <div className="space-y-0.5">
-              <Label className="text-base text-foreground/90">Theme</Label>
-              <p className="text-sm text-muted-foreground/60">
-                Select your preferred color theme.
-              </p>
-            </div>
-            <Tabs
-              value={theme}
-              onValueChange={(v) => setTheme((v ?? "system") as "light" | "dark" | "system")}
-              className="w-[200px]"
-            >
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="light" title="Light Theme">
-                  <Sun className="h-4 w-4" />
-                </TabsTrigger>
-                <TabsTrigger value="dark" title="Dark Theme">
-                  <Moon className="h-4 w-4" />
-                </TabsTrigger>
-                <TabsTrigger value="auto" title="System Theme">
-                  <Monitor className="h-4 w-4" />
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="general" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="scanners">Scanners</TabsTrigger>
+          <TabsTrigger value="about">About</TabsTrigger>
+        </TabsList>
 
-      {/* Scanner Configuration */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Sliders className="w-5 h-5 text-muted-foreground" />
-            <CardTitle>Scanner Configuration</CardTitle>
-          </div>
-          <CardDescription>
-            Control scan behavior, timeouts, and caching.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <FieldRow
-            label="Auto-scan on Startup"
-            description="Automatically run a full scan when Envexa starts."
-          >
-            <Switch
-              checked={settings.autoScan}
-              onCheckedChange={(checked) =>
-                setSettings((prev) => ({ ...prev, autoScan: checked }))
-              }
-            />
-          </FieldRow>
-
-          <FieldRow
-            label="Scan Timeout"
-            description="Maximum time allowed per toolchain scan."
-          >
-            <Select
-              value={settings.scanTimeout}
-              onValueChange={(v) =>
-                setSettings((prev) => ({ ...prev, scanTimeout: v ?? prev.scanTimeout }))
-              }
-            >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="15">15 seconds</SelectItem>
-                <SelectItem value="30">30 seconds</SelectItem>
-                <SelectItem value="60">60 seconds</SelectItem>
-              </SelectContent>
-            </Select>
-          </FieldRow>
-
-          <FieldRow
-            label="Daemon Interval"
-            description="How often the background scanner runs."
-          >
-            <Select
-              value={settings.daemonInterval}
-              onValueChange={(v) =>
-                setSettings((prev) => ({ ...prev, daemonInterval: v ?? prev.daemonInterval }))
-              }
-            >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="3600">Every 1 hour</SelectItem>
-                <SelectItem value="14400">Every 4 hours</SelectItem>
-                <SelectItem value="28800">Every 8 hours</SelectItem>
-                <SelectItem value="86400">Every 24 hours</SelectItem>
-              </SelectContent>
-            </Select>
-          </FieldRow>
-
-          <FieldRow
-            label="Cache TTL"
-            description="How long scan results are cached before re-fetching."
-          >
-            <Select
-              value={settings.cacheTtl}
-              onValueChange={(v) =>
-                setSettings((prev) => ({ ...prev, cacheTtl: v ?? prev.cacheTtl }))
-              }
-            >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="15">15 minutes</SelectItem>
-                <SelectItem value="30">30 minutes</SelectItem>
-                <SelectItem value="60">60 minutes</SelectItem>
-              </SelectContent>
-            </Select>
-          </FieldRow>
-        </CardContent>
-      </Card>
-
-      {/* Enabled Toolchains */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Boxes className="w-5 h-5 text-muted-foreground" />
-            <CardTitle>Enabled Toolchains</CardTitle>
-          </div>
-          <CardDescription>
-            Select which package managers Envexa should scan.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {ALL_SCANNERS.map((scanner) => (
-              <label
-                key={scanner.id}
-                className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/50 p-3 transition-colors hover:bg-muted cursor-pointer"
+        <TabsContent value="general" className="space-y-6 animate-in fade-in">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sliders className="w-5 h-5" />
+                General
+              </CardTitle>
+              <CardDescription>Core scanner behavior and defaults.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <FieldRow
+                label="Auto-scan on startup"
+                description="Automatically run a full scan when the dashboard opens."
               >
-                <Checkbox
-                  checked={settings.enabledScanners.includes(scanner.id)}
-                  onCheckedChange={() => toggleScanner(scanner.id)}
+                <Switch
+                  checked={settings.autoScan}
+                  onCheckedChange={(checked) =>
+                    setSettings((prev) => ({ ...prev, autoScan: checked }))
+                  }
                 />
-                <span className="text-sm text-foreground/90">{scanner.label}</span>
-              </label>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              </FieldRow>
 
-      {/* Data & Logging */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-muted-foreground" />
-            <CardTitle>Data & Logging</CardTitle>
-          </div>
-          <CardDescription>
-            Export format, log verbosity, and retention settings.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <FieldRow
-            label="Export Format"
-            description="Default format for scan report exports."
-          >
-            <Select
-              value={settings.exportFormat}
-              onValueChange={(v) =>
-                setSettings((prev) => ({ ...prev, exportFormat: v ?? prev.exportFormat }))
-              }
-            >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="markdown">Markdown</SelectItem>
-                <SelectItem value="json">JSON</SelectItem>
-              </SelectContent>
-            </Select>
-          </FieldRow>
+              <FieldRow
+                label="Scan timeout (seconds)"
+                description="Maximum time to wait for a single scan to complete."
+              >
+                <Select
+                  value={settings.scanTimeout}
+                  onValueChange={(v) => setSettings((p) => ({ ...p, scanTimeout: v ?? p.scanTimeout }))}
+                >
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">15s</SelectItem>
+                    <SelectItem value="30">30s</SelectItem>
+                    <SelectItem value="60">60s</SelectItem>
+                    <SelectItem value="120">120s</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FieldRow>
 
-          <FieldRow
-            label="Verbose Logs"
-            description="Include detailed output in scan logs."
-          >
-            <Switch
-              checked={settings.verboseLogs}
-              onCheckedChange={(checked) =>
-                setSettings((prev) => ({ ...prev, verboseLogs: checked }))
-              }
-            />
-          </FieldRow>
+              <FieldRow
+                label="Daemon interval (seconds)"
+                description="How often the background daemon rescans. 14400 = 4 hours."
+              >
+                <Select
+                  value={settings.daemonInterval}
+                  onValueChange={(v) => setSettings((p) => ({ ...p, daemonInterval: v ?? p.daemonInterval }))}
+                >
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="3600">1 hour (3600s)</SelectItem>
+                    <SelectItem value="14400">4 hours (14400s)</SelectItem>
+                    <SelectItem value="28800">8 hours (28800s)</SelectItem>
+                    <SelectItem value="86400">24 hours (86400s)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FieldRow>
 
-          <FieldRow
-            label="Log Retention"
-            description="How long to keep historical scan logs."
-          >
-            <Select
-              value={settings.logRetention}
-              onValueChange={(v) =>
-                setSettings((prev) => ({ ...prev, logRetention: v ?? prev.logRetention }))
-              }
-            >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">1 day</SelectItem>
-                <SelectItem value="7">7 days</SelectItem>
-                <SelectItem value="30">30 days</SelectItem>
-                <SelectItem value="90">90 days</SelectItem>
-              </SelectContent>
-            </Select>
-          </FieldRow>
-        </CardContent>
-      </Card>
+              <FieldRow
+                label="Cache TTL (minutes)"
+                description="How long to cache scan results before re-scanning."
+              >
+                <Select
+                  value={settings.cacheTtl}
+                  onValueChange={(v) => setSettings((p) => ({ ...p, cacheTtl: v ?? p.cacheTtl }))}
+                >
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5 min</SelectItem>
+                    <SelectItem value="15">15 min</SelectItem>
+                    <SelectItem value="30">30 min</SelectItem>
+                    <SelectItem value="60">1 hour</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FieldRow>
 
-      {/* About */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Info className="w-5 h-5 text-muted-foreground" />
-            <CardTitle>About</CardTitle>
-          </div>
-          <CardDescription>Version information and updates.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between gap-4 rounded-lg border border-border/50 bg-muted/50 p-4 transition-colors hover:bg-muted">
-            <div className="space-y-0.5">
-              <Label className="text-base text-foreground/90">Version</Label>
-              <p className="text-sm text-muted-foreground/60">v2.11.0</p>
-            </div>
-            <Button variant="outline" size="sm" className="gap-2" onClick={handleCheckUpdates}>
-              <ExternalLink className="w-3.5 h-3.5" />
-              Check for Updates
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              <FieldRow
+                label="Export format"
+                description="Default format for scan result exports."
+              >
+                <Select
+                  value={settings.exportFormat}
+                  onValueChange={(v) => setSettings((p) => ({ ...p, exportFormat: v ?? p.exportFormat }))}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="json">JSON</SelectItem>
+                    <SelectItem value="markdown">Markdown</SelectItem>
+                    <SelectItem value="csv">CSV</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FieldRow>
+
+              <FieldRow
+                label="Theme"
+                description="Application color theme."
+              >
+                <Select value={theme} onValueChange={(v) => { if (v) setTheme(v) }}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">System</SelectItem>
+                    <SelectItem value="light">Light</SelectItem>
+                    <SelectItem value="dark">Dark</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FieldRow>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="w-5 h-5" />
+                Logging
+              </CardTitle>
+              <CardDescription>Verbosity and retention settings.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <FieldRow
+                label="Verbose logs"
+                description="Enable detailed debug logging for troubleshooting."
+              >
+                <Switch
+                  checked={settings.verboseLogs}
+                  onCheckedChange={(checked) =>
+                    setSettings((prev) => ({ ...prev, verboseLogs: checked }))
+                  }
+                />
+              </FieldRow>
+
+              <FieldRow
+                label="Log retention (days)"
+                description="How many days to keep log files before rotation."
+              >
+                <Select
+                  value={settings.logRetention}
+                  onValueChange={(v) => setSettings((p) => ({ ...p, logRetention: v ?? p.logRetention }))}
+                >
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 day</SelectItem>
+                    <SelectItem value="7">1 week</SelectItem>
+                    <SelectItem value="14">2 weeks</SelectItem>
+                    <SelectItem value="30">1 month</SelectItem>
+                    <SelectItem value="90">3 months</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FieldRow>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ExternalLink className="w-5 h-5" />
+                Actions
+              </CardTitle>
+              <CardDescription>Maintenance actions and utilities.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button variant="outline" onClick={handleCheckUpdates} className="w-full justify-start gap-4 h-auto py-4">
+                <Info className="w-5 h-5 shrink-0" />
+                <div className="text-left">
+                  <div className="font-medium">Check for Updates</div>
+                  <div className="text-xs text-muted-foreground">Check if a new version of Envexa is available</div>
+                </div>
+              </Button>
+              <Button variant="outline" className="w-full justify-start gap-4 h-auto py-4 text-destructive hover:bg-destructive/10 hover:text-destructive">
+                <Database className="w-5 h-5 shrink-0" />
+                <div className="text-left">
+                  <div className="font-medium">Clear All Caches</div>
+                  <div className="text-xs text-muted-foreground">Remove all cached scan data and logs</div>
+                </div>
+              </Button>
+              <Button variant="outline" className="w-full justify-start gap-4 h-auto py-4 text-destructive hover:bg-destructive/10 hover:text-destructive">
+                <ExternalLink className="w-5 h-5 shrink-0" />
+                <div className="text-left">
+                  <div className="font-medium">Reset to Defaults</div>
+                  <div className="text-xs text-muted-foreground">Reset all settings to factory defaults</div>
+                </div>
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="scanners" className="space-y-6 animate-in fade-in">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Boxes className="w-5 h-5" />
+                Enabled Scanners
+              </CardTitle>
+              <CardDescription>Toggle individual package manager and tool scanners.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {ALL_SCANNERS.map((scanner) => (
+                  <label
+                    key={scanner.id}
+                    className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/50 p-3 transition-colors hover:bg-muted cursor-pointer"
+                  >
+                    <Checkbox
+                      checked={settings.enabledScanners.includes(scanner.id)}
+                      onCheckedChange={() => toggleScanner(scanner.id)}
+                    />
+                    <span className="text-sm text-foreground/90 capitalize">{scanner.label}</span>
+                  </label>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+
+        <TabsContent value="about" className="space-y-6 animate-in fade-in">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Info className="w-5 h-5" />
+                About Envexa
+              </CardTitle>
+              <CardDescription>Version information and links.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-4 rounded-lg border border-border/50 bg-muted/50 p-4">
+                <Boxes className="w-12 h-12 text-muted-foreground/50" />
+                <div>
+                  <h3 className="font-semibold text-foreground">Envexa</h3>
+                  <p className="text-sm text-muted-foreground">Universal environment scanner</p>
+                  <p className="text-sm font-mono text-muted-foreground mt-1">v2.11.0</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="rounded-lg border border-border/50 bg-muted/50 p-3">
+                  <p className="text-muted-foreground/60 mb-1">Rust Version</p>
+                  <p className="font-mono text-foreground">1.85+</p>
+                </div>
+                <div className="rounded-lg border border-border/50 bg-muted/50 p-3">
+                  <p className="text-muted-foreground/60 mb-1">Frontend</p>
+                  <p className="font-mono text-foreground">React 18 + TanStack Router</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <a
+                  href="https://github.com/kurtcalacday/envexa"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  GitHub
+                </a>
+                <a
+                  href="https://github.com/kurtcalacday/envexa/issues"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Info className="w-4 h-4" />
+                  Report Issue
+                </a>
+              </div>
+              <div className="rounded-lg border border-border/50 bg-muted/50 p-4">
+                <p className="text-sm text-muted-foreground/80 mb-3">
+                  Configuration file location:
+                </p>
+                <code className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded block break-all">
+                  ~/.config/envexa/config.json
+                </code>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

@@ -14,8 +14,11 @@ import {
   RefreshCw,
   Box,
   CheckCircle,
-  Activity,
   Boxes,
+  Clock,
+  LayoutGrid,
+  Table as TableIcon,
+  Gauge,
 } from "lucide-react"
 import {
   Bar,
@@ -26,7 +29,6 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts"
-import { SimpleChartTooltip } from "@/components/ui/chart"
 import {
   Table,
   TableBody,
@@ -35,26 +37,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Skeleton } from "@/components/ui/skeleton"
+import { DataTable } from "@/components/ui/data-table"
+import type { ColumnDef } from "@tanstack/react-table"
 import { Button } from "@/components/ui/button"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-  PaginationLink,
-} from "@/components/ui/pagination"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Toggle } from "@/components/ui/toggle"
+import { ScanProgress } from "@/components/scan-progress"
+import { PackageDetailDialog } from "@/components/package-detail-dialog"
+import { SimpleChartTooltip } from "@/components/ui/chart"
 
 export const Route = createFileRoute("/")({ component: App })
-
 interface PackageInfo {
   name: string
   current: string
@@ -177,12 +168,28 @@ function severityOrder(s: string): number {
   }
 }
 
+function formatRelativeTime(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffSecs = Math.floor(diffMs / 1000)
+  const diffMins = Math.floor(diffSecs / 60)
+  const diffHours = Math.floor(diffMins / 60)
+  const diffDays = Math.floor(diffHours / 24)
+
+  if (diffSecs < 60) return "just now"
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`
+  return `${Math.floor(diffDays / 365)}y ago`
+}
+
 function App() {
   const { report, loading, refetch: fetchReport } = useScanData()
-  const [vulnPage, setVulnPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(5)
-
-  // Aggregate all vulnerabilities
+  const [compactView, setCompactView] = useState(false)
+  const [selectedPackage, setSelectedPackage] = useState<{ name: string; toolchain: string } | null>(null)
   const allVulnerabilities = useMemo(() => {
     if (!report?.results) return []
     const vulns: Array<VulnerabilityInfo & { toolchain: string }> = []
@@ -233,7 +240,102 @@ function App() {
 
   const vulnCount = allVulnerabilities.length
   const outCount = allOutdated.length
-  const healthScore = Math.max(0, 100 - vulnCount * 10 - outCount * 2)
+  const outdatedColumns: ColumnDef<PackageInfo & { toolchain: string }, unknown>[] = [
+    {
+      accessorKey: "toolchain",
+      header: "Toolchain",
+      cell: ({ row }) => (
+        <span className="font-medium capitalize text-muted-foreground/80 text-sm">
+          {row.original.toolchain}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "name",
+      header: "Package",
+      cell: ({ row }) => (
+        <span
+          className="font-mono text-sm text-primary underline underline-offset-2 hover:text-primary/80 cursor-pointer"
+          onClick={() => setSelectedPackage({ name: row.original.name, toolchain: row.original.toolchain })}
+        >
+          {row.original.name}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "current",
+      header: "Current",
+      cell: ({ row }) => (
+        <span className="font-mono text-sm text-muted-foreground">
+          {row.original.current}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "latest",
+      header: "Latest",
+      cell: ({ row }) => (
+        <span className="font-mono text-sm text-green-500 font-medium">
+          {row.original.latest}
+        </span>
+      ),
+    },
+  ]
+
+  const topVulnColumns: ColumnDef<VulnerabilityInfo & { toolchain: string }, unknown>[] = [
+    {
+      accessorKey: "toolchain",
+      header: "Toolchain",
+      cell: ({ row }) => (
+        <span className="font-medium capitalize text-muted-foreground/80 text-sm">
+          {row.original.toolchain}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "package",
+      header: "Package",
+      cell: ({ row }) => (
+        <span
+          className="font-mono text-sm text-primary underline underline-offset-2 hover:text-primary/80 cursor-pointer"
+          onClick={() => setSelectedPackage({ name: row.original.package, toolchain: row.original.toolchain })}
+        >
+          {row.original.package || "Unknown"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "severity",
+      header: "Severity",
+      sortingFn: (a, b) => severityOrder(a.original.severity) - severityOrder(b.original.severity),
+      cell: ({ row }) => (
+        <Badge
+          variant="outline"
+          className={`shadow-none ${severityColor(row.original.severity)}`}
+        >
+          {row.original.severity}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: "title",
+      header: "Description",
+      cell: ({ row }) => (
+        <span className="text-muted-foreground text-sm">
+          {row.original.title || "Security vulnerability found"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "cve",
+      header: "CVE",
+      cell: ({ row }) => (
+        <span className="font-mono text-xs text-muted-foreground">
+          {row.original.cve || "-"}
+        </span>
+      ),
+    },
+  ]
 
   // Project tooling signals
   const projectTooling = useMemo(() => {
@@ -265,6 +367,9 @@ function App() {
       riskCount: supply?.supply_chain_risks?.length || 0,
     }
   }, [report])
+  const auditCount = projectTooling.auditCount
+  const riskCount = projectTooling.riskCount
+  const healthScore = Math.max(0, 100 - vulnCount * 10 - outCount * 5 - auditCount * 3 - riskCount * 5)
 
   // Signal distribution for bar chart
   const signalData = useMemo(() => {
@@ -327,78 +432,11 @@ function App() {
     }))
   }, [report])
 
-  // Pagination for top vulns
-  const topVulnTotalPages = Math.ceil(vulnCount / itemsPerPage)
-  const paginatedVulns = allVulnerabilities.slice(
-    (vulnPage - 1) * itemsPerPage,
-    vulnPage * itemsPerPage,
-  )
-
-  const renderPageNumbers = (
-    currentPage: number,
-    total: number,
-    setP: (p: number) => void,
-  ) => {
-    const pages = []
-    for (let i = 1; i <= total; i++) {
-      if (
-        i === 1 ||
-        i === total ||
-        (i >= currentPage - 1 && i <= currentPage + 1)
-      ) {
-        pages.push(
-          <PaginationItem key={i}>
-            <PaginationLink
-              onClick={() => setP(i)}
-              isActive={currentPage === i}
-              className={
-                currentPage === i
-                  ? "bg-muted"
-                  : "cursor-pointer hover:bg-muted/50"
-              }
-            >
-              {i}
-            </PaginationLink>
-          </PaginationItem>,
-        )
-      } else if (i === currentPage - 2 || i === currentPage + 2) {
-        pages.push(
-          <PaginationItem key={i}>
-            <span className="px-2 text-muted-foreground/60">...</span>
-          </PaginationItem>,
-        )
-      }
-    }
-    return pages.filter(
-      (item, index, self) =>
-        item.key !== null &&
-        self.findIndex((t) => t.key === item.key) === index,
-    )
-  }
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto flex flex-col gap-6 animate-in fade-in duration-700">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
-          <div>
-            <Skeleton className="h-10 w-64 bg-muted" />
-            <Skeleton className="h-4 w-96 mt-3 bg-muted" />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Skeleton className="h-28 w-full rounded-xl bg-muted/50" />
-          <Skeleton className="h-28 w-full rounded-xl bg-muted/50" />
-          <Skeleton className="h-28 w-full rounded-xl bg-muted/50" />
-          <Skeleton className="h-28 w-full rounded-xl bg-muted/50" />
-        </div>
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-48 bg-muted" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-[200px] w-full bg-muted/50" />
-          </CardContent>
-        </Card>
+      <div className="max-w-7xl mx-auto animate-in fade-in duration-700">
+        <ScanProgress loading={true} onRetry={() => fetchReport(true)} />
       </div>
     )
   }
@@ -434,29 +472,74 @@ function App() {
               : new Date().toLocaleTimeString()}
           </p>
         </div>
-        <Button
-          variant="outline"
-          className="gap-2 shadow-xs"
-          onClick={() => fetchReport(true)}
-        >
-          <RefreshCw className="w-4 h-4" />
-          Rescan Now
-        </Button>
+        <div className="flex flex-col md:flex-row items-start md:items-end gap-3 md:gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock className="w-4 h-4" />
+            <span>Last scanned {report.timestamp ? formatRelativeTime(report.timestamp) : "just now"}</span>
+          </div>
+          <Button
+            variant="outline"
+            className="gap-2 shadow-xs"
+            onClick={() => fetchReport(true)}
+          >
+            <RefreshCw className="w-4 h-4" />
+            Rescan Now
+          </Button>
+        </div>
       </div>
 
       {/* Top Metric Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Risk Score Card */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Health
+              Risk Score
             </CardTitle>
-            <Activity className="w-4 h-4 text-muted-foreground" />
+            <Gauge className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-foreground">{healthScore}%</div>
-            <p className="text-xs text-muted-foreground/60 mt-1">
-              {healthScore > 80 ? "Optimal" : "Needs attention"}
+          <CardContent className="flex flex-col items-center gap-3 py-2">
+            <div className="relative w-24 h-24">
+              <svg className="w-full h-full transform -rotate-90">
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="42"
+                  stroke="hsl(var(--muted))"
+                  strokeWidth="6"
+                  fill="none"
+                />
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="42"
+                  stroke={
+                    healthScore > 70
+                      ? "hsl(var(--green-500))"
+                      : healthScore > 40
+                      ? "hsl(var(--yellow-500))"
+                      : "hsl(var(--red-500))"
+                  }
+                  strokeWidth="6"
+                  fill="none"
+                  strokeDasharray={264}
+                  strokeDashoffset={264 - (healthScore / 100) * 264}
+                  strokeLinecap="round"
+                  className="transition-all duration-500 ease-out"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-3xl font-bold text-foreground">
+                  {healthScore}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground/60 text-center">
+              {healthScore > 70
+                ? "Healthy"
+                : healthScore > 40
+                ? "Needs attention"
+                : "Critical"}
             </p>
           </CardContent>
         </Card>
@@ -628,87 +711,191 @@ function App() {
         </CardContent>
       </Card>
 
-      {/* Toolchain Status Table */}
+      {/* Toolchain Status */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CardTitle>Toolchain Status</CardTitle>
+            <CardDescription className="ml-2 text-xs text-muted-foreground hidden sm:inline">
+              Per-tool status, versions, and issue counts.
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Toggle
+              variant="outline"
+              size="sm"
+              pressed={compactView}
+              onPressedChange={setCompactView}
+              aria-label="Toggle compact view"
+              className="gap-1.5"
+            >
+              <TableIcon className="w-4 h-4" />
+              <LayoutGrid className="w-4 h-4" />
+              <span className="hidden sm:inline text-xs font-medium">
+                {compactView ? "Table" : "Cards"}
+              </span>
+            </Toggle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {compactView ? (
+            <div className="rounded-md border border-border overflow-hidden">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="w-[150px]">Tool</TableHead>
+                    <TableHead className="w-[80px]">Status</TableHead>
+                    <TableHead className="w-[120px]">Version</TableHead>
+                    <TableHead className="w-[80px] text-center">Vulns</TableHead>
+                    <TableHead className="w-[80px] text-center">Outdated</TableHead>
+                    <TableHead className="w-[80px] text-center">Issues</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {toolchainTableData.map((cat) => (
+                    <>
+                      <TableRow
+                        key={`header-${cat.category}`}
+                        className="border-border bg-muted/30 hover:bg-muted/30"
+                      >
+                        <TableCell
+                          colSpan={6}
+                          className="font-semibold text-xs text-muted-foreground uppercase tracking-wider"
+                        >
+                          {cat.category}
+                        </TableCell>
+                      </TableRow>
+                      {cat.tools.map((t) => (
+                        <TableRow
+                          key={t.tool}
+                          className="border-border hover:bg-muted/50"
+                        >
+                          <TableCell className="font-medium text-sm capitalize">
+                            {displayName(t.tool)}
+                          </TableCell>
+                          <TableCell>{statusBadge(t.status)}</TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">
+                            {t.version}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {t.vulns > 0 ? (
+                              <span className="text-red-500 font-semibold text-sm">
+                                {t.vulns}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">0</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {t.outdated > 0 ? (
+                              <span className="text-blue-500 font-semibold text-sm">
+                                {t.outdated}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">0</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {t.issues > 0 ? (
+                              <span className="text-yellow-500 font-semibold text-sm">
+                                {t.issues}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">0</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {toolchainTableData.map((cat) => (
+                <div key={cat.category}>
+                  <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-3">
+                    {cat.category}
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {cat.tools.map((t) => (
+                      <Card key={t.tool} className="p-4 flex flex-col gap-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="font-medium text-sm capitalize">
+                              {displayName(t.tool)}
+                            </span>
+                            <span className="font-mono text-xs text-muted-foreground ml-2">
+                              {t.version}
+                            </span>
+                          </div>
+                          {statusBadge(t.status)}
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t border-border/50">
+                          <div>
+                            <div
+                              className={`text-lg font-semibold ${
+                                t.vulns > 0 ? "text-red-500" : "text-muted-foreground"
+                              }`}
+                            >
+                              {t.vulns}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Vulns</div>
+                          </div>
+                          <div>
+                            <div
+                              className={`text-lg font-semibold ${
+                                t.outdated > 0 ? "text-blue-500" : "text-muted-foreground"
+                              }`}
+                            >
+                              {t.outdated}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Outdated</div>
+                          </div>
+                          <div>
+                            <div
+                              className={`text-lg font-semibold ${
+                                t.issues > 0 ? "text-yellow-500" : "text-muted-foreground"
+                              }`}
+                            >
+                              {t.issues}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Issues</div>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Outdated Packages */}
       <Card>
         <CardHeader>
-          <CardTitle>Toolchain Status</CardTitle>
+          <CardTitle>Outdated Packages</CardTitle>
           <CardDescription>
-            Per-tool status, versions, and issue counts.
+            Packages with available updates across all toolchains.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border border-border overflow-hidden">
-            <Table>
-              <TableHeader className="bg-muted/50">
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="w-[150px]">Tool</TableHead>
-                  <TableHead className="w-[80px]">Status</TableHead>
-                  <TableHead className="w-[120px]">Version</TableHead>
-                  <TableHead className="w-[80px] text-center">Vulns</TableHead>
-                  <TableHead className="w-[80px] text-center">Outdated</TableHead>
-                  <TableHead className="w-[80px] text-center">Issues</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {toolchainTableData.map((cat) => (
-                  <>
-                    <TableRow
-                      key={`header-${cat.category}`}
-                      className="border-border bg-muted/30 hover:bg-muted/30"
-                    >
-                      <TableCell
-                        colSpan={6}
-                        className="font-semibold text-xs text-muted-foreground uppercase tracking-wider"
-                      >
-                        {cat.category}
-                      </TableCell>
-                    </TableRow>
-                    {cat.tools.map((t) => (
-                      <TableRow
-                        key={t.tool}
-                        className="border-border hover:bg-muted/50"
-                      >
-                        <TableCell className="font-medium text-sm capitalize">
-                          {displayName(t.tool)}
-                        </TableCell>
-                        <TableCell>{statusBadge(t.status)}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {t.version}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {t.vulns > 0 ? (
-                            <span className="text-red-500 font-semibold text-sm">
-                              {t.vulns}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">0</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {t.outdated > 0 ? (
-                            <span className="text-blue-500 font-semibold text-sm">
-                              {t.outdated}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">0</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {t.issues > 0 ? (
-                            <span className="text-yellow-500 font-semibold text-sm">
-                              {t.issues}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">0</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          {allOutdated.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60">
+              <CheckCircle className="w-12 h-12 mb-4 text-green-500/50" />
+              <p>All packages are up to date!</p>
+            </div>
+          ) : (
+            <DataTable
+              columns={outdatedColumns}
+              data={allOutdated}
+              defaultPageSize={8}
+              pageSizeOptions={[5, 8, 15, 50]}
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -744,110 +931,24 @@ function App() {
 
           {/* Top vulns table */}
           {vulnCount > 0 && (
-            <>
-              <div className="rounded-md border border-border overflow-hidden">
-                <Table>
-                  <TableHeader className="bg-muted/50">
-                    <TableRow className="border-border hover:bg-transparent">
-                      <TableHead className="w-[120px]">Toolchain</TableHead>
-                      <TableHead className="w-[160px]">Package</TableHead>
-                      <TableHead className="w-[90px]">Severity</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="w-[120px]">CVE</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedVulns.map((v, idx) => (
-                      <TableRow
-                        key={idx}
-                        className="border-border hover:bg-muted/50"
-                      >
-                        <TableCell className="font-medium capitalize text-muted-foreground/80 text-sm">
-                          {v.toolchain}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm text-foreground">
-                          {v.package || "Unknown"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={`shadow-none ${severityColor(v.severity)}`}
-                          >
-                            {v.severity}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {v.title || "Security vulnerability found"}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {v.cve || "-"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {topVulnTotalPages > 1 && (
-                <div className="pt-4 border-t border-border/50 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">
-                      Rows per page
-                    </span>
-                    <Select
-                      value={itemsPerPage.toString()}
-                      onValueChange={(v) => {
-                        setItemsPerPage(Number(v))
-                        setVulnPage(1)
-                      }}
-                    >
-                      <SelectTrigger className="w-[70px] h-8 bg-popover border-border text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover border-border">
-                        <SelectItem value="5">5</SelectItem>
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="20">20</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Pagination className="mx-0 w-auto">
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious
-                          onClick={() =>
-                            setVulnPage((p) => Math.max(1, p - 1))
-                          }
-                          className={
-                            vulnPage === 1
-                              ? "pointer-events-none opacity-50"
-                              : "cursor-pointer"
-                          }
-                        />
-                      </PaginationItem>
-                      {renderPageNumbers(vulnPage, topVulnTotalPages, setVulnPage)}
-                      <PaginationItem>
-                        <PaginationNext
-                          onClick={() =>
-                            setVulnPage((p) =>
-                              Math.min(topVulnTotalPages, p + 1),
-                            )
-                          }
-                          className={
-                            vulnPage === topVulnTotalPages
-                              ? "pointer-events-none opacity-50"
-                              : "cursor-pointer"
-                          }
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-                </div>
-              )}
-            </>
+            <DataTable
+              columns={topVulnColumns}
+              data={allVulnerabilities}
+              defaultPageSize={5}
+              pageSizeOptions={[5, 10, 20]}
+            />
           )}
         </CardContent>
       </Card>
+
+      {selectedPackage && (
+        <PackageDetailDialog
+          packageName={selectedPackage.name}
+          toolchain={selectedPackage.toolchain}
+          open={!!selectedPackage}
+          onClose={() => setSelectedPackage(null)}
+        />
+      )}
     </div>
   )
 }

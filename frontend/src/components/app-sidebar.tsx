@@ -10,13 +10,14 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { Home, ShieldAlert, Boxes, Settings, ScrollText } from "lucide-react"
+import { Home, ShieldAlert, Boxes, Settings, ScrollText, PackageMinus } from "lucide-react"
 import { Link } from "@tanstack/react-router"
 
 
 const navItems = [
   { title: "Overview", url: "/", icon: Home },
   { title: "Vulnerabilities", url: "/vulnerabilities", icon: ShieldAlert },
+  { title: "Outdated", url: "/outdated", icon: PackageMinus },
   { title: "Toolchains", url: "/toolchains", icon: Boxes },
   { title: "System Logs", url: "/logs", icon: ScrollText },
 ]

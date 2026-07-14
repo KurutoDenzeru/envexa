@@ -18,7 +18,6 @@ import {
   FileSearch,
   Boxes,
 } from "lucide-react"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -51,7 +50,7 @@ import {
   siApple,
   siGithub,
 } from "simple-icons"
-
+import { ScanProgress } from "@/components/scan-progress"
 export const Route = createFileRoute("/toolchains")({ component: Toolchains })
 
 interface PackageInfo {
@@ -590,18 +589,8 @@ function Toolchains() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto flex flex-col gap-6">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
-          <div>
-            <Skeleton className="h-10 w-64 bg-muted" />
-            <Skeleton className="h-4 w-96 mt-3 bg-muted" />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Skeleton className="h-56 w-full rounded-xl bg-muted/50" />
-          <Skeleton className="h-56 w-full rounded-xl bg-muted/50" />
-          <Skeleton className="h-56 w-full rounded-xl bg-muted/50" />
-        </div>
+      <div className="max-w-7xl mx-auto animate-in fade-in duration-700">
+        <ScanProgress loading={true} onRetry={() => fetchReport(true)} />
       </div>
     )
   }
