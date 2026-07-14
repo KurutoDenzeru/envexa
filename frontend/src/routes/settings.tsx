@@ -485,16 +485,6 @@ function SettingsPage() {
                   <p className="text-sm font-mono text-muted-foreground mt-1">v2.11.0</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="rounded-lg border border-border/50 bg-muted/50 p-3">
-                  <p className="text-muted-foreground/60 mb-1">Rust Version</p>
-                  <p className="font-mono text-foreground">1.85+</p>
-                </div>
-                <div className="rounded-lg border border-border/50 bg-muted/50 p-3">
-                  <p className="text-muted-foreground/60 mb-1">Frontend</p>
-                  <p className="font-mono text-foreground">React 18 + TanStack Router</p>
-                </div>
-              </div>
               <div className="flex flex-wrap gap-3">
                 <a
                   href="https://github.com/kurtcalacday/envexa"
