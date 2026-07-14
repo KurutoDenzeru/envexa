@@ -20,6 +20,9 @@ import {
   Save,
   Info,
   ExternalLink,
+  Monitor,
+  Sun,
+  Moon,
 } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
@@ -341,16 +344,19 @@ function SettingsPage() {
                 label="Theme"
                 description="Application color theme."
               >
-                <Select value={theme} onValueChange={(v) => { if (v) setTheme(v) }}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="default">System</SelectItem>
-                    <SelectItem value="light">Light</SelectItem>
-                    <SelectItem value="dark">Dark</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Tabs value={theme} onValueChange={(v) => { if (v) setTheme(v as "dark" | "light" | "system") }}>
+                  <TabsList className="h-9">
+                    <TabsTrigger value="system" className="h-7 w-7 p-0" title="System">
+                      <Monitor className="h-4 w-4" />
+                    </TabsTrigger>
+                    <TabsTrigger value="light" className="h-7 w-7 p-0" title="Light">
+                      <Sun className="h-4 w-4" />
+                    </TabsTrigger>
+                    <TabsTrigger value="dark" className="h-7 w-7 p-0" title="Dark">
+                      <Moon className="h-4 w-4" />
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </FieldRow>
             </CardContent>
           </Card>
