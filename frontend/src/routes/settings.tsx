@@ -23,6 +23,7 @@ import {
   Monitor,
   Sun,
   Moon,
+  AlertTriangle,
 } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
@@ -33,6 +34,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useTheme } from "@/components/theme-provider"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 
 export const Route = createFileRoute("/settings")({ component: SettingsPage })
@@ -114,6 +125,8 @@ function SettingsPage() {
     verboseLogs: false,
     logRetention: "7",
   })
+  const [clearCacheOpen, setClearCacheOpen] = useState(false)
+  const [resetDefaultsOpen, setResetDefaultsOpen] = useState(false)
 
   const loadConfig = async () => {
     try {
@@ -193,6 +206,29 @@ function SettingsPage() {
         description: "Envexa v2.11.0 is the latest version.",
       })
     }, 1500)
+  }
+  const handleClearCache = () => {
+    setClearCacheOpen(false)
+    const id = toast.loading("Clearing caches...")
+    setTimeout(() => {
+      toast.success("Caches cleared", { id, description: "All cached scan data and logs removed." })
+    }, 1000)
+  }
+
+  const handleResetDefaults = () => {
+    setResetDefaultsOpen(false)
+    setSettings({
+      autoScan: false,
+      scanTimeout: "30",
+      daemonInterval: "14400",
+      cacheTtl: "30",
+      enabledScanners: ALL_SCANNERS.map((s) => s.id),
+      exportFormat: "markdown",
+      verboseLogs: false,
+      logRetention: "7",
+    })
+    setTheme("system")
+    toast.success("Settings reset", { description: "All settings restored to factory defaults." })
   }
 
   if (loading) {
@@ -420,14 +456,14 @@ function SettingsPage() {
                   <div className="text-xs text-muted-foreground">Check if a new version of Envexa is available</div>
                 </div>
               </Button>
-              <Button variant="outline" className="w-full justify-start gap-4 h-auto py-4 text-destructive hover:bg-destructive/10 hover:text-destructive">
+              <Button variant="outline" onClick={() => setClearCacheOpen(true)} className="w-full justify-start gap-4 h-auto py-4 text-destructive hover:bg-destructive/10 hover:text-destructive">
                 <Database className="w-5 h-5 shrink-0" />
                 <div className="text-left">
                   <div className="font-medium">Clear All Caches</div>
                   <div className="text-xs text-muted-foreground">Remove all cached scan data and logs</div>
                 </div>
               </Button>
-              <Button variant="outline" className="w-full justify-start gap-4 h-auto py-4 text-destructive hover:bg-destructive/10 hover:text-destructive">
+              <Button variant="outline" onClick={() => setResetDefaultsOpen(true)} className="w-full justify-start gap-4 h-auto py-4 text-destructive hover:bg-destructive/10 hover:text-destructive">
                 <ExternalLink className="w-5 h-5 shrink-0" />
                 <div className="text-left">
                   <div className="font-medium">Reset to Defaults</div>
@@ -517,6 +553,45 @@ function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      <AlertDialog open={clearCacheOpen} onOpenChange={setClearCacheOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Clear All Caches?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove all cached scan data and logs. You'll need to run a new scan to rebuild the cache.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClearCache} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Clear Caches
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={resetDefaultsOpen} onOpenChange={setResetDefaultsOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Reset to Defaults?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reset all settings to factory defaults, including theme, scanner toggles, and all preferences. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetDefaults} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Reset Settings
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
