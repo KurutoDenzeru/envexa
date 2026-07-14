@@ -44,8 +44,76 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScanProgress } from "@/components/scan-progress"
 import { PackageDetailDialog } from "@/components/package-detail-dialog"
 import { SimpleChartTooltip } from "@/components/ui/chart"
+import {
+  siDocker,
+  siNpm,
+  siPnpm,
+  siYarn,
+  siBun,
+  siDeno,
+  siPython,
+  siRubygems,
+  siRust,
+  siHomebrew,
+  siApple,
+  siGithub,
+} from "simple-icons"
+import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/")({ component: App })
+
+function ToolIcon({
+  icon,
+  className = "w-5 h-5",
+  color,
+  invertInDark = false,
+}: {
+  icon: { path: string; hex: string }
+  className?: string
+  color?: string
+  invertInDark?: boolean
+}) {
+  const isDark =
+    invertInDark &&
+    (typeof window !== "undefined" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches)
+
+  return (
+    <svg
+      role="img"
+      viewBox="0 0 24 24"
+      className={cn(className, isDark && "invert brightness-200")}
+      fill={color || `#${icon.hex}`}
+    >
+      <path d={icon.path} />
+    </svg>
+  )
+}
+
+const TOOL_ICONS: Record<string, { icon: { path: string; hex: string }; fallback?: React.ReactNode; invertInDark?: boolean }> = {
+  brew: { icon: siHomebrew },
+  cargo: { icon: siRust, invertInDark: true },
+  docker: { icon: siDocker },
+  pip: { icon: siPython },
+  gem: { icon: siRubygems },
+  npm: { icon: siNpm },
+  pnpm: { icon: siPnpm },
+  yarn: { icon: siYarn },
+  bun: { icon: siBun, invertInDark: true },
+  deno: { icon: siDeno, invertInDark: true },
+  project: { icon: siApple, invertInDark: true },
+  security: { icon: { path: "M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z", hex: "71717a" }, fallback: <Boxes className="w-5 h-5 text-muted-foreground" /> },
+  supply_chain: { icon: { path: "M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z", hex: "71717a" }, fallback: <Boxes className="w-5 h-5 text-muted-foreground" /> },
+  audit: { icon: { path: "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z", hex: "71717a" }, fallback: <Box className="w-5 h-5 text-muted-foreground" /> },
+  ci: { icon: siGithub, invertInDark: true },
+}
+
+function getToolIcon(tool: string) {
+  const entry = TOOL_ICONS[tool]
+  if (!entry) return <Boxes className="w-5 h-5 text-muted-foreground" />
+  if (entry.fallback) return entry.fallback
+  return <ToolIcon icon={entry.icon} className="w-5 h-5" invertInDark={entry.invertInDark} />
+}
 interface PackageInfo {
   name: string
   current: string
@@ -818,13 +886,16 @@ function App() {
                     {cat.tools.map((t) => (
                       <Card key={t.tool} className="p-4 flex flex-col gap-3">
                         <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <span className="font-medium text-sm capitalize">
-                              {displayName(t.tool)}
-                            </span>
-                            <span className="font-mono text-xs text-muted-foreground ml-2">
-                              {t.version}
-                            </span>
+                          <div className="flex items-center gap-2">
+                            {getToolIcon(t.tool)}
+                            <div>
+                              <span className="font-medium text-sm capitalize">
+                                {displayName(t.tool)}
+                              </span>
+                              <span className="font-mono text-xs text-muted-foreground ml-2">
+                                {t.version}
+                              </span>
+                            </div>
                           </div>
                           {statusBadge(t.status)}
                         </div>
