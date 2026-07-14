@@ -48,22 +48,40 @@ import { toast } from "sonner"
 
 export const Route = createFileRoute("/settings")({ component: SettingsPage })
 
-const ALL_SCANNERS = [
-  { id: "brew", label: "Brew" },
-  { id: "npm", label: "npm" },
-  { id: "pnpm", label: "pnpm" },
-  { id: "yarn", label: "Yarn" },
-  { id: "bun", label: "Bun" },
-  { id: "deno", label: "Deno" },
-  { id: "pip", label: "pip" },
-  { id: "gem", label: "Gem" },
-  { id: "cargo", label: "Cargo" },
-  { id: "docker", label: "Docker" },
-  { id: "project", label: "Project" },
-  { id: "security", label: "Security" },
-  { id: "audit", label: "Audit" },
-  { id: "ci", label: "CI/CD" },
+const SCANNER_CATEGORIES = [
+  {
+    name: "System & Runtime",
+    scanners: [
+      { id: "brew", label: "Brew" },
+      { id: "cargo", label: "Cargo" },
+      { id: "docker", label: "Docker" },
+      { id: "pip", label: "pip" },
+      { id: "gem", label: "Gem" },
+    ],
+  },
+  {
+    name: "Web Development",
+    scanners: [
+      { id: "npm", label: "npm" },
+      { id: "pnpm", label: "pnpm" },
+      { id: "yarn", label: "Yarn" },
+      { id: "bun", label: "Bun" },
+      { id: "deno", label: "Deno" },
+    ],
+  },
+  {
+    name: "Project Tooling",
+    scanners: [
+      { id: "project", label: "Project" },
+      { id: "security", label: "Security" },
+      { id: "supply_chain", label: "Supply Chain" },
+      { id: "audit", label: "Audit" },
+      { id: "ci", label: "CI/CD" },
+    ],
+  },
 ]
+
+const ALL_SCANNERS = SCANNER_CATEGORIES.flatMap((c) => c.scanners)
 
 interface UserConfig {
   cache_ttl_minutes: number
@@ -161,6 +179,19 @@ function SettingsPage() {
       enabledScanners: prev.enabledScanners.includes(id)
         ? prev.enabledScanners.filter((s) => s !== id)
         : [...prev.enabledScanners, id],
+    }))
+  }
+  const enableAllScanners = () => {
+    setSettings((prev) => ({
+      ...prev,
+      enabledScanners: ALL_SCANNERS.map((s) => s.id),
+    }))
+  }
+
+  const disableAllScanners = () => {
+    setSettings((prev) => ({
+      ...prev,
+      enabledScanners: [],
     }))
   }
 
@@ -477,27 +508,48 @@ function SettingsPage() {
         <TabsContent value="scanners" className="space-y-6 animate-in fade-in">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Boxes className="w-5 h-5" />
-                Enabled Scanners
-              </CardTitle>
-              <CardDescription>Toggle individual package manager and tool scanners.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {ALL_SCANNERS.map((scanner) => (
-                  <label
-                    key={scanner.id}
-                    className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/50 p-3 transition-colors hover:bg-muted cursor-pointer"
-                  >
-                    <Checkbox
-                      checked={settings.enabledScanners.includes(scanner.id)}
-                      onCheckedChange={() => toggleScanner(scanner.id)}
-                    />
-                    <span className="text-sm text-foreground/90 capitalize">{scanner.label}</span>
-                  </label>
-                ))}
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Boxes className="w-5 h-5" />
+                    Enabled Scanners
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    {settings.enabledScanners.length} of {ALL_SCANNERS.length} scanners enabled.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={enableAllScanners}>
+                    Enable All
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={disableAllScanners}>
+                    Disable All
+                  </Button>
+                </div>
               </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {SCANNER_CATEGORIES.map((category) => (
+                <div key={category.name}>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                    {category.name}
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {category.scanners.map((scanner) => (
+                      <label
+                        key={scanner.id}
+                        className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/50 p-3 transition-colors hover:bg-muted cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={settings.enabledScanners.includes(scanner.id)}
+                          onCheckedChange={() => toggleScanner(scanner.id)}
+                        />
+                        <span className="text-sm text-foreground/90">{scanner.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </TabsContent>

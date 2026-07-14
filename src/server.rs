@@ -71,7 +71,12 @@ async fn api_scan(Query(query): Query<ScanQuery>) -> Json<crate::scanner::Report
         "INFO: Running multi-language scan engine... [system]".to_string(),
     ));
 
-    let results = crate::toolchains::scan_all().await;
+    let cfg = crate::core::config::load_config();
+    let enabled_refs: Vec<String> = cfg.enabled_scanners.unwrap_or_default();
+    let results = crate::toolchains::scan_all_with(
+        cfg.scan_timeout_secs,
+        if enabled_refs.is_empty() { None } else { Some(&enabled_refs) },
+    ).await;
 
     let now_done = chrono::Local::now();
     logs.push((
