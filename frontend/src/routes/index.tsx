@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState, useMemo } from "react"
 import { useScanData } from "@/components/scan-data-context"
 import {
@@ -256,6 +256,7 @@ function formatRelativeTime(dateString: string): string {
 
 function App() {
   const { report, loading, refetch: fetchReport } = useScanData()
+  const navigate = useNavigate()
   const [compactView, setCompactView] = useState(false)
   const [selectedPackage, setSelectedPackage] = useState<{ name: string; toolchain: string } | null>(null)
   const allVulnerabilities = useMemo(() => {
@@ -832,7 +833,8 @@ function App() {
                       {cat.tools.map((t) => (
                         <TableRow
                           key={t.tool}
-                          className="border-border hover:bg-muted/50"
+                          className="border-border hover:bg-muted/50 cursor-pointer"
+                          onClick={() => navigate({ to: "/toolchains", search: { open: t.tool } })}
                         >
                           <TableCell className="font-medium text-sm capitalize">
                             {displayName(t.tool)}
@@ -884,7 +886,7 @@ function App() {
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {cat.tools.map((t) => (
-                      <Card key={t.tool} className="p-4 flex flex-col gap-3">
+                      <Card key={t.tool} className="p-4 flex flex-col gap-3 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate({ to: "/toolchains", search: { open: t.tool } })}>
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2">
                             {getToolIcon(t.tool)}

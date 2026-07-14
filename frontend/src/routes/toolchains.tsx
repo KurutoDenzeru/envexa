@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useScanData } from "@/components/scan-data-context"
 import { useTheme } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
@@ -50,7 +50,12 @@ import {
   siGithub,
 } from "simple-icons"
 import { ScanProgress } from "@/components/scan-progress"
-export const Route = createFileRoute("/toolchains")({ component: Toolchains })
+export const Route = createFileRoute("/toolchains")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    open: (search.open as string) || undefined,
+  }),
+  component: Toolchains,
+})
 
 interface PackageInfo {
   name: string
@@ -346,7 +351,7 @@ const outdatedColumns: ColumnDef<PackageInfo, unknown>[] = [
   },
 ]
 
-function ToolchainCard({ tc }: { tc: ToolchainResult }) {
+function ToolchainCard({ tc, open, onOpenChange }: { tc: ToolchainResult; open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const vulnCount = tc.vulnerabilities?.length || 0
   const outdatedCount = tc.outdated?.length || 0
   const [activeTab, setActiveTab] = useState<"security" | "updates" | "specs">(
@@ -394,7 +399,7 @@ function ToolchainCard({ tc }: { tc: ToolchainResult }) {
         </div>
 
         <div className="flex justify-end pt-2 border-t border-border/30">
-          <Dialog>
+          <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogTrigger className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-popover px-4 text-xs font-semibold text-foreground transition-all hover:bg-muted/50 hover:text-foreground cursor-pointer select-none shadow-xs gap-1.5">
               View Details
             </DialogTrigger>
@@ -551,6 +556,16 @@ function ToolchainCard({ tc }: { tc: ToolchainResult }) {
 
 function Toolchains() {
   const { report, loading, refetch: fetchReport } = useScanData()
+  const searchParams = Route.useSearch()
+  const [openDialog, setOpenDialog] = useState<string | null>(searchParams.open ?? null)
+
+  useEffect(() => {
+    if (searchParams.open) {
+      setOpenDialog(searchParams.open)
+      window.history.replaceState({}, "", "/toolchains")
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const toolchainMap = useMemo(() => {
     if (!report?.results) return new Map<string, ToolchainResult>()
@@ -624,7 +639,12 @@ function Toolchains() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {cat.items.map((tc) => (
-                  <ToolchainCard key={tc.tool} tc={tc} />
+                  <ToolchainCard
+                    key={tc.tool}
+                    tc={tc}
+                    open={openDialog === tc.tool}
+                    onOpenChange={(isOpen) => setOpenDialog(isOpen ? tc.tool : null)}
+                  />
                 ))}
               </div>
             )}
