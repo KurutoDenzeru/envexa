@@ -40,7 +40,7 @@ import {
 import { DataTable } from "@/components/ui/data-table"
 import type { ColumnDef } from "@tanstack/react-table"
 import { Button } from "@/components/ui/button"
-import { Toggle } from "@/components/ui/toggle"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScanProgress } from "@/components/scan-progress"
 import { PackageDetailDialog } from "@/components/package-detail-dialog"
 import { SimpleChartTooltip } from "@/components/ui/chart"
@@ -713,28 +713,24 @@ function App() {
 
       {/* Toolchain Status */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CardTitle>Toolchain Status</CardTitle>
-            <CardDescription className="ml-2 text-xs text-muted-foreground hidden sm:inline">
-              Per-tool status, versions, and issue counts.
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <Toggle
-              variant="outline"
-              size="sm"
-              pressed={compactView}
-              onPressedChange={setCompactView}
-              aria-label="Toggle compact view"
-              className="gap-1.5"
-            >
-              <TableIcon className="w-4 h-4" />
-              <LayoutGrid className="w-4 h-4" />
-              <span className="hidden sm:inline text-xs font-medium">
-                {compactView ? "Table" : "Cards"}
-              </span>
-            </Toggle>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle>Toolchain Status</CardTitle>
+              <CardDescription className="mt-1">
+                Per-tool status, versions, and issue counts.
+              </CardDescription>
+            </div>
+            <Tabs value={compactView ? "table" : "cards"} onValueChange={(v) => setCompactView(v === "table")}>
+              <TabsList className="h-9">
+                <TabsTrigger value="table" className="h-7 w-7 p-0" title="Table view">
+                  <TableIcon className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="cards" className="h-7 w-7 p-0" title="Cards view">
+                  <LayoutGrid className="h-4 w-4" />
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </CardHeader>
         <CardContent>
