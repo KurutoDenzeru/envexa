@@ -490,7 +490,6 @@ function ToolchainCard({ tc }: { tc: ToolchainResult }) {
                         data={tc.vulnerabilities || []}
                         defaultPageSize={5}
                         pageSizeOptions={[5, 10, 25]}
-                        containerClassName="border border-border/40 rounded-lg bg-muted/10"
                       />
                     )}
                   </div>
@@ -515,7 +514,6 @@ function ToolchainCard({ tc }: { tc: ToolchainResult }) {
                         data={tc.outdated || []}
                         defaultPageSize={5}
                         pageSizeOptions={[5, 10, 25]}
-                        containerClassName="border border-border/40 rounded-lg bg-muted/10"
                       />
                     )}
                   </div>
