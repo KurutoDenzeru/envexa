@@ -603,6 +603,11 @@ function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+          <div className="text-center py-6 border-t border-border/50">
+            <p className="text-sm text-muted-foreground/60">
+              © 2026 All rights reserved by <span className="text-muted-foreground/80">KurutoDenzeru</span>
+            </p>
+          </div>
         </TabsContent>
       </Tabs>
       <AlertDialog open={clearCacheOpen} onOpenChange={setClearCacheOpen}>
