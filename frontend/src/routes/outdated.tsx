@@ -14,13 +14,6 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { DataTable } from "@/components/ui/data-table"
 import type { ColumnDef } from "@tanstack/react-table"
 export const Route = createFileRoute("/outdated")({
@@ -138,9 +131,6 @@ function updateTypeLabel(type: "major" | "minor" | "patch" | "unknown"): string 
 function Outdated() {
   const { report, loading } = useScanData()
   const [search, setSearch] = useState("")
-  const [toolchainFilter, setToolchainFilter] = useState<string>("all")
-  const [sourceFilter, setSourceFilter] = useState<string>("all")
-  const [updateTypeFilter, setUpdateTypeFilter] = useState<string>("all")
   const [selectedPackages, setSelectedPackages] = useState<Set<string>>(new Set())
   const [selectAll, setSelectAll] = useState(false)
   const [currentPageSize, setCurrentPageSize] = useState(10)
@@ -207,16 +197,6 @@ function Outdated() {
     return outdated
   }, [report])
 
-  const availableToolchains = useMemo(() => {
-    const set = new Set(allOutdated.map((o) => o.toolchain))
-    return Array.from(set).sort()
-  }, [allOutdated])
-
-  const availableSources = useMemo(() => {
-    const set = new Set(allOutdated.map((o) => o.source))
-    return Array.from(set).sort()
-  }, [allOutdated])
-
   const filteredOutdated = useMemo(() => {
     return allOutdated
       .filter((o) => {
@@ -224,13 +204,7 @@ function Outdated() {
           o.name.toLowerCase().includes(search.toLowerCase()) ||
           o.toolchain.toLowerCase().includes(search.toLowerCase()) ||
           o.source.toLowerCase().includes(search.toLowerCase())
-        const matchesToolchain =
-          toolchainFilter === "all" || o.toolchain === toolchainFilter
-        const matchesSource =
-          sourceFilter === "all" || o.source === sourceFilter
-        const matchesUpdateType =
-          updateTypeFilter === "all" || o.updateType === updateTypeFilter
-        return matchesSearch && matchesToolchain && matchesSource && matchesUpdateType
+        return matchesSearch
       })
       .sort((a, b) => {
         // Sort by update type priority: major > minor > patch > unknown
@@ -243,7 +217,7 @@ function Outdated() {
         // Then by package name
         return a.name.localeCompare(b.name)
       })
-  }, [allOutdated, search, toolchainFilter, sourceFilter, updateTypeFilter])
+  }, [allOutdated, search])
 
 
   const updateTypeCounts = useMemo(() => {
@@ -540,53 +514,6 @@ function Outdated() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
               />
             </div>
-            <Select
-              value={toolchainFilter}
-              onValueChange={(v) => setToolchainFilter(v ?? "all")}
-            >
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="All toolchains" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Toolchains</SelectItem>
-                {availableToolchains.map((tc) => (
-                  <SelectItem key={tc} value={tc}>
-                    {displayName(tc)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={sourceFilter}
-              onValueChange={(v) => setSourceFilter(v ?? "all")}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="All sources" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Sources</SelectItem>
-                {availableSources.map((src) => (
-                  <SelectItem key={src} value={src}>
-                    {sourceLabel(src)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={updateTypeFilter}
-              onValueChange={(v) => setUpdateTypeFilter(v ?? "all")}
-            >
-              <SelectTrigger className="w-[130px]">
-                <SelectValue placeholder="All types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="major">Major</SelectItem>
-                <SelectItem value="minor">Minor</SelectItem>
-                <SelectItem value="patch">Patch</SelectItem>
-                <SelectItem value="unknown">Unknown</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </CardHeader>
         <CardContent>
@@ -594,8 +521,8 @@ function Outdated() {
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60">
               <CheckCircle className="w-12 h-12 mb-4 text-green-500/50" />
               <p>
-                {search || toolchainFilter !== "all" || sourceFilter !== "all" || updateTypeFilter !== "all"
-                  ? "No packages match your filters."
+                {search
+                  ? "No packages match your search."
                   : "All packages are up to date!"}
               </p>
             </div>
