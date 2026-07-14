@@ -15,13 +15,6 @@ import { Input } from "@/components/ui/input"
 import { DataTable } from "@/components/ui/data-table"
 import type { ColumnDef } from "@tanstack/react-table"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   PieChart,
   Pie,
   Cell,
@@ -94,7 +87,6 @@ const SEVERITY_COLORS: Record<string, string> = {
 function Vulnerabilities() {
   const { report, loading, refetch } = useScanData()
   const [search, setSearch] = useState("")
-  const [toolchainFilter, setToolchainFilter] = useState<string>("all")
   const [detailPkg, setDetailPkg] = useState<{ name: string; toolchain: string } | null>(null)
 
    const openDetail = (name: string, toolchain: string) => {
@@ -123,11 +115,6 @@ function Vulnerabilities() {
     return vulns
   }, [report])
 
-  const availableToolchains = useMemo(() => {
-    const set = new Set(allVulnerabilities.map((v) => v.toolchain))
-    return Array.from(set).sort()
-  }, [allVulnerabilities])
-
   const filteredVulnerabilities = useMemo(() => {
     return allVulnerabilities
       .filter((v) => {
@@ -135,12 +122,10 @@ function Vulnerabilities() {
           v.package.toLowerCase().includes(search.toLowerCase()) ||
           v.title.toLowerCase().includes(search.toLowerCase()) ||
           v.toolchain.toLowerCase().includes(search.toLowerCase())
-        const matchesToolchain =
-          toolchainFilter === "all" || v.toolchain === toolchainFilter
-        return matchesSearch && matchesToolchain
+        return matchesSearch
       })
       .sort((a, b) => severityOrder(a.severity) - severityOrder(b.severity))
-  }, [allVulnerabilities, search, toolchainFilter])
+  }, [allVulnerabilities, search])
 
 
   const severityCounts = useMemo(() => {
@@ -551,22 +536,6 @@ function Vulnerabilities() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <Select
-              value={toolchainFilter}
-              onValueChange={(v) => setToolchainFilter(v ?? "all")}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="All toolchains" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Toolchains</SelectItem>
-                {availableToolchains.map((tc) => (
-                  <SelectItem key={tc} value={tc}>
-                    {tc}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
         </CardHeader>
         <CardContent>
@@ -574,8 +543,8 @@ function Vulnerabilities() {
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60">
               <CheckCircle className="w-12 h-12 mb-4 text-green-500/50" />
               <p>
-                {search || toolchainFilter !== "all"
-                  ? "No vulnerabilities match your filters."
+                {search
+                  ? "No vulnerabilities match your search."
                   : "No vulnerabilities detected. Your project is secure."}
               </p>
             </div>
