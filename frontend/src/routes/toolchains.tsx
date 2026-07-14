@@ -31,11 +31,10 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
-  TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { DataTable } from "@/components/ui/data-table"
+import type { ColumnDef } from "@tanstack/react-table"
 import {
   siDocker,
   siNpm,
@@ -275,6 +274,77 @@ function getToolIcon(tool: string) {
   if (entry.fallback) return entry.fallback
   return <ToolIcon icon={entry.icon} className="w-5 h-5" invertInDark={entry.invertInDark} />
 }
+const vulnColumns: ColumnDef<VulnerabilityInfo, unknown>[] = [
+  {
+    accessorKey: "package",
+    header: "Package",
+    cell: ({ row }) => (
+      <span className="font-medium text-xs font-mono">{row.original.package}</span>
+    ),
+  },
+  {
+    accessorKey: "title",
+    header: "Title",
+    cell: ({ row }) => (
+      <div className="font-semibold text-xs text-foreground">{row.original.title}</div>
+    ),
+  },
+  {
+    accessorKey: "cve",
+    header: "CVE",
+    cell: ({ row }) => (
+      <span className="text-xs font-mono text-muted-foreground">{row.original.cve || "-"}</span>
+    ),
+  },
+  {
+    accessorKey: "severity",
+    header: "Severity",
+    cell: ({ row }) => (
+      <Badge
+        variant="destructive"
+        className="bg-red-500/10 text-red-500 border-red-500/20 shadow-none text-[10px] h-5 px-1.5"
+      >
+        {row.original.severity}
+      </Badge>
+    ),
+  },
+  {
+    accessorKey: "patched_version",
+    header: "Patched",
+    cell: ({ row }) => (
+      <span className="text-xs font-mono text-muted-foreground">{row.original.patched_version || "-"}</span>
+    ),
+  },
+]
+
+const outdatedColumns: ColumnDef<PackageInfo, unknown>[] = [
+  {
+    accessorKey: "name",
+    header: "Package",
+    cell: ({ row }) => (
+      <span className="font-medium text-xs font-mono">{row.original.name}</span>
+    ),
+  },
+  {
+    accessorKey: "current",
+    header: "Current",
+    cell: ({ row }) => (
+      <span className="text-xs text-muted-foreground font-mono">{row.original.current}</span>
+    ),
+  },
+  {
+    accessorKey: "latest",
+    header: "Latest",
+    cell: ({ row }) => (
+      <Badge
+        variant="outline"
+        className="border-blue-500/30 text-blue-400 bg-blue-500/10 shadow-none text-[10px] h-5 px-1.5"
+      >
+        {row.original.latest}
+      </Badge>
+    ),
+  },
+]
 
 function ToolchainCard({ tc }: { tc: ToolchainResult }) {
   const vulnCount = tc.vulnerabilities?.length || 0
@@ -415,60 +485,13 @@ function ToolchainCard({ tc }: { tc: ToolchainResult }) {
                         </p>
                       </div>
                     ) : (
-                      <ScrollArea className="max-h-[300px] border border-border/40 rounded-lg bg-muted/10 overflow-y-auto">
-                        <Table>
-                          <TableHeader className="bg-muted/50 sticky top-0 z-10">
-                            <TableRow className="border-border hover:bg-transparent">
-                              <TableHead className="text-xs h-9">
-                                Package
-                              </TableHead>
-                              <TableHead className="text-xs h-9">
-                                Title
-                              </TableHead>
-                              <TableHead className="text-xs h-9">
-                                CVE
-                              </TableHead>
-                              <TableHead className="text-xs h-9">
-                                Severity
-                              </TableHead>
-                              <TableHead className="text-xs h-9">
-                                Patched
-                              </TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {tc.vulnerabilities?.map((v, vIdx) => (
-                              <TableRow
-                                key={vIdx}
-                                className="border-border hover:bg-muted/30"
-                              >
-                                <TableCell className="font-medium text-xs font-mono">
-                                  {v.package}
-                                </TableCell>
-                                <TableCell className="text-xs">
-                                  <div className="font-semibold text-foreground">
-                                    {v.title}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-xs font-mono text-muted-foreground">
-                                  {v.cve || "-"}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge
-                                    variant="destructive"
-                                    className="bg-red-500/10 text-red-500 border-red-500/20 shadow-none text-[10px] h-5 px-1.5"
-                                  >
-                                    {v.severity}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-xs font-mono text-muted-foreground">
-                                  {v.patched_version || "-"}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </ScrollArea>
+                      <DataTable
+                        columns={vulnColumns}
+                        data={tc.vulnerabilities || []}
+                        defaultPageSize={5}
+                        pageSizeOptions={[5, 10, 25]}
+                        containerClassName="border border-border/40 rounded-lg bg-muted/10"
+                      />
                     )}
                   </div>
                 )}
@@ -487,46 +510,13 @@ function ToolchainCard({ tc }: { tc: ToolchainResult }) {
                         </p>
                       </div>
                     ) : (
-                      <ScrollArea className="max-h-[300px] border border-border/40 rounded-lg bg-muted/10 overflow-y-auto">
-                        <Table>
-                          <TableHeader className="bg-muted/50 sticky top-0 z-10">
-                            <TableRow className="border-border hover:bg-transparent">
-                              <TableHead className="text-xs h-9">
-                                Package
-                              </TableHead>
-                              <TableHead className="text-xs h-9">
-                                Current
-                              </TableHead>
-                              <TableHead className="text-xs h-9 text-right">
-                                Latest
-                              </TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {tc.outdated?.map((o, oIdx) => (
-                              <TableRow
-                                key={oIdx}
-                                className="border-border hover:bg-muted/30"
-                              >
-                                <TableCell className="font-medium text-xs font-mono">
-                                  {o.name}
-                                </TableCell>
-                                <TableCell className="text-xs text-muted-foreground font-mono">
-                                  {o.current}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <Badge
-                                    variant="outline"
-                                    className="border-blue-500/30 text-blue-400 bg-blue-500/10 shadow-none text-[10px] h-5 px-1.5"
-                                  >
-                                    {o.latest}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </ScrollArea>
+                      <DataTable
+                        columns={outdatedColumns}
+                        data={tc.outdated || []}
+                        defaultPageSize={5}
+                        pageSizeOptions={[5, 10, 25]}
+                        containerClassName="border border-border/40 rounded-lg bg-muted/10"
+                      />
                     )}
                   </div>
                 )}
