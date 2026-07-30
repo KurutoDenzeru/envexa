@@ -25,6 +25,7 @@ pub async fn start(port: u16) {
         .route("/api/project/favorite", put(api_project_favorite))
         .route("/api/config", get(api_config_get).put(api_config_put))
         .route("/api/update/check", get(api_update_check))
+        .route("/api/version", get(api_version))
         .fallback(static_handler);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
@@ -450,6 +451,12 @@ async fn fetch_latest_release() -> Option<(String, String)> {
             let body = v["body"].as_str().unwrap_or("").to_string();
             Some((tag, body))
         })
+}
+
+async fn api_version() -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "version": VERSION
+    }))
 }
 
 fn parse_log_line(time: chrono::DateTime<chrono::Local>, msg: String) -> LogEntry {

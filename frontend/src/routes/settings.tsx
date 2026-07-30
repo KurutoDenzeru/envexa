@@ -146,6 +146,7 @@ function SettingsPage() {
   })
   const [clearCacheOpen, setClearCacheOpen] = useState(false)
   const [resetDefaultsOpen, setResetDefaultsOpen] = useState(false)
+  const [appVersion, setAppVersion] = useState("")
 
   const loadConfig = async () => {
     try {
@@ -172,6 +173,10 @@ function SettingsPage() {
 
   useEffect(() => {
     loadConfig()
+    fetch("/api/version")
+      .then((r) => r.json())
+      .then((d) => setAppVersion(d.version))
+      .catch(() => {})
   }, [])
 
   const toggleScanner = (id: string) => {
@@ -510,74 +515,6 @@ function SettingsPage() {
               </FieldRow>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ExternalLink className="w-5 h-5" />
-                Actions
-              </CardTitle>
-              <CardDescription>Maintenance actions and utilities.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {updateInfo.updateAvailable ? (
-                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-sm font-medium text-emerald-500">
-                      Update available: Envexa v{updateInfo.latestVersion}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    You&apos;re currently on v{updateInfo.currentVersion}.{' '}
-                    <a
-                      href="https://github.com/KurutoDenzeru/envexa/releases/latest"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="underline hover:text-foreground"
-                    >
-                      Download the latest release
-                    </a>
-                    {' '}and restart the server to update.
-                  </p>
-                  {updateInfo.releaseBody && (
-                    <details className="text-xs text-muted-foreground">
-                      <summary className="cursor-pointer hover:text-foreground">Release notes</summary>
-                      <pre className="mt-2 whitespace-pre-wrap font-mono text-[11px] leading-relaxed max-h-40 overflow-y-auto bg-black/10 dark:bg-white/5 rounded p-2">
-                        {updateInfo.releaseBody}
-                      </pre>
-                    </details>
-                  )}
-                </div>
-              ) : null}
-              <Button variant="outline" onClick={handleCheckUpdates} disabled={updateInfo.checking} className="w-full justify-start gap-4 h-auto py-4">
-                <Info className="w-5 h-5 shrink-0" />
-                <div className="text-left">
-                  <div className="font-medium">
-                    {updateInfo.checking ? "Checking..." : "Check for Updates"}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {updateInfo.latestVersion && !updateInfo.checking
-                      ? `Latest: v${updateInfo.latestVersion} — Current: v${updateInfo.currentVersion}`
-                      : "Check if a new version of Envexa is available"}
-                  </div>
-                </div>
-              </Button>
-              <Button variant="outline" onClick={() => setClearCacheOpen(true)} className="w-full justify-start gap-4 h-auto py-4 text-destructive hover:bg-destructive/10 hover:text-destructive">
-                <Database className="w-5 h-5 shrink-0" />
-                <div className="text-left">
-                  <div className="font-medium">Clear All Caches</div>
-                  <div className="text-xs text-muted-foreground">Remove all cached scan data and logs</div>
-                </div>
-              </Button>
-              <Button variant="outline" onClick={() => setResetDefaultsOpen(true)} className="w-full justify-start gap-4 h-auto py-4 text-destructive hover:bg-destructive/10 hover:text-destructive">
-                <ExternalLink className="w-5 h-5 shrink-0" />
-                <div className="text-left">
-                  <div className="font-medium">Reset to Defaults</div>
-                  <div className="text-xs text-muted-foreground">Reset all settings to factory defaults</div>
-                </div>
-              </Button>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="scanners" className="space-y-6 animate-in fade-in">
@@ -644,31 +581,11 @@ function SettingsPage() {
                 <Boxes className="w-12 h-12 text-muted-foreground/50" />
                 <div>
                   <h3 className="font-semibold text-foreground">Envexa</h3>
-                  <p className="text-sm text-muted-foreground">Universal environment scanner</p>
-                  <p className="text-sm font-mono text-muted-foreground mt-1">v2.11.0</p>
+                  <p className="text-sm text-muted-foreground">Blazing-fast Rust TUI, scriptable CLI, and Web Dashboard for monitoring local developer tooling health.</p>
+                  <p className="text-sm font-mono text-muted-foreground mt-1">v{appVersion || "?.?.?"}</p>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <a
-                  href="https://github.com/kurtcalacday/envexa"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  GitHub
-                </a>
-                <a
-                  href="https://github.com/kurtcalacday/envexa/issues"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <Info className="w-4 h-4" />
-                  Report Issue
-                </a>
-              </div>
-              <div className="rounded-lg border border-border/50 bg-muted/50 p-4">
+              <div className="rounded-lg border border-border/50 bg-muted/50 p-4 space-y-4">
                 <p className="text-sm text-muted-foreground/80 mb-3">
                   Configuration file location:
                 </p>
@@ -676,6 +593,74 @@ function SettingsPage() {
                   ~/.config/envexa/config.json
                 </code>
               </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ExternalLink className="w-5 h-5" />
+                Actions
+              </CardTitle>
+              <CardDescription>Maintenance actions and utilities.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {updateInfo.updateAvailable ? (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-sm font-medium text-emerald-500">
+                      Update available: Envexa v{updateInfo.latestVersion}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    You&apos;re currently on v{updateInfo.currentVersion}.{' '}
+                    <a
+                      href="https://github.com/KurutoDenzeru/envexa/releases/latest"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline hover:text-foreground"
+                    >
+                      Download the latest release
+                    </a>
+                    {' '}and restart the server to update.
+                  </p>
+                  {updateInfo.releaseBody && (
+                    <details className="text-xs text-muted-foreground">
+                      <summary className="cursor-pointer hover:text-foreground">Release notes</summary>
+                      <pre className="mt-2 whitespace-pre-wrap font-mono text-[11px] leading-relaxed max-h-40 overflow-y-auto bg-black/10 dark:bg-white/5 rounded p-2">
+                        {updateInfo.releaseBody}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              ) : null}
+              <Button variant="outline" onClick={handleCheckUpdates} disabled={updateInfo.checking} className="w-full justify-start gap-4 h-auto py-4">
+                <Info className="w-5 h-5 shrink-0" />
+                <div className="text-left">
+                  <div className="font-medium">
+                    {updateInfo.checking ? "Checking..." : "Check for Updates"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {updateInfo.latestVersion && !updateInfo.checking
+                      ? `Latest: v${updateInfo.latestVersion} — Current: v${updateInfo.currentVersion}`
+                      : "Check if a new version of Envexa is available"}
+                  </div>
+                </div>
+              </Button>
+              <Button variant="outline" onClick={() => setClearCacheOpen(true)} className="w-full justify-start gap-4 h-auto py-4 text-destructive hover:bg-destructive/10 hover:text-destructive">
+                <Database className="w-5 h-5 shrink-0" />
+                <div className="text-left">
+                  <div className="font-medium">Clear All Caches</div>
+                  <div className="text-xs text-muted-foreground">Remove all cached scan data and logs</div>
+                </div>
+              </Button>
+              <Button variant="outline" onClick={() => setResetDefaultsOpen(true)} className="w-full justify-start gap-4 h-auto py-4 text-destructive hover:bg-destructive/10 hover:text-destructive">
+                <ExternalLink className="w-5 h-5 shrink-0" />
+                <div className="text-left">
+                  <div className="font-medium">Reset to Defaults</div>
+                  <div className="text-xs text-muted-foreground">Reset all settings to factory defaults</div>
+                </div>
+              </Button>
             </CardContent>
           </Card>
           <div className="text-center py-6 border-t border-border/50 space-y-4">
