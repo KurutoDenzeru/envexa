@@ -1,3 +1,4 @@
+use crate::core::config::{load_config, save_config, UserConfig};
 use axum::{
     extract::Query,
     http::{header, StatusCode, Uri},
@@ -5,9 +6,8 @@ use axum::{
     routing::{get, put},
     Json, Router,
 };
-use crate::core::config::{load_config, save_config, UserConfig};
- use rust_embed::RustEmbed;
- use std::net::SocketAddr;
+use rust_embed::RustEmbed;
+use std::net::SocketAddr;
 
 #[derive(RustEmbed)]
 #[folder = "frontend/dist/"]
@@ -75,8 +75,13 @@ async fn api_scan(Query(query): Query<ScanQuery>) -> Json<crate::scanner::Report
     let enabled_refs: Vec<String> = cfg.enabled_scanners.unwrap_or_default();
     let results = crate::toolchains::scan_all_with(
         cfg.scan_timeout_secs,
-        if enabled_refs.is_empty() { None } else { Some(&enabled_refs) },
-    ).await;
+        if enabled_refs.is_empty() {
+            None
+        } else {
+            Some(&enabled_refs)
+        },
+    )
+    .await;
 
     let now_done = chrono::Local::now();
     logs.push((
@@ -330,7 +335,6 @@ async fn api_config_put(
     save_config(&cfg).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(load_config()))
 }
-
 
 fn parse_log_line(time: chrono::DateTime<chrono::Local>, msg: String) -> LogEntry {
     let mut level = "INFO".to_string();
