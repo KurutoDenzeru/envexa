@@ -7,6 +7,7 @@ import {
   Folder,
   CornerDownLeft,
   Star,
+  RefreshCw,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -43,8 +44,10 @@ function shortenPath(p: string): string {
 
 export function ProjectPathSelector({
   onPathChanged,
+  onSwitchAndScan,
 }: {
   onPathChanged?: () => void
+  onSwitchAndScan?: () => void
 }) {
   const [project, setProject] = useState<ProjectData | null>(null)
   const [open, setOpen] = useState(false)
@@ -125,6 +128,32 @@ export function ProjectPathSelector({
       setOpen(false)
       toast.success("Project switched")
       onPathChanged?.()
+    } catch {
+      toast.error("Failed to switch project")
+      setSwitching(null)
+    }
+  }
+
+  const handleSwitchAndScan = async (path: string) => {
+    setSwitching(path)
+    try {
+      const res = await fetch("/api/project", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path }),
+      })
+      if (!res.ok) {
+        const err = await res.text()
+        toast.error(err || "Failed to switch project")
+        setSwitching(null)
+        return
+      }
+      const data: ProjectData = await res.json()
+      setProject(data)
+      setInputValue(data.current)
+      setOpen(false)
+      toast.success("Project switched, scanning...")
+      onSwitchAndScan?.()
     } catch {
       toast.error("Failed to switch project")
       setSwitching(null)
@@ -231,6 +260,23 @@ export function ProjectPathSelector({
           >
             <ArrowRight className="h-4 w-4" />
             Switch
+          </button>
+          <button
+            type="button"
+            disabled={
+              switching !== null || inputValue.trim() === project?.current || !inputValue.trim()
+            }
+            onClick={() => inputValue.trim() && handleSwitchAndScan(inputValue.trim())}
+            className={cn(
+              "px-3 py-2 rounded-md text-sm font-medium",
+              "bg-emerald-600 text-white",
+              "hover:bg-emerald-700 transition-colors",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              "flex items-center gap-1.5 shrink-0"
+            )}
+          >
+            <RefreshCw className="h-4 w-4" />
+            Switch & Scan
           </button>
         </form>
 

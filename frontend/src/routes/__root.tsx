@@ -6,7 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { ThemeProvider as NextThemesProvider } from "next-themes"
 import { Toaster } from "@/components/ui/sonner"
 import { ProjectPathSelector } from "@/components/project-path-selector"
-import { ScanDataProvider } from "@/components/scan-data-context"
+import { ScanDataProvider, useScanData } from "@/components/scan-data-context"
 
 type ScannerStatus = "warming" | "active" | "error"
 
@@ -14,6 +14,16 @@ const STATUS_CONFIG: Record<ScannerStatus, { color: string; label: string }> = {
   warming: { color: "bg-orange-500", label: "Warming up..." },
   active: { color: "bg-emerald-500", label: "Scanner Service Active" },
   error: { color: "bg-red-500", label: "Failed to load environment report" },
+}
+
+function ProjectPathWithScan() {
+  const { refetch } = useScanData()
+  return (
+    <ProjectPathSelector
+      onPathChanged={() => window.location.reload()}
+      onSwitchAndScan={() => refetch(true)}
+    />
+  )
 }
 
 export const Route = createRootRoute({
@@ -44,7 +54,7 @@ export const Route = createRootRoute({
                   <SidebarTrigger />
                 </div>
                 <div className="flex-1 flex justify-center">
-                  <ProjectPathSelector onPathChanged={() => window.location.reload()} />
+                  <ProjectPathWithScan />
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
                   <div className={`w-2 h-2 rounded-full animate-pulse ${STATUS_CONFIG[status].color}`} />
