@@ -45,6 +45,9 @@ pub struct UserConfig {
     pub cache_ttl_minutes: u64,
     pub project_path: Option<String>,
     #[serde(default)]
+    pub recent_project_paths: Vec<String>,
+    #[serde(default)]
+    pub favorite_project_paths: Vec<String>,
     pub auto_scan_on_startup: bool,
     #[serde(default = "default_theme")]
     pub theme: String,
@@ -86,9 +89,11 @@ impl Default for UserConfig {
         Self {
             cache_ttl_minutes: 15,
             project_path: None,
+            recent_project_paths: Vec::new(),
             auto_scan_on_startup: false,
             theme: default_theme(),
             verbose_logs: false,
+            favorite_project_paths: Vec::new(),
             scan_timeout_secs: default_scan_timeout(),
             daemon_interval_secs: default_daemon_interval(),
             export_format: default_export_format(),

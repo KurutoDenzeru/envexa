@@ -28,7 +28,10 @@ fn parse_vuln(name: &str, info: &serde_json::Value, out: &mut Vec<VulnerabilityI
     let mut dependency_path = Vec::new();
     if let Some(nodes) = info["nodes"].as_array() {
         if let Some(first_node) = nodes.first().and_then(|n| n.as_str()) {
-            let path_parts: Vec<&str> = first_node.split("node_modules/").filter(|s| !s.is_empty()).collect();
+            let path_parts: Vec<&str> = first_node
+                .split("node_modules/")
+                .filter(|s| !s.is_empty())
+                .collect();
             for part in path_parts {
                 let clean = part.trim_end_matches('/');
                 if !clean.is_empty() {
@@ -109,9 +112,16 @@ async fn bun_audit(project_path: &std::path::Path) -> Vec<VulnerabilityInfo> {
                         for v in vuln_arr {
                             vulns.push(VulnerabilityInfo {
                                 package: pkg_name.clone(),
-                                severity: v["severity"].as_str().unwrap_or("unknown").to_uppercase(),
+                                severity: v["severity"]
+                                    .as_str()
+                                    .unwrap_or("unknown")
+                                    .to_uppercase(),
                                 title: v["title"].as_str().unwrap_or("?").to_string(),
-                                cve: v["cve"].as_array().and_then(|a| a.first()).and_then(|c| c.as_str()).map(|s| s.to_string()),
+                                cve: v["cve"]
+                                    .as_array()
+                                    .and_then(|a| a.first())
+                                    .and_then(|c| c.as_str())
+                                    .map(|s| s.to_string()),
                                 patched_version: String::new(), // bun output often doesn't give a simple patched version
                                 dependency_path: Vec::new(),
                             });
