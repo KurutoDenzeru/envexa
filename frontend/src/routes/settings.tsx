@@ -230,14 +230,52 @@ function SettingsPage() {
     }
   }
 
-  const handleCheckUpdates = () => {
+  const [updateInfo, setUpdateInfo] = useState<{
+    checking: boolean
+    currentVersion: string
+    latestVersion: string
+    updateAvailable: boolean
+    releaseBody: string
+  }>({
+    checking: false,
+    currentVersion: "",
+    latestVersion: "",
+    updateAvailable: false,
+    releaseBody: "",
+  })
+
+  const handleCheckUpdates = async () => {
+    setUpdateInfo((prev) => ({ ...prev, checking: true }))
     const id = toast.loading("Checking for updates...")
-    setTimeout(() => {
-      toast.success("You're up to date", {
-        id,
-        description: "Envexa v2.11.0 is the latest version.",
+    try {
+      const res = await fetch("/api/update/check")
+      const data = await res.json()
+      if (data.update_available) {
+        toast.success("Update available!", {
+          id,
+          description: `Envexa v${data.latest_version} is available (you're on v${data.current_version}).`,
+          duration: 8000,
+        })
+      } else {
+        toast.success("You're up to date", {
+          id,
+          description: `Envexa v${data.current_version} is the latest version.`,
+        })
+      }
+      setUpdateInfo({
+        checking: false,
+        currentVersion: data.current_version,
+        latestVersion: data.latest_version,
+        updateAvailable: data.update_available,
+        releaseBody: data.release_body,
       })
-    }, 1500)
+    } catch {
+      toast.error("Failed to check for updates", {
+        id,
+        description: "Could not reach GitHub release API.",
+      })
+      setUpdateInfo((prev) => ({ ...prev, checking: false }))
+    }
   }
   const handleClearCache = () => {
     setClearCacheOpen(false)
@@ -481,11 +519,47 @@ function SettingsPage() {
               <CardDescription>Maintenance actions and utilities.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button variant="outline" onClick={handleCheckUpdates} className="w-full justify-start gap-4 h-auto py-4">
+              {updateInfo.updateAvailable ? (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-sm font-medium text-emerald-500">
+                      Update available: Envexa v{updateInfo.latestVersion}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    You&apos;re currently on v{updateInfo.currentVersion}.{' '}
+                    <a
+                      href="https://github.com/KurutoDenzeru/envexa/releases/latest"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline hover:text-foreground"
+                    >
+                      Download the latest release
+                    </a>
+                    {' '}and restart the server to update.
+                  </p>
+                  {updateInfo.releaseBody && (
+                    <details className="text-xs text-muted-foreground">
+                      <summary className="cursor-pointer hover:text-foreground">Release notes</summary>
+                      <pre className="mt-2 whitespace-pre-wrap font-mono text-[11px] leading-relaxed max-h-40 overflow-y-auto bg-black/10 dark:bg-white/5 rounded p-2">
+                        {updateInfo.releaseBody}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              ) : null}
+              <Button variant="outline" onClick={handleCheckUpdates} disabled={updateInfo.checking} className="w-full justify-start gap-4 h-auto py-4">
                 <Info className="w-5 h-5 shrink-0" />
                 <div className="text-left">
-                  <div className="font-medium">Check for Updates</div>
-                  <div className="text-xs text-muted-foreground">Check if a new version of Envexa is available</div>
+                  <div className="font-medium">
+                    {updateInfo.checking ? "Checking..." : "Check for Updates"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {updateInfo.latestVersion && !updateInfo.checking
+                      ? `Latest: v${updateInfo.latestVersion} — Current: v${updateInfo.currentVersion}`
+                      : "Check if a new version of Envexa is available"}
+                  </div>
                 </div>
               </Button>
               <Button variant="outline" onClick={() => setClearCacheOpen(true)} className="w-full justify-start gap-4 h-auto py-4 text-destructive hover:bg-destructive/10 hover:text-destructive">

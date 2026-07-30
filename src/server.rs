@@ -10,6 +10,8 @@ use chrono::Timelike;
 use rust_embed::RustEmbed;
 use std::net::SocketAddr;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(RustEmbed)]
 #[folder = "frontend/dist/"]
 struct Asset;
@@ -22,6 +24,7 @@ pub async fn start(port: u16) {
         .route("/api/project/dirs", get(api_project_dirs))
         .route("/api/project/favorite", put(api_project_favorite))
         .route("/api/config", get(api_config_get).put(api_config_put))
+        .route("/api/update/check", get(api_update_check))
         .fallback(static_handler);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
@@ -390,6 +393,63 @@ async fn api_config_put(
 ) -> Result<Json<UserConfig>, (StatusCode, String)> {
     save_config(&cfg).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(load_config()))
+}
+
+#[derive(serde::Serialize)]
+struct UpdateCheckResponse {
+    current_version: String,
+    latest_version: String,
+    update_available: bool,
+    release_body: String,
+}
+
+async fn api_update_check() -> Json<UpdateCheckResponse> {
+    let current = VERSION.to_string();
+
+    let result =
+        tokio::time::timeout(std::time::Duration::from_secs(10), fetch_latest_release()).await;
+
+    match result {
+        Ok(Some((tag, body))) => {
+            let latest = tag.trim_start_matches('v').to_string();
+            let available = latest != current && !latest.is_empty();
+            Json(UpdateCheckResponse {
+                current_version: current,
+                latest_version: latest,
+                update_available: available,
+                release_body: body,
+            })
+        }
+        _ => Json(UpdateCheckResponse {
+            current_version: current,
+            latest_version: VERSION.to_string(),
+            update_available: false,
+            release_body: String::new(),
+        }),
+    }
+}
+
+async fn fetch_latest_release() -> Option<(String, String)> {
+    let url = "https://api.github.com/repos/KurutoDenzeru/envexa/releases/latest";
+
+    let output = tokio::process::Command::new("curl")
+        .args(["-sL", "-H", "User-Agent: envexa", url])
+        .output()
+        .await
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let body_str = String::from_utf8_lossy(&output.stdout).to_string();
+    serde_json::from_str::<serde_json::Value>(&body_str)
+        .ok()
+        .and_then(|v| {
+            let tag = v["tag_name"].as_str()?.to_string();
+            let body = v["body"].as_str().unwrap_or("").to_string();
+            Some((tag, body))
+        })
 }
 
 fn parse_log_line(time: chrono::DateTime<chrono::Local>, msg: String) -> LogEntry {
