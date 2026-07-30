@@ -13,6 +13,7 @@ import { toast } from "sonner"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -221,7 +222,13 @@ export function ProjectPathSelector({
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Project Path</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <FolderOpen className="w-5 h-5 text-muted-foreground" />
+            Project Path
+          </DialogTitle>
+          <DialogDescription>
+            Select or enter a directory to scan for toolchains and dependencies.
+          </DialogDescription>
         </DialogHeader>
 
         {/* Path input */}
