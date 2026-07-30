@@ -9,31 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VulnerabilitiesRouteImport } from './routes/vulnerabilities'
-import { Route as ToolchainsRouteImport } from './routes/toolchains'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as OutdatedRouteImport } from './routes/outdated'
-import { Route as LogsRouteImport } from './routes/logs'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LogsRouteImport } from './routes/logs'
+import { Route as OutdatedRouteImport } from './routes/outdated'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ToolchainsRouteImport } from './routes/toolchains'
+import { Route as VulnerabilitiesRouteImport } from './routes/vulnerabilities'
 
-const VulnerabilitiesRoute = VulnerabilitiesRouteImport.update({
-  id: '/vulnerabilities',
-  path: '/vulnerabilities',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ToolchainsRoute = ToolchainsRouteImport.update({
-  id: '/toolchains',
-  path: '/toolchains',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OutdatedRoute = OutdatedRouteImport.update({
-  id: '/outdated',
-  path: '/outdated',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LogsRoute = LogsRouteImport.update({
@@ -41,9 +26,24 @@ const LogsRoute = LogsRouteImport.update({
   path: '/logs',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const OutdatedRoute = OutdatedRouteImport.update({
+  id: '/outdated',
+  path: '/outdated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ToolchainsRoute = ToolchainsRouteImport.update({
+  id: '/toolchains',
+  path: '/toolchains',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VulnerabilitiesRoute = VulnerabilitiesRouteImport.update({
+  id: '/vulnerabilities',
+  path: '/vulnerabilities',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -110,32 +110,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/vulnerabilities': {
-      id: '/vulnerabilities'
-      path: '/vulnerabilities'
-      fullPath: '/vulnerabilities'
-      preLoaderRoute: typeof VulnerabilitiesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/toolchains': {
-      id: '/toolchains'
-      path: '/toolchains'
-      fullPath: '/toolchains'
-      preLoaderRoute: typeof ToolchainsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/outdated': {
-      id: '/outdated'
-      path: '/outdated'
-      fullPath: '/outdated'
-      preLoaderRoute: typeof OutdatedRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/logs': {
@@ -145,11 +124,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LogsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/outdated': {
+      id: '/outdated'
+      path: '/outdated'
+      fullPath: '/outdated'
+      preLoaderRoute: typeof OutdatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/toolchains': {
+      id: '/toolchains'
+      path: '/toolchains'
+      fullPath: '/toolchains'
+      preLoaderRoute: typeof ToolchainsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vulnerabilities': {
+      id: '/vulnerabilities'
+      path: '/vulnerabilities'
+      fullPath: '/vulnerabilities'
+      preLoaderRoute: typeof VulnerabilitiesRouteImport
       parentRoute: typeof rootRouteImport
     }
   }

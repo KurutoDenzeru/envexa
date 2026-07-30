@@ -2,17 +2,22 @@ import { createFileRoute } from "@tanstack/react-router"
 import {
   CardContent,
 } from "@/components/ui/card"
-import { Terminal, ScrollText, Filter, Download, Search, Check, Trash2 } from "lucide-react"
+import { Terminal, ScrollText, Filter, Download, Search, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 
 export const Route = createFileRoute("/logs")({ component: LogsPage })
 
@@ -74,6 +79,23 @@ function LogsPage() {
     })
   }, [logs, filterLevel, search])
 
+  const downloadLogs = useCallback(() => {
+    const header = "# Envexa System Logs\n# Generated: " + new Date().toISOString() + "\n# Source: " + logsPath + "\n\n"
+    const formatted = filteredLogs
+      .map((log) => `${log.time} ${log.level.padEnd(5)} [${log.source}] ${log.message}`)
+      .join("\n")
+    const content = header + formatted + "\n"
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = logsPath.split("/").pop() || "envexa-logs.txt"
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [filteredLogs, logsPath])
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto flex flex-col gap-6">
@@ -131,12 +153,22 @@ function LogsPage() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button variant="outline" size="icon" className="bg-popover text-foreground border-border hover:bg-muted/50 hover:text-red-400 h-9 w-9 shadow-xs" title="Clear Logs">
-            <Trash2 className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" size="icon" className="bg-popover text-foreground border-border hover:bg-muted/50 h-9 w-9 shadow-xs" title="Export Logs">
-            <Download className="w-4 h-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="bg-popover text-foreground border-border hover:bg-muted/50 h-9 w-9 shadow-xs"
+                  onClick={downloadLogs}
+                  aria-label="Download Logs"
+                />
+              }
+            >
+              <Download className="w-4 h-4" />
+            </TooltipTrigger>
+            <TooltipContent>Download Logs</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
