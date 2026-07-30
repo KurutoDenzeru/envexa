@@ -117,6 +117,7 @@ struct LogResponse {
 #[derive(serde::Serialize)]
 struct LogEntry {
     time: String,
+    date: String,
     level: String,
     message: String,
     source: String,
@@ -366,6 +367,7 @@ fn parse_log_line(time: chrono::DateTime<chrono::Local>, msg: String) -> LogEntr
 
     LogEntry {
         time: time.format("%H:%M:%S").to_string(),
+        date: time.format("%B %d, %Y").to_string(),
         level,
         message,
         source,

@@ -22,15 +22,15 @@ import { useState, useMemo, useEffect, useCallback } from "react"
 export const Route = createFileRoute("/logs")({ component: LogsPage })
 
 const mockLogs = [
-  { time: "10:15:32", level: "INFO", message: "Starting Envexa scanner engine...", source: "system" },
-  { time: "10:15:33", level: "INFO", message: "Detected Node.js project. Scanning package.json...", source: "node" },
-  { time: "10:15:34", level: "WARN", message: "Outdated dependency found: lodash (current: 4.17.20, latest: 4.17.21)", source: "node" },
-  { time: "10:15:35", level: "INFO", message: "Detected Rust project. Scanning Cargo.toml...", source: "rust" },
-  { time: "10:15:38", level: "ERROR", message: "Security vulnerability found in 'regex' crate: CVE-2022-24713", source: "rust" },
-  { time: "10:15:39", level: "INFO", message: "Detected Python project. Scanning requirements.txt...", source: "python" },
-  { time: "10:15:40", level: "INFO", message: "Scan completed successfully. Generated report.", source: "system" },
-  { time: "10:15:42", level: "DEBUG", message: "Cleaning up temporary files...", source: "system" },
-  { time: "10:16:01", level: "INFO", message: "File change detected in src/main.rs. Re-running scanner...", source: "watcher" },
+  { time: "10:15:32", date: "July 31, 2026", level: "INFO", message: "Starting Envexa scanner engine...", source: "system" },
+  { time: "10:15:33", date: "July 31, 2026", level: "INFO", message: "Detected Node.js project. Scanning package.json...", source: "node" },
+  { time: "10:15:34", date: "July 31, 2026", level: "WARN", message: "Outdated dependency found: lodash (current: 4.17.20, latest: 4.17.21)", source: "node" },
+  { time: "10:15:35", date: "July 31, 2026", level: "INFO", message: "Detected Rust project. Scanning Cargo.toml...", source: "rust" },
+  { time: "10:15:38", date: "July 31, 2026", level: "ERROR", message: "Security vulnerability found in 'regex' crate: CVE-2022-24713", source: "rust" },
+  { time: "10:15:39", date: "July 31, 2026", level: "INFO", message: "Detected Python project. Scanning requirements.txt...", source: "python" },
+  { time: "10:15:40", date: "July 31, 2026", level: "INFO", message: "Scan completed successfully. Generated report.", source: "system" },
+  { time: "10:15:42", date: "July 31, 2026", level: "DEBUG", message: "Cleaning up temporary files...", source: "system" },
+  { time: "10:16:01", date: "July 31, 2026", level: "INFO", message: "File change detected in src/main.rs. Re-running scanner...", source: "watcher" },
 ]
 
 function LogsPage() {
@@ -58,6 +58,7 @@ function LogsPage() {
         console.error(err)
         const parsedMock = mockLogs.map(log => ({
           time: log.time,
+          date: log.date,
           level: log.level,
           message: log.message,
           source: log.source
@@ -185,6 +186,8 @@ function LogsPage() {
           <div className="flex items-center gap-1.5 text-xs font-sans font-medium text-zinc-400 tracking-wide max-w-[60%] truncate">
             <Terminal className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
             <span className="truncate">{logsPath}</span>
+            <span className="text-zinc-600 mx-1">·</span>
+            <span className="text-zinc-500 shrink-0">{filteredLogs[0]?.date || "—"}</span>
           </div>
           {/* Right indicator for balance */}
           <div className="w-20 text-right text-[10px] text-zinc-600 font-mono tracking-wider">
