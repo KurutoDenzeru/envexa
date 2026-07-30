@@ -80,6 +80,36 @@ function LogsPage() {
     })
   }, [logs, filterLevel, search])
 
+  const logDateRange = useMemo(() => {
+    if (filteredLogs.length === 0) return null
+    const dates = [...new Set(filteredLogs.map(l => l.date).filter(Boolean))].sort()
+    if (dates.length === 0) return null
+    if (dates.length === 1) return dates[0]
+
+    const parseDate = (d: string) => {
+      const m = d.match(/^(\w+)\s+(\d+),\s+(\d+)$/)
+      if (!m) return { month: d, day: "", year: "" }
+      const month = m[1].slice(0, 3)
+      const day = m[2]
+      const year = m[3]
+      return { month, day, year, fullMonth: m[1] }
+    }
+
+    const first = parseDate(dates[0])
+    const last = parseDate(dates[dates.length - 1])
+
+    if (first.month === last.month && first.year === last.year) {
+      // Same month and year: "Jul 25 – 31, 2026"
+      return `${first.fullMonth} ${first.day} – ${last.day}, ${first.year}`
+    }
+    if (first.year === last.year) {
+      // Same year, different months: "Jun 30 – Jul 31, 2026"
+      return `${first.fullMonth} ${first.day} – ${last.fullMonth} ${last.day}, ${first.year}`
+    }
+    // Different years: "Jul 25, 2025 – Jul 31, 2026"
+    return `${first.fullMonth} ${first.day}, ${first.year} – ${last.fullMonth} ${last.day}, ${last.year}`
+  }, [filteredLogs])
+
   const downloadLogs = useCallback(() => {
     const header = "# Envexa System Logs\n# Generated: " + new Date().toISOString() + "\n# Source: " + logsPath + "\n\n"
     const formatted = filteredLogs
@@ -187,7 +217,7 @@ function LogsPage() {
             <Terminal className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
             <span className="truncate">{logsPath}</span>
             <span className="text-zinc-600 mx-1">·</span>
-            <span className="text-zinc-500 shrink-0">{filteredLogs[0]?.date || "—"}</span>
+            <span className="text-zinc-500 shrink-0">{logDateRange || "—"}</span>
           </div>
           {/* Right indicator for balance */}
           <div className="w-20 text-right text-[10px] text-zinc-600 font-mono tracking-wider">

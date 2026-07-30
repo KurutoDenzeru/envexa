@@ -6,6 +6,7 @@ use axum::{
     routing::{get, put},
     Json, Router,
 };
+use chrono::Timelike;
 use rust_embed::RustEmbed;
 use std::net::SocketAddr;
 
@@ -133,17 +134,71 @@ async fn api_logs() -> Json<LogResponse> {
 
     if raw_logs.is_empty() {
         let now = chrono::Local::now();
-        let initial_logs = vec![
-            (now - chrono::Duration::minutes(10), "INFO: Starting Envexa scanner engine... [system]".to_string()),
-            (now - chrono::Duration::minutes(9), "INFO: Detected Node.js project. Scanning package.json... [node]".to_string()),
-            (now - chrono::Duration::minutes(8), "WARN: Outdated dependency found: lodash (current: 4.17.20, latest: 4.17.21) [node]".to_string()),
-            (now - chrono::Duration::minutes(7), "INFO: Detected Rust project. Scanning Cargo.toml... [rust]".to_string()),
-            (now - chrono::Duration::minutes(6), "ERROR: Security vulnerability found in 'regex' crate: CVE-2022-24713 [rust]".to_string()),
-            (now - chrono::Duration::minutes(5), "INFO: Detected Python project. Scanning requirements.txt... [python]".to_string()),
-            (now - chrono::Duration::minutes(4), "INFO: Scan completed successfully. Generated report. [system]".to_string()),
-            (now - chrono::Duration::minutes(3), "DEBUG: Cleaning up temporary files... [system]".to_string()),
-            (now - chrono::Duration::minutes(1), "INFO: Web API server listening on port 8080 [system]".to_string()),
-        ];
+        let mut initial_logs = Vec::new();
+
+        // Seed historical log entries spanning the past 7 days
+        for day_offset in (0..7).rev() {
+            let base = now - chrono::Duration::days(day_offset);
+
+            if day_offset > 0 {
+                // Past days: a single scan cycle per day
+                let day = base
+                    .with_hour(9)
+                    .and_then(|t| t.with_minute(15))
+                    .and_then(|t| t.with_second(0))
+                    .unwrap_or(base);
+
+                initial_logs.push((
+                    day,
+                    "INFO: Envexa daemon started — daily scan initiated [system]".to_string(),
+                ));
+                initial_logs.push((
+                    day + chrono::Duration::seconds(45),
+                    "INFO: Detected Node.js project. Scanning package.json... [node]".to_string(),
+                ));
+                initial_logs.push((
+                    day + chrono::Duration::seconds(75),
+                    "INFO: Detected Rust project. Scanning Cargo.toml... [rust]".to_string(),
+                ));
+                initial_logs.push((
+                    day + chrono::Duration::seconds(110),
+                    "INFO: Detected Python project. Scanning requirements.txt... [python]"
+                        .to_string(),
+                ));
+                initial_logs.push((
+                    day + chrono::Duration::seconds(140),
+                    "INFO: Scan completed. Generated report. [system]".to_string(),
+                ));
+
+                // Alternate between clean and warning results across days
+                if day_offset % 3 == 0 {
+                    initial_logs.push((
+                        day + chrono::Duration::seconds(90),
+                        "WARN: Outdated dependency found: lodash (current: 4.17.20, latest: 4.17.21) [node]".to_string(),
+                    ));
+                }
+                if day_offset == 2 {
+                    initial_logs.push((
+                        day + chrono::Duration::seconds(100),
+                        "ERROR: Security vulnerability found in 'regex' crate: CVE-2022-24713 [rust]".to_string(),
+                    ));
+                }
+            } else {
+                // Today: detailed session timeline
+                initial_logs.extend([
+                    (base - chrono::Duration::minutes(10), "INFO: Starting Envexa scanner engine... [system]".to_string()),
+                    (base - chrono::Duration::minutes(9), "INFO: Detected Node.js project. Scanning package.json... [node]".to_string()),
+                    (base - chrono::Duration::minutes(8), "WARN: Outdated dependency found: lodash (current: 4.17.20, latest: 4.17.21) [node]".to_string()),
+                    (base - chrono::Duration::minutes(7), "INFO: Detected Rust project. Scanning Cargo.toml... [rust]".to_string()),
+                    (base - chrono::Duration::minutes(6), "ERROR: Security vulnerability found in 'regex' crate: CVE-2022-24713 [rust]".to_string()),
+                    (base - chrono::Duration::minutes(5), "INFO: Detected Python project. Scanning requirements.txt... [python]".to_string()),
+                    (base - chrono::Duration::minutes(4), "INFO: Scan completed successfully. Generated report. [system]".to_string()),
+                    (base - chrono::Duration::minutes(3), "DEBUG: Cleaning up temporary files... [system]".to_string()),
+                    (base - chrono::Duration::minutes(1), "INFO: Web API server listening on port 8080 [system]".to_string()),
+                ]);
+            }
+        }
+
         let _ = crate::core::config::write_logs(&initial_logs);
 
         for (time, msg) in initial_logs {
