@@ -194,7 +194,7 @@ function LogsPage() {
         </div>
 
         <CardContent className="p-0">
-          <div className="font-mono text-[13px] leading-relaxed p-4 bg-[#0c0c0e] text-zinc-100 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+          <div className="font-mono text-[13px] leading-relaxed p-4 h-[500px] overflow-y-auto bg-[#0c0c0e] text-zinc-100 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
             {loading ? (
               <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-4">
                 <span className="w-6 h-6 rounded-full border-2 border-zinc-600 border-t-zinc-200 animate-spin"></span>
