@@ -80,36 +80,6 @@ function LogsPage() {
     })
   }, [logs, filterLevel, search])
 
-  const logDateRange = useMemo(() => {
-    if (filteredLogs.length === 0) return null
-    const dates = [...new Set(filteredLogs.map(l => l.date).filter(Boolean))].sort()
-    if (dates.length === 0) return null
-    if (dates.length === 1) return dates[0]
-
-    const parseDate = (d: string) => {
-      const m = d.match(/^(\w+)\s+(\d+),\s+(\d+)$/)
-      if (!m) return { month: d, day: "", year: "" }
-      const month = m[1].slice(0, 3)
-      const day = m[2]
-      const year = m[3]
-      return { month, day, year, fullMonth: m[1] }
-    }
-
-    const first = parseDate(dates[0])
-    const last = parseDate(dates[dates.length - 1])
-
-    if (first.month === last.month && first.year === last.year) {
-      // Same month and year: "Jul 25 – 31, 2026"
-      return `${first.fullMonth} ${first.day} – ${last.day}, ${first.year}`
-    }
-    if (first.year === last.year) {
-      // Same year, different months: "Jun 30 – Jul 31, 2026"
-      return `${first.fullMonth} ${first.day} – ${last.fullMonth} ${last.day}, ${first.year}`
-    }
-    // Different years: "Jul 25, 2025 – Jul 31, 2026"
-    return `${first.fullMonth} ${first.day}, ${first.year} – ${last.fullMonth} ${last.day}, ${last.year}`
-  }, [filteredLogs])
-
   const downloadLogs = useCallback(() => {
     const header = "# Envexa System Logs\n# Generated: " + new Date().toISOString() + "\n# Source: " + logsPath + "\n\n"
     const formatted = filteredLogs
@@ -216,8 +186,6 @@ function LogsPage() {
           <div className="flex items-center gap-1.5 text-xs font-sans font-medium text-zinc-400 tracking-wide max-w-[60%] truncate">
             <Terminal className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
             <span className="truncate">{logsPath}</span>
-            <span className="text-zinc-600 mx-1">·</span>
-            <span className="text-zinc-500 shrink-0">{logDateRange || "—"}</span>
           </div>
           {/* Right indicator for balance */}
           <div className="w-20 text-right text-[10px] text-zinc-600 font-mono tracking-wider">
@@ -226,7 +194,7 @@ function LogsPage() {
         </div>
 
         <CardContent className="p-0">
-          <div className="font-mono text-[13px] leading-relaxed p-4 h-[600px] overflow-y-auto bg-[#0c0c0e] text-zinc-100 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+          <div className="font-mono text-[13px] leading-relaxed p-4 bg-[#0c0c0e] text-zinc-100 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
             {loading ? (
               <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-4">
                 <span className="w-6 h-6 rounded-full border-2 border-zinc-600 border-t-zinc-200 animate-spin"></span>
@@ -250,7 +218,13 @@ function LogsPage() {
                   const sourceColor = sourceColors[log.source.toLowerCase()] || "text-zinc-500"
                   return (
                     <div key={i} className="flex gap-4 py-1.5 hover:bg-zinc-900/60 px-2 rounded transition-colors group">
-                      <span className="text-zinc-500 w-20 shrink-0 select-none group-hover:text-zinc-400 transition-colors font-mono">{log.time}</span>
+                      <span className="text-zinc-500 shrink-0 select-none group-hover:text-zinc-400 transition-colors font-mono w-36">
+                        {log.date ? (() => {
+                          const m = log.date.match(/^(\w+)\s+(\d+)/)
+                          return m ? m[1].slice(0, 3) + " " + m[2].padStart(2, " ") + " " : ""
+                        })() : ""}
+                        {log.time}
+                      </span>
                       <span className={`w-14 shrink-0 font-bold select-none font-mono ${
                         log.level === 'INFO' ? 'text-[#57ab5a]' : 
                         log.level === 'WARN' ? 'text-[#e5c07b]' : 
@@ -270,14 +244,6 @@ function LogsPage() {
                     </div>
                   )
                 })}
-                <div className="flex gap-4 py-3 px-2 mt-2 border-t border-zinc-800/80">
-                  <span className="text-zinc-500 w-20 shrink-0 font-mono">...</span>
-                  <div className="flex items-center gap-2 text-emerald-400 font-medium font-mono">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                    <span>envexa-daemon: watching incoming events</span>
-                    <span className="inline-block w-1.5 h-4 bg-emerald-400 animate-pulse ml-0.5"></span>
-                  </div>
-                </div>
               </>
             )}
           </div>
