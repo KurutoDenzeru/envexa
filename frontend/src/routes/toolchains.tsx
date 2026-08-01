@@ -15,6 +15,7 @@ import {
   PackageOpen,
   CheckCircle,
   Shield,
+  ShieldAlert,
   FileSearch,
   Boxes,
   Folder,
@@ -115,6 +116,14 @@ const CATEGORIES: ToolCategory[] = [
     tools: ["project", "security", "supply_chain", "audit", "ci"],
   },
 ]
+
+// Severity weights used for the total risk score (higher = more severe)
+const RISK_WEIGHTS: Record<string, number> = {
+  critical: 10,
+  high: 5,
+  moderate: 3,
+  low: 1,
+}
 
 function ToolIcon({
   icon,
@@ -748,6 +757,31 @@ function Toolchains() {
   const totalVulns = vulnPieData.reduce((sum, d) => sum + d.value, 0)
   const totalOutdated = outdatedPieData.reduce((sum, d) => sum + d.value, 0)
 
+  // Aggregated vulnerability stats for the summary cards
+  const vulnStats = useMemo(() => {
+    const severityCounts: Record<string, number> = {}
+    let total = 0
+    for (const cat of groupedCategories) {
+      for (const tc of cat.items) {
+        for (const v of tc.vulnerabilities || []) {
+          total += 1
+          const sev = v.severity.toLowerCase()
+          severityCounts[sev] = (severityCounts[sev] || 0) + 1
+        }
+      }
+    }
+    const riskScore = Object.entries(severityCounts).reduce(
+      (sum, [sev, count]) => sum + (RISK_WEIGHTS[sev] || 1) * count,
+      0
+    )
+    return {
+      total,
+      critical: severityCounts["critical"] || 0,
+      high: severityCounts["high"] || 0,
+      riskScore,
+    }
+  }, [groupedCategories])
+
   if (loading) {
     return (
       <div className="mx-auto max-w-7xl animate-in duration-700 fade-in">
@@ -768,6 +802,87 @@ function Toolchains() {
             Package managers and runtimes detected in your environment.
           </p>
         </div>
+      </div>
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Toolchains
+            </CardTitle>
+            <Boxes className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-foreground">
+              {totalTools}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground/60">
+              Detected in your environment
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Risk Score
+            </CardTitle>
+            <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div
+              className={`text-3xl font-bold ${
+                vulnStats.critical > 0
+                  ? "text-red-500"
+                  : vulnStats.high > 0
+                    ? "text-orange-500"
+                    : "text-foreground"
+              }`}
+            >
+              {vulnStats.riskScore}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground/60">
+              Severity-weighted vulnerabilities
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Vulnerabilities
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              className={`text-3xl font-bold ${vulnStats.total > 0 ? "text-red-400" : "text-foreground"}`}
+            >
+              {vulnStats.total}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground/60">
+              Across all toolchains
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Outdated
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              className={`text-3xl font-bold ${totalOutdated > 0 ? "text-blue-400" : "text-foreground"}`}
+            >
+              {totalOutdated}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground/60">
+              Packages behind latest
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Charts Section */}
