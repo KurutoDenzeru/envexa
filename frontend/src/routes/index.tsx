@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { useState, useMemo } from "react"
 import { useScanData } from "@/components/scan-data-context"
 import {
@@ -56,6 +56,7 @@ import {
 import { SimpleChartTooltip } from "@/components/ui/chart"
 import {
   ToolchainCard,
+  ToolchainDetailDialog,
   displayName,
   statusBadge,
 } from "@/components/toolchain-card"
@@ -119,8 +120,8 @@ function severityOrder(s: string): number {
 
 function App() {
   const { report, loading, refetch: fetchReport } = useScanData()
-  const navigate = useNavigate()
   const [compactView, setCompactView] = useState(false)
+  const [openDialog, setOpenDialog] = useState<string | null>(null)
   const [selectedPackage, setSelectedPackage] = useState<{
     name: string
     toolchain: string
@@ -765,12 +766,7 @@ function App() {
                         <TableRow
                           key={t.tool}
                           className="cursor-pointer border-border hover:bg-muted/50"
-                          onClick={() =>
-                            navigate({
-                              to: "/toolchains",
-                              search: { open: t.tool },
-                            })
-                          }
+                          onClick={() => setOpenDialog(t.tool)}
                         >
                           <TableCell className="text-sm font-medium capitalize">
                             {displayName(t.tool)}
@@ -831,12 +827,7 @@ function App() {
                       <ToolchainCard
                         key={tc.tool}
                         tc={tc}
-                        onViewDetails={() =>
-                          navigate({
-                            to: "/toolchains",
-                            search: { open: tc.tool },
-                          })
-                        }
+                        onViewDetails={() => setOpenDialog(tc.tool)}
                       />
                     ))}
                   </div>
@@ -977,6 +968,18 @@ function App() {
           open={!!selectedPackage}
           onClose={() => setSelectedPackage(null)}
         />
+      )}
+
+      {/* Page-level toolchain dialogs so cards and table rows open in place */}
+      {toolchainCards.flatMap((cat) =>
+        cat.tools.map((tc) => (
+          <ToolchainDetailDialog
+            key={tc.tool}
+            tc={tc}
+            open={openDialog === tc.tool}
+            onOpenChange={(isOpen) => setOpenDialog(isOpen ? tc.tool : null)}
+          />
+        ))
       )}
     </div>
   )
