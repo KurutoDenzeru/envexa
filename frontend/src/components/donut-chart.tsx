@@ -6,6 +6,13 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 
 export interface DonutSlice {
   name: string
@@ -82,4 +89,48 @@ export function DonutChart({ data }: { data: DonutSlice[] }) {
       </ResponsiveContainer>
     </div>
   )
+}
+
+/** Chart card wrapper used by every dashboard page. */
+export function DonutCard({
+  title,
+  description,
+  data,
+}: {
+  title: string
+  description: string
+  data: DonutSlice[]
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <DonutChart data={data} />
+      </CardContent>
+    </Card>
+  )
+}
+
+/** Top-N slice builder for per-key counts (toolchain/package/source donuts). */
+export function keyCountPie(
+  counts: Record<string, number>,
+  options: {
+    offset?: number
+    limit?: number
+    label?: (key: string) => string
+  } = {}
+): DonutSlice[] {
+  const { offset = 0, limit, label = (key: string) => key } = options
+  return Object.entries(counts)
+    .filter(([, value]) => value > 0)
+    .map(([name, value], i) => ({
+      name: label(name),
+      value,
+      fill: CHART_PALETTE[(i + offset) % CHART_PALETTE.length],
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, limit)
 }

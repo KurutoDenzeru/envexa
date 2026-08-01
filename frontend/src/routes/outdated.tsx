@@ -26,31 +26,12 @@ import {
   UPDATE_TYPE_COLORS,
   type OutdatedPackage,
 } from "@/lib/outdated"
-import { DonutChart, CHART_PALETTE } from "@/components/donut-chart"
+import { DonutCard, keyCountPie } from "@/components/donut-chart"
+import { StatCard } from "@/components/stat-card"
+import { displayName } from "@/lib/toolchains"
 export const Route = createFileRoute("/outdated")({
   component: Outdated,
 })
-
-function displayName(tool: string): string {
-  const names: Record<string, string> = {
-    brew: "Brew",
-    npm: "npm",
-    pnpm: "pnpm",
-    yarn: "Yarn",
-    bun: "Bun",
-    deno: "Deno",
-    pip: "pip",
-    gem: "Gem",
-    cargo: "Cargo",
-    docker: "Docker",
-    project: "Project",
-    security: "Security",
-    supply_chain: "Supply Chain",
-    audit: "Audit",
-    ci: "CI/CD",
-  }
-  return names[tool] || tool
-}
 
 function Outdated() {
   const { report, loading } = useScanData()
@@ -154,13 +135,7 @@ function Outdated() {
     for (const o of allOutdated) {
       counts[o.toolchain] = (counts[o.toolchain] || 0) + 1
     }
-    return Object.entries(counts)
-      .map(([name, count], i) => ({
-        name: displayName(name),
-        value: count,
-        fill: CHART_PALETTE[i % CHART_PALETTE.length],
-      }))
-      .sort((a, b) => b.value - a.value)
+    return keyCountPie(counts, { label: displayName })
   }, [allOutdated])
 
   const sourcePieData = useMemo(() => {
@@ -168,13 +143,7 @@ function Outdated() {
     for (const o of allOutdated) {
       counts[o.source] = (counts[o.source] || 0) + 1
     }
-    return Object.entries(counts)
-      .map(([name, count], i) => ({
-        name: sourceLabel(name),
-        value: count,
-        fill: CHART_PALETTE[(i + 5) % CHART_PALETTE.length],
-      }))
-      .sort((a, b) => b.value - a.value)
+    return keyCountPie(counts, { label: sourceLabel, offset: 5 })
   }, [allOutdated])
 
   const handleUpdateSelected = () => {
@@ -349,131 +318,63 @@ function Outdated() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total
-            </CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-foreground">{total}</div>
-            <p className="mt-1 text-xs text-muted-foreground/60">
-              Across all toolchains
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Total"
+          icon={<Package className="h-4 w-4 text-muted-foreground" />}
+          value={total}
+          subtext="Across all toolchains"
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Major
-            </CardTitle>
-            <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-3xl font-bold ${major > 0 ? "text-red-500" : "text-foreground"}`}
-            >
-              {major}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground/60">
-              Breaking changes
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Major"
+          icon={<ArrowUpRight className="h-4 w-4 text-muted-foreground" />}
+          value={major}
+          valueClassName={major > 0 ? "text-red-500" : "text-foreground"}
+          subtext="Breaking changes"
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Minor
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-3xl font-bold ${minor > 0 ? "text-amber-500" : "text-foreground"}`}
-            >
-              {minor}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground/60">
-              New features
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Minor"
+          value={minor}
+          valueClassName={minor > 0 ? "text-amber-500" : "text-foreground"}
+          subtext="New features"
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Patch
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-3xl font-bold ${patch > 0 ? "text-emerald-500" : "text-foreground"}`}
-            >
-              {patch}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground/60">Bug fixes</p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Patch"
+          value={patch}
+          valueClassName={patch > 0 ? "text-emerald-500" : "text-foreground"}
+          subtext="Bug fixes"
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Unknown
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-muted-foreground">
-              {updateTypeCounts.unknown || 0}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground/60">
-              Non-semver versions
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Unknown"
+          value={updateTypeCounts.unknown || 0}
+          valueClassName="text-muted-foreground"
+          subtext="Non-semver versions"
+        />
       </div>
 
       {/* Charts Section */}
       {total > 0 && (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                Update Type Distribution
-              </CardTitle>
-              <CardDescription>
-                Breakdown of outdated packages by update type.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DonutChart data={updateTypePieData} />
-            </CardContent>
-          </Card>
+          <DonutCard
+            title="Update Type Distribution"
+            description="Breakdown of outdated packages by update type."
+            data={updateTypePieData}
+          />
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">By Toolchain</CardTitle>
-              <CardDescription>
-                Toolchains with the most outdated packages.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DonutChart data={toolchainPieData} />
-            </CardContent>
-          </Card>
+          <DonutCard
+            title="By Toolchain"
+            description="Toolchains with the most outdated packages."
+            data={toolchainPieData}
+          />
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">By Source</CardTitle>
-              <CardDescription>
-                Sources with the most outdated packages.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DonutChart data={sourcePieData} />
-            </CardContent>
-          </Card>
+          <DonutCard
+            title="By Source"
+            description="Sources with the most outdated packages."
+            data={sourcePieData}
+          />
         </div>
       )}
 

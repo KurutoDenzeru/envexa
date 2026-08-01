@@ -13,61 +13,20 @@ import { Badge } from "@/components/ui/badge"
 import { ShieldAlert, CheckCircle, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { DataTable } from "@/components/ui/data-table"
-import type { ColumnDef } from "@tanstack/react-table"
-import { DonutChart, CHART_PALETTE } from "@/components/donut-chart"
+import { DonutCard, keyCountPie } from "@/components/donut-chart"
+import { StatCard } from "@/components/stat-card"
 import { ScanProgress } from "@/components/scan-progress"
+import {
+  SEVERITY_COLORS,
+  collectVulnerabilities,
+  countBySeverity,
+  severityColor,
+  severityOrder,
+  vulnerabilityColumns,
+} from "@/lib/vulnerabilities"
 export const Route = createFileRoute("/vulnerabilities")({
   component: Vulnerabilities,
 })
-
-interface VulnEntry {
-  package: string
-  severity: string
-  title: string
-  cve: string | null
-  patched_version: string
-  toolchain: string
-}
-
-function severityOrder(s: string): number {
-  switch (s.toLowerCase()) {
-    case "critical":
-      return 0
-    case "high":
-      return 1
-    case "medium":
-      return 2
-    case "low":
-      return 3
-    default:
-      return 4
-  }
-}
-
-function severityColor(s: string): string {
-  switch (s.toLowerCase()) {
-    case "critical":
-      return "bg-red-500/10 text-red-600 border-red-500/20 dark:bg-red-500/15 dark:text-red-400 dark:border-red-500/25"
-    case "high":
-      return "bg-orange-500/10 text-orange-600 border-orange-500/20 dark:bg-orange-500/15 dark:text-orange-400 dark:border-orange-500/25"
-    case "medium":
-    case "moderate":
-      return "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/25"
-    case "low":
-      return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/25"
-    default:
-      return "bg-muted text-muted-foreground border-border"
-  }
-}
-
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: "#ef4444",
-  high: "#f97316",
-  medium: "#d97706",
-  moderate: "#d97706",
-  low: "#10b981",
-  other: "#71717a",
-}
 
 function Vulnerabilities() {
   const { report, loading, refetch } = useScanData()
@@ -83,27 +42,10 @@ function Vulnerabilities() {
 
   const closeDetail = () => setDetailPkg(null)
 
-  const allVulnerabilities = useMemo((): VulnEntry[] => {
-    if (!report?.results) return []
-    const vulns: VulnEntry[] = []
-    Object.entries(report.results).forEach(
-      ([toolchain, data]: [string, any]) => {
-        if (data.vulnerabilities) {
-          data.vulnerabilities.forEach((v: any) => {
-            vulns.push({
-              package: v.package,
-              severity: v.severity,
-              title: v.title,
-              cve: v.cve ?? null,
-              patched_version: v.patched_version ?? "",
-              toolchain,
-            })
-          })
-        }
-      }
-    )
-    return vulns
-  }, [report])
+  const allVulnerabilities = useMemo(
+    () => collectVulnerabilities(report?.results),
+    [report]
+  )
 
   const filteredVulnerabilities = useMemo(() => {
     return allVulnerabilities
@@ -117,14 +59,10 @@ function Vulnerabilities() {
       .sort((a, b) => severityOrder(a.severity) - severityOrder(b.severity))
   }, [allVulnerabilities, search])
 
-  const severityCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    for (const v of allVulnerabilities) {
-      const key = v.severity.toLowerCase()
-      counts[key] = (counts[key] || 0) + 1
-    }
-    return counts
-  }, [allVulnerabilities])
+  const severityCounts = useMemo(
+    () => countBySeverity(allVulnerabilities),
+    [allVulnerabilities]
+  )
 
   // Pie chart data
   const pieData = useMemo(() => {
@@ -138,103 +76,35 @@ function Vulnerabilities() {
   }, [severityCounts])
 
   // Pie chart data: vulns per toolchain
-  const toolchainPieData = useMemo(() => {
+  const toolchainCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const v of allVulnerabilities) {
       counts[v.toolchain] = (counts[v.toolchain] || 0) + 1
     }
-    return Object.entries(counts)
-      .map(([name, count], i) => ({
-        name,
-        value: count,
-        fill: CHART_PALETTE[i % CHART_PALETTE.length],
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10)
+    return counts
   }, [allVulnerabilities])
+  const toolchainPieData = useMemo(
+    () => keyCountPie(toolchainCounts, { limit: 10 }),
+    [toolchainCounts]
+  )
 
   // Pie chart data: vulns per package
-  const packagePieData = useMemo(() => {
+  const packageCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const v of allVulnerabilities) {
       counts[v.package] = (counts[v.package] || 0) + 1
     }
-    return Object.entries(counts)
-      .map(([name, count], i) => ({
-        name,
-        value: count,
-        fill: CHART_PALETTE[(i + 3) % CHART_PALETTE.length],
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10)
+    return counts
   }, [allVulnerabilities])
+  const packagePieData = useMemo(
+    () => keyCountPie(packageCounts, { offset: 3, limit: 10 }),
+    [packageCounts]
+  )
 
-  const vulnColumns: ColumnDef<VulnEntry, unknown>[] = [
-    {
-      accessorKey: "toolchain",
-      header: "Toolchain",
-      cell: ({ row }) => (
-        <span className="font-medium text-muted-foreground/80 capitalize">
-          {row.original.toolchain}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "package",
-      header: "Package",
-      cell: ({ row }) => (
-        <span
-          className="cursor-pointer font-mono text-sm text-primary underline underline-offset-2 hover:text-primary/80"
-          onClick={() =>
-            openDetail(row.original.package, row.original.toolchain)
-          }
-        >
-          {row.original.package || "Unknown"}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "severity",
-      header: "Severity",
-      sortingFn: (a, b) =>
-        severityOrder(a.original.severity) - severityOrder(b.original.severity),
-      cell: ({ row }) => (
-        <Badge
-          variant="outline"
-          className={`shadow-none ${severityColor(row.original.severity)}`}
-        >
-          {row.original.severity}
-        </Badge>
-      ),
-    },
-    {
-      accessorKey: "title",
-      header: "Description",
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
-          {row.original.title || "Security vulnerability found"}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "cve",
-      header: "CVE",
-      cell: ({ row }) => (
-        <span className="font-mono text-xs text-muted-foreground">
-          {row.original.cve || "-"}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "patched_version",
-      header: "Patched Version",
-      cell: ({ row }) => (
-        <span className="font-mono text-xs text-muted-foreground">
-          {row.original.patched_version || "-"}
-        </span>
-      ),
-    },
-  ]
+  const vulnColumns = vulnerabilityColumns({
+    onOpenPackage: openDetail,
+    showPatchedVersion: true,
+  })
   if (loading) {
     return (
       <div className="mx-auto max-w-7xl animate-in duration-700 fade-in">
@@ -264,116 +134,55 @@ function Vulnerabilities() {
 
       {/* Severity Summary Cards */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total
-            </CardTitle>
-            <ShieldAlert className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-foreground">{total}</div>
-            <p className="mt-1 text-xs text-muted-foreground/60">
-              Across all toolchains
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Total"
+          icon={<ShieldAlert className="h-4 w-4 text-muted-foreground" />}
+          value={total}
+          subtext="Across all toolchains"
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Critical
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-3xl font-bold ${critical > 0 ? "text-red-500" : "text-foreground"}`}
-            >
-              {critical}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground/60">
-              Immediate action required
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Critical"
+          value={critical}
+          valueClassName={critical > 0 ? "text-red-500" : "text-foreground"}
+          subtext="Immediate action required"
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              High
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-3xl font-bold ${high > 0 ? "text-orange-500" : "text-foreground"}`}
-            >
-              {high}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground/60">
-              Should be addressed soon
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="High"
+          value={high}
+          valueClassName={high > 0 ? "text-orange-500" : "text-foreground"}
+          subtext="Should be addressed soon"
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Medium
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-3xl font-bold ${medium > 0 ? "text-yellow-500" : "text-foreground"}`}
-            >
-              {medium}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground/60">
-              Schedule for review
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Medium"
+          value={medium}
+          valueClassName={medium > 0 ? "text-yellow-500" : "text-foreground"}
+          subtext="Schedule for review"
+        />
       </div>
 
       {/* Charts Section */}
       {total > 0 && (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {/* Severity Distribution Donut */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Severity Distribution</CardTitle>
-              <CardDescription>
-                Breakdown of vulnerabilities by severity level.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DonutChart data={pieData} />
-            </CardContent>
-          </Card>
+          <DonutCard
+            title="Severity Distribution"
+            description="Breakdown of vulnerabilities by severity level."
+            data={pieData}
+          />
 
-          {/* Vulnerabilities by Toolchain */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">By Toolchain</CardTitle>
-              <CardDescription>
-                Top toolchains with the most vulnerabilities.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DonutChart data={toolchainPieData} />
-            </CardContent>
-          </Card>
-          {/* Vulnerabilities by Package */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">By Package</CardTitle>
-              <CardDescription>
-                Top packages with the most vulnerabilities.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DonutChart data={packagePieData} />
-            </CardContent>
-          </Card>
+          <DonutCard
+            title="By Toolchain"
+            description="Top toolchains with the most vulnerabilities."
+            data={toolchainPieData}
+          />
+
+          <DonutCard
+            title="By Package"
+            description="Top packages with the most vulnerabilities."
+            data={packagePieData}
+          />
         </div>
       )}
       {/* Vulnerability Table */}
