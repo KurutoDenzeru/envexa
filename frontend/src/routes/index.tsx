@@ -20,7 +20,6 @@ import {
   Gauge,
   PackageMinus,
   Search,
-  Folder,
 } from "lucide-react"
 import {
   Bar,
@@ -56,111 +55,12 @@ import {
 } from "@/lib/outdated"
 import { SimpleChartTooltip } from "@/components/ui/chart"
 import {
-  siDocker,
-  siNpm,
-  siPnpm,
-  siYarn,
-  siBun,
-  siDeno,
-  siPython,
-  siRubygems,
-  siRust,
-  siHomebrew,
-  siGithub,
-} from "simple-icons"
-import { cn } from "@/lib/utils"
+  ToolchainCard,
+  displayName,
+  statusBadge,
+} from "@/components/toolchain-card"
 
 export const Route = createFileRoute("/")({ component: App })
-
-function ToolIcon({
-  icon,
-  className = "w-5 h-5",
-  color,
-  invertInDark = false,
-}: {
-  icon: { path: string; hex: string }
-  className?: string
-  color?: string
-  invertInDark?: boolean
-}) {
-  const isDark =
-    invertInDark &&
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches
-
-  return (
-    <svg
-      role="img"
-      viewBox="0 0 24 24"
-      className={cn(className, isDark && "brightness-200 invert")}
-      fill={color || `#${icon.hex}`}
-    >
-      <path d={icon.path} />
-    </svg>
-  )
-}
-
-const TOOL_ICONS: Record<
-  string,
-  {
-    icon: { path: string; hex: string }
-    fallback?: React.ReactNode
-    invertInDark?: boolean
-  }
-> = {
-  brew: { icon: siHomebrew },
-  cargo: { icon: siRust, invertInDark: true },
-  docker: { icon: siDocker },
-  pip: { icon: siPython },
-  gem: { icon: siRubygems },
-  npm: { icon: siNpm },
-  pnpm: { icon: siPnpm },
-  yarn: { icon: siYarn },
-  bun: { icon: siBun, invertInDark: true },
-  deno: { icon: siDeno, invertInDark: true },
-  project: {
-    icon: {
-      path: "M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z",
-      hex: "71717a",
-    },
-    fallback: <Folder className="h-5 w-5 text-muted-foreground" />,
-  },
-  security: {
-    icon: {
-      path: "M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z",
-      hex: "71717a",
-    },
-    fallback: <Boxes className="h-5 w-5 text-muted-foreground" />,
-  },
-  supply_chain: {
-    icon: {
-      path: "M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z",
-      hex: "71717a",
-    },
-    fallback: <Boxes className="h-5 w-5 text-muted-foreground" />,
-  },
-  audit: {
-    icon: {
-      path: "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
-      hex: "71717a",
-    },
-    fallback: <Box className="h-5 w-5 text-muted-foreground" />,
-  },
-  ci: { icon: siGithub, invertInDark: true },
-}
-
-function getToolIcon(tool: string) {
-  const entry = TOOL_ICONS[tool]
-  if (!entry) return <Boxes className="h-5 w-5 text-muted-foreground" />
-  if (entry.fallback) return entry.fallback
-  return (
-    <ToolIcon
-      icon={entry.icon}
-      className="h-5 w-5"
-      invertInDark={entry.invertInDark}
-    />
-  )
-}
 interface VulnerabilityInfo {
   package: string
   severity: string
@@ -185,69 +85,6 @@ const CATEGORIES: ToolCategory[] = [
     tools: ["project", "security", "supply_chain", "audit", "ci"],
   },
 ]
-
-function displayName(tool: string): string {
-  const names: Record<string, string> = {
-    brew: "Brew",
-    npm: "npm",
-    pnpm: "pnpm",
-    yarn: "Yarn",
-    bun: "Bun",
-    deno: "Deno",
-    pip: "pip",
-    gem: "Gem",
-    cargo: "Cargo",
-    docker: "Docker",
-    project: "Project",
-    security: "Security",
-    supply_chain: "Supply Chain",
-    audit: "Audit",
-    ci: "CI/CD",
-  }
-  return names[tool] || tool
-}
-
-function statusBadge(status: string) {
-  const s = status.toLowerCase()
-  if (s.includes("fail") || s.includes("error")) {
-    return (
-      <Badge
-        variant="destructive"
-        className="border-red-500/20 bg-red-500/10 text-xs text-red-500 shadow-none"
-      >
-        FAIL
-      </Badge>
-    )
-  }
-  if (s.includes("warn")) {
-    return (
-      <Badge
-        variant="outline"
-        className="border-yellow-500/30 bg-yellow-500/10 text-xs text-yellow-500 shadow-none"
-      >
-        WARN
-      </Badge>
-    )
-  }
-  if (s.includes("skip") || s.includes("not found")) {
-    return (
-      <Badge
-        variant="outline"
-        className="border-border text-xs text-muted-foreground shadow-none"
-      >
-        SKIP
-      </Badge>
-    )
-  }
-  return (
-    <Badge
-      variant="outline"
-      className="border-green-500/30 bg-green-500/10 text-xs text-green-500 shadow-none"
-    >
-      PASS
-    </Badge>
-  )
-}
 
 function severityColor(s: string): string {
   switch (s.toLowerCase()) {
@@ -572,7 +409,7 @@ function App() {
       category: cat.name,
       tools: cat.tools
         .map((tool) => {
-          const data = report.results?.[tool]
+          const data = report.results[tool]
           if (!data) return null
           return {
             tool,
@@ -588,6 +425,20 @@ function App() {
             outdated: data.outdated?.length || 0,
             issues: data.issues?.length || 0,
           }
+        })
+        .filter((t): t is NonNullable<typeof t> => t !== null),
+    }))
+  }, [report])
+
+  // Full toolchain objects for the cards view
+  const toolchainCards = useMemo(() => {
+    if (!report?.results) return []
+    return CATEGORIES.map((cat) => ({
+      category: cat.name,
+      tools: cat.tools
+        .map((tool) => {
+          const data = report.results[tool]
+          return data ? { ...data, tool } : null
         })
         .filter((t): t is NonNullable<typeof t> => t !== null),
     }))
@@ -970,82 +821,23 @@ function App() {
             </div>
           ) : (
             <div className="space-y-4">
-              {toolchainTableData.map((cat) => (
+              {toolchainCards.map((cat) => (
                 <div key={cat.category}>
                   <h4 className="mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                     {cat.category}
                   </h4>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {cat.tools.map((t) => (
-                      <Card
-                        key={t.tool}
-                        className="flex cursor-pointer flex-col gap-3 p-4 transition-colors hover:bg-muted/50"
-                        onClick={() =>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {cat.tools.map((tc) => (
+                      <ToolchainCard
+                        key={tc.tool}
+                        tc={tc}
+                        onViewDetails={() =>
                           navigate({
                             to: "/toolchains",
-                            search: { open: t.tool },
+                            search: { open: tc.tool },
                           })
                         }
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            {getToolIcon(t.tool)}
-                            <div>
-                              <span className="text-sm font-medium capitalize">
-                                {displayName(t.tool)}
-                              </span>
-                              <span className="ml-2 font-mono text-xs text-muted-foreground">
-                                {t.version}
-                              </span>
-                            </div>
-                          </div>
-                          {statusBadge(t.status)}
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 border-t border-border/50 pt-2 text-center">
-                          <div>
-                            <div
-                              className={`text-lg font-semibold ${
-                                t.vulns > 0
-                                  ? "text-red-500"
-                                  : "text-muted-foreground"
-                              }`}
-                            >
-                              {t.vulns}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              Vulns
-                            </div>
-                          </div>
-                          <div>
-                            <div
-                              className={`text-lg font-semibold ${
-                                t.outdated > 0
-                                  ? "text-blue-500"
-                                  : "text-muted-foreground"
-                              }`}
-                            >
-                              {t.outdated}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              Outdated
-                            </div>
-                          </div>
-                          <div>
-                            <div
-                              className={`text-lg font-semibold ${
-                                t.issues > 0
-                                  ? "text-yellow-500"
-                                  : "text-muted-foreground"
-                              }`}
-                            >
-                              {t.issues}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              Issues
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
+                      />
                     ))}
                   </div>
                 </div>
