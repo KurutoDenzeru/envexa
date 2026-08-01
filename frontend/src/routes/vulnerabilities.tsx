@@ -1,16 +1,16 @@
- import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { useState, useMemo } from "react"
- import { useScanData } from "@/components/scan-data-context"
- import { PackageDetailDialog } from "@/components/package-detail-dialog"
- import {
-   Card,
-   CardContent,
-   CardDescription,
-   CardHeader,
-   CardTitle,
- } from "@/components/ui/card"
- import { Badge } from "@/components/ui/badge"
- import { ShieldAlert, CheckCircle, Search } from "lucide-react"
+import { useScanData } from "@/components/scan-data-context"
+import { PackageDetailDialog } from "@/components/package-detail-dialog"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { ShieldAlert, CheckCircle, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { DataTable } from "@/components/ui/data-table"
 import type { ColumnDef } from "@tanstack/react-table"
@@ -41,8 +41,6 @@ interface VulnEntry {
   patched_version: string
   toolchain: string
 }
-
-
 
 function severityOrder(s: string): number {
   switch (s.toLowerCase()) {
@@ -87,31 +85,36 @@ const SEVERITY_COLORS: Record<string, string> = {
 function Vulnerabilities() {
   const { report, loading, refetch } = useScanData()
   const [search, setSearch] = useState("")
-  const [detailPkg, setDetailPkg] = useState<{ name: string; toolchain: string } | null>(null)
+  const [detailPkg, setDetailPkg] = useState<{
+    name: string
+    toolchain: string
+  } | null>(null)
 
-   const openDetail = (name: string, toolchain: string) => {
-     setDetailPkg({ name, toolchain })
-   }
+  const openDetail = (name: string, toolchain: string) => {
+    setDetailPkg({ name, toolchain })
+  }
 
-   const closeDetail = () => setDetailPkg(null)
+  const closeDetail = () => setDetailPkg(null)
 
   const allVulnerabilities = useMemo((): VulnEntry[] => {
     if (!report?.results) return []
     const vulns: VulnEntry[] = []
-    Object.entries(report.results).forEach(([toolchain, data]: [string, any]) => {
-      if (data.vulnerabilities) {
-        data.vulnerabilities.forEach((v: any) => {
-          vulns.push({
-            package: v.package,
-            severity: v.severity,
-            title: v.title,
-            cve: v.cve ?? null,
-            patched_version: v.patched_version ?? "",
-            toolchain,
+    Object.entries(report.results).forEach(
+      ([toolchain, data]: [string, any]) => {
+        if (data.vulnerabilities) {
+          data.vulnerabilities.forEach((v: any) => {
+            vulns.push({
+              package: v.package,
+              severity: v.severity,
+              title: v.title,
+              cve: v.cve ?? null,
+              patched_version: v.patched_version ?? "",
+              toolchain,
+            })
           })
-        })
+        }
       }
-    })
+    )
     return vulns
   }, [report])
 
@@ -126,7 +129,6 @@ function Vulnerabilities() {
       })
       .sort((a, b) => severityOrder(a.severity) - severityOrder(b.severity))
   }, [allVulnerabilities, search])
-
 
   const severityCounts = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -171,13 +173,12 @@ function Vulnerabilities() {
       .slice(0, 10)
   }, [allVulnerabilities])
 
-
   const vulnColumns: ColumnDef<VulnEntry, unknown>[] = [
     {
       accessorKey: "toolchain",
       header: "Toolchain",
       cell: ({ row }) => (
-        <span className="font-medium capitalize text-muted-foreground/80">
+        <span className="font-medium text-muted-foreground/80 capitalize">
           {row.original.toolchain}
         </span>
       ),
@@ -187,8 +188,10 @@ function Vulnerabilities() {
       header: "Package",
       cell: ({ row }) => (
         <span
-          className="font-mono text-sm text-foreground cursor-pointer hover:underline"
-          onClick={() => openDetail(row.original.package, row.original.toolchain)}
+          className="cursor-pointer font-mono text-sm text-primary underline underline-offset-2 hover:text-primary/80"
+          onClick={() =>
+            openDetail(row.original.package, row.original.toolchain)
+          }
         >
           {row.original.package || "Unknown"}
         </span>
@@ -197,7 +200,8 @@ function Vulnerabilities() {
     {
       accessorKey: "severity",
       header: "Severity",
-      sortingFn: (a, b) => severityOrder(a.original.severity) - severityOrder(b.original.severity),
+      sortingFn: (a, b) =>
+        severityOrder(a.original.severity) - severityOrder(b.original.severity),
       cell: ({ row }) => (
         <Badge
           variant="outline"
@@ -211,7 +215,7 @@ function Vulnerabilities() {
       accessorKey: "title",
       header: "Description",
       cell: ({ row }) => (
-        <span className="text-muted-foreground text-sm">
+        <span className="text-sm text-muted-foreground">
           {row.original.title || "Security vulnerability found"}
         </span>
       ),
@@ -237,7 +241,7 @@ function Vulnerabilities() {
   ]
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto animate-in fade-in duration-700">
+      <div className="mx-auto max-w-7xl animate-in duration-700 fade-in">
         <ScanProgress loading={true} onRetry={refetch} />
       </div>
     )
@@ -249,31 +253,31 @@ function Vulnerabilities() {
   const medium = severityCounts["medium"] || 0
 
   return (
-    <div className="max-w-7xl mx-auto flex flex-col gap-6">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6">
+      <div className="flex flex-col justify-between gap-4 border-b border-border pb-6 md:flex-row md:items-end">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-            <ShieldAlert className="w-8 h-8 text-foreground" />
+          <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight text-foreground">
+            <ShieldAlert className="h-8 w-8 text-foreground" />
             Security Vulnerabilities
           </h1>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="mt-2 text-sm text-muted-foreground">
             All security flaws across your dependencies.
           </p>
         </div>
       </div>
 
       {/* Severity Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Total
             </CardTitle>
-            <ShieldAlert className="w-4 h-4 text-muted-foreground" />
+            <ShieldAlert className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-foreground">{total}</div>
-            <p className="text-xs text-muted-foreground/60 mt-1">
+            <p className="mt-1 text-xs text-muted-foreground/60">
               Across all toolchains
             </p>
           </CardContent>
@@ -291,7 +295,7 @@ function Vulnerabilities() {
             >
               {critical}
             </div>
-            <p className="text-xs text-muted-foreground/60 mt-1">
+            <p className="mt-1 text-xs text-muted-foreground/60">
               Immediate action required
             </p>
           </CardContent>
@@ -309,7 +313,7 @@ function Vulnerabilities() {
             >
               {high}
             </div>
-            <p className="text-xs text-muted-foreground/60 mt-1">
+            <p className="mt-1 text-xs text-muted-foreground/60">
               Should be addressed soon
             </p>
           </CardContent>
@@ -327,7 +331,7 @@ function Vulnerabilities() {
             >
               {medium}
             </div>
-            <p className="text-xs text-muted-foreground/60 mt-1">
+            <p className="mt-1 text-xs text-muted-foreground/60">
               Schedule for review
             </p>
           </CardContent>
@@ -336,7 +340,7 @@ function Vulnerabilities() {
 
       {/* Charts Section */}
       {total > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {/* Severity Distribution Donut */}
           <Card>
             <CardHeader>
@@ -364,7 +368,7 @@ function Vulnerabilities() {
                         <Cell
                           key={index}
                           fill={entry.fill}
-                          className="transition-opacity hover:opacity-80 cursor-pointer outline-none"
+                          className="cursor-pointer transition-opacity outline-none hover:opacity-80"
                         />
                       ))}
                     </Pie>
@@ -376,11 +380,13 @@ function Vulnerabilities() {
                           <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground shadow-xs">
                             <div className="flex items-center gap-2">
                               <span
-                                className="inline-block h-2 w-2 rounded-full shrink-0"
+                                className="inline-block h-2 w-2 shrink-0 rounded-full"
                                 style={{ backgroundColor: data.fill }}
                               />
                               <span className="font-medium">{data.name}</span>
-                              <span className="text-muted-foreground ml-1">: {data.value}</span>
+                              <span className="ml-1 text-muted-foreground">
+                                : {data.value}
+                              </span>
                             </div>
                           </div>
                         )
@@ -405,9 +411,7 @@ function Vulnerabilities() {
           {/* Vulnerabilities by Toolchain */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">
-                By Toolchain
-              </CardTitle>
+              <CardTitle className="text-base">By Toolchain</CardTitle>
               <CardDescription>
                 Top toolchains with the most vulnerabilities.
               </CardDescription>
@@ -464,9 +468,7 @@ function Vulnerabilities() {
           {/* Vulnerabilities by Package */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">
-                By Package
-              </CardTitle>
+              <CardTitle className="text-base">By Package</CardTitle>
               <CardDescription>
                 Top packages with the most vulnerabilities.
               </CardDescription>
@@ -518,30 +520,46 @@ function Vulnerabilities() {
       )}
       {/* Vulnerability Table */}
       <Card>
-        <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <CardHeader className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div>
             <CardTitle>Identified Flaws</CardTitle>
             <CardDescription>
               Review and address these issues to secure your workspace.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="flex w-full items-center gap-3 md:w-auto">
             <div className="relative w-full md:w-64">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground/60" />
+              <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground/60" />
               <Input
                 type="text"
                 placeholder="Search packages..."
-                className="pl-9 bg-background/50 border-border"
+                className="border-border bg-background/50 pl-9"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
+          {total > 0 && (
+            <div className="flex flex-wrap gap-3">
+              {Object.entries(severityCounts)
+                .filter(([, count]) => count > 0)
+                .sort(([a], [b]) => severityOrder(a) - severityOrder(b))
+                .map(([sev, count]) => (
+                  <Badge
+                    key={sev}
+                    variant="outline"
+                    className={`shadow-none ${severityColor(sev)}`}
+                  >
+                    {sev.charAt(0).toUpperCase() + sev.slice(1)}: {count}
+                  </Badge>
+                ))}
+            </div>
+          )}
           {filteredVulnerabilities.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60">
-              <CheckCircle className="w-12 h-12 mb-4 text-green-500/50" />
+              <CheckCircle className="mb-4 h-12 w-12 text-green-500/50" />
               <p>
                 {search
                   ? "No vulnerabilities match your search."
