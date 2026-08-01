@@ -20,6 +20,7 @@ import {
   Table as TableIcon,
   Gauge,
   PackageMinus,
+  Search,
 } from "lucide-react"
 import {
   Bar,
@@ -41,6 +42,7 @@ import {
 import { DataTable } from "@/components/ui/data-table"
 import type { ColumnDef } from "@tanstack/react-table"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScanProgress } from "@/components/scan-progress"
 import { PackageDetailDialog } from "@/components/package-detail-dialog"
@@ -67,7 +69,7 @@ import {
   siApple,
   siGithub,
 } from "simple-icons"
-import { cn } from "@/lib/utils"
+import { cn, formatRelativeTime } from "@/lib/utils"
 
 export const Route = createFileRoute("/")({ component: App })
 
@@ -273,24 +275,6 @@ function severityOrder(s: string): number {
   }
 }
 
-function formatRelativeTime(dateString: string): string {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffSecs = Math.floor(diffMs / 1000)
-  const diffMins = Math.floor(diffSecs / 60)
-  const diffHours = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHours / 24)
-
-  if (diffSecs < 60) return "just now"
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`
-  return `${Math.floor(diffDays / 365)}y ago`
-}
-
 function App() {
   const { report, loading, refetch: fetchReport } = useScanData()
   const navigate = useNavigate()
@@ -299,6 +283,8 @@ function App() {
     name: string
     toolchain: string
   } | null>(null)
+  const [outdatedSearch, setOutdatedSearch] = useState("")
+  const [vulnSearch, setVulnSearch] = useState("")
   const allVulnerabilities = useMemo(() => {
     if (!report?.results) return []
     const vulns: Array<VulnerabilityInfo & { toolchain: string }> = []
@@ -320,6 +306,28 @@ function App() {
   const allOutdated = useMemo((): OutdatedPackage[] => {
     return enrichOutdated(report?.results)
   }, [report])
+
+  const filteredOutdated = useMemo(() => {
+    if (!outdatedSearch) return allOutdated
+    const q = outdatedSearch.toLowerCase()
+    return allOutdated.filter(
+      (o) =>
+        o.name.toLowerCase().includes(q) ||
+        o.toolchain.toLowerCase().includes(q) ||
+        o.source.toLowerCase().includes(q)
+    )
+  }, [allOutdated, outdatedSearch])
+
+  const filteredVulnerabilities = useMemo(() => {
+    if (!vulnSearch) return allVulnerabilities
+    const q = vulnSearch.toLowerCase()
+    return allVulnerabilities.filter(
+      (v) =>
+        v.package.toLowerCase().includes(q) ||
+        (v.title || "").toLowerCase().includes(q) ||
+        v.toolchain.toLowerCase().includes(q)
+    )
+  }, [allVulnerabilities, vulnSearch])
 
   // Count active toolchains
   const activeToolchains = useMemo(() => {
@@ -654,43 +662,19 @@ function App() {
             </CardTitle>
             <Gauge className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="flex flex-col items-center gap-3 py-2">
-            <div className="relative h-24 w-24">
-              <svg className="h-full w-full -rotate-90 transform">
-                <circle
-                  cx="48"
-                  cy="48"
-                  r="42"
-                  stroke="hsl(var(--muted))"
-                  strokeWidth="6"
-                  fill="none"
-                />
-                <circle
-                  cx="48"
-                  cy="48"
-                  r="42"
-                  stroke={
-                    healthScore > 70
-                      ? "hsl(var(--green-500))"
-                      : healthScore > 40
-                        ? "hsl(var(--yellow-500))"
-                        : "hsl(var(--red-500))"
-                  }
-                  strokeWidth="6"
-                  fill="none"
-                  strokeDasharray={264}
-                  strokeDashoffset={264 - (healthScore / 100) * 264}
-                  strokeLinecap="round"
-                  className="transition-all duration-500 ease-out"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-3xl font-bold text-foreground">
-                  {healthScore}
-                </span>
-              </div>
+          <CardContent>
+            <div
+              className={`text-3xl font-bold ${
+                healthScore > 70
+                  ? "text-green-500"
+                  : healthScore > 40
+                    ? "text-yellow-500"
+                    : "text-red-500"
+              }`}
+            >
+              {healthScore}
             </div>
-            <p className="text-center text-xs text-muted-foreground/60">
+            <p className="mt-1 text-xs text-muted-foreground/60">
               {healthScore > 70
                 ? "Healthy"
                 : healthScore > 40
@@ -1087,14 +1071,26 @@ function App() {
 
       {/* Outdated Packages */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <PackageMinus className="h-4 w-4 shrink-0 text-muted-foreground" />
-            Outdated Packages
-          </CardTitle>
-          <CardDescription>
-            Packages with available updates across all toolchains.
-          </CardDescription>
+        <CardHeader className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <PackageMinus className="h-4 w-4 shrink-0 text-muted-foreground" />
+              Outdated Packages
+            </CardTitle>
+            <CardDescription>
+              Packages with available updates across all toolchains.
+            </CardDescription>
+          </div>
+          <div className="relative w-full md:w-72">
+            <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground/60" />
+            <Input
+              type="text"
+              placeholder="Search packages, toolchains, sources..."
+              className="border-border bg-background/50 pl-9"
+              value={outdatedSearch}
+              onChange={(e) => setOutdatedSearch(e.target.value)}
+            />
+          </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {allOutdated.length > 0 && (
@@ -1113,15 +1109,19 @@ function App() {
                 ))}
             </div>
           )}
-          {allOutdated.length === 0 ? (
+          {filteredOutdated.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60">
               <CheckCircle className="mb-4 h-12 w-12 text-green-500/50" />
-              <p>All packages are up to date!</p>
+              <p>
+                {outdatedSearch
+                  ? "No packages match your search."
+                  : "All packages are up to date!"}
+              </p>
             </div>
           ) : (
             <DataTable
               columns={outdatedColumns}
-              data={allOutdated}
+              data={filteredOutdated}
               defaultPageSize={8}
               pageSizeOptions={[5, 8, 15, 50]}
             />
@@ -1131,14 +1131,26 @@ function App() {
 
       {/* Severity Breakdown */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShieldAlert className="h-4 w-4 shrink-0 text-muted-foreground" />
-            Severity Breakdown
-          </CardTitle>
-          <CardDescription>
-            Top vulnerabilities requiring attention.
-          </CardDescription>
+        <CardHeader className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 shrink-0 text-muted-foreground" />
+              Severity Breakdown
+            </CardTitle>
+            <CardDescription>
+              Top vulnerabilities requiring attention.
+            </CardDescription>
+          </div>
+          <div className="relative w-full md:w-72">
+            <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground/60" />
+            <Input
+              type="text"
+              placeholder="Search packages..."
+              className="border-border bg-background/50 pl-9"
+              value={vulnSearch}
+              onChange={(e) => setVulnSearch(e.target.value)}
+            />
+          </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {/* Severity badges */}
@@ -1163,14 +1175,20 @@ function App() {
           </div>
 
           {/* Top vulns table */}
-          {vulnCount > 0 && (
-            <DataTable
-              columns={topVulnColumns}
-              data={allVulnerabilities}
-              defaultPageSize={5}
-              pageSizeOptions={[5, 10, 20]}
-            />
-          )}
+          {vulnCount > 0 &&
+            (filteredVulnerabilities.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60">
+                <Search className="mb-4 h-12 w-12 opacity-50" />
+                <p>No vulnerabilities match your search.</p>
+              </div>
+            ) : (
+              <DataTable
+                columns={topVulnColumns}
+                data={filteredVulnerabilities}
+                defaultPageSize={5}
+                pageSizeOptions={[5, 10, 20]}
+              />
+            ))}
         </CardContent>
       </Card>
 
