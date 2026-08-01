@@ -403,6 +403,7 @@ function ToolchainCard({
 }) {
   const vulnCount = tc.vulnerabilities?.length || 0
   const outdatedCount = tc.outdated?.length || 0
+  const issuesCount = tc.issues?.length || 0
   const [activeTab, setActiveTab] = useState<"security" | "updates" | "specs">(
     vulnCount > 0 ? "security" : outdatedCount > 0 ? "updates" : "specs"
   )
@@ -420,11 +421,16 @@ function ToolchainCard({
       </CardHeader>
 
       <CardContent className="flex flex-1 flex-col gap-4 pt-4">
-        <div className="flex items-center gap-2 rounded-md border border-border/40 bg-muted/30 p-2.5 font-mono text-xs text-muted-foreground/80">
-          <span className="text-foreground">{getPrimaryVersion(tc)}</span>
+        <div className="flex min-w-0 items-center gap-2 rounded-md border border-border/40 bg-muted/30 p-2.5 font-mono text-xs text-muted-foreground/80">
+          <span
+            className="min-w-0 truncate text-foreground"
+            title={getPrimaryVersion(tc)}
+          >
+            {getPrimaryVersion(tc)}
+          </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <div className="rounded-lg border border-border/50 bg-muted/50 p-3">
             <div className="mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground/60 uppercase">
               Vulns
@@ -443,6 +449,16 @@ function ToolchainCard({
               className={`text-xl font-bold ${outdatedCount > 0 ? "text-blue-400" : "text-foreground/90"}`}
             >
               {outdatedCount}
+            </div>
+          </div>
+          <div className="rounded-lg border border-border/50 bg-muted/50 p-3">
+            <div className="mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground/60 uppercase">
+              Issues
+            </div>
+            <div
+              className={`text-xl font-bold ${issuesCount > 0 ? "text-yellow-400" : "text-foreground/90"}`}
+            >
+              {issuesCount}
             </div>
           </div>
         </div>
@@ -471,7 +487,7 @@ function ToolchainCard({
 
               <div className="flex flex-1 flex-col gap-6 overflow-y-auto py-4">
                 {/* Top Stats */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-4 gap-4">
                   <div className="rounded-xl border border-border/40 bg-muted/30 p-3.5 text-center">
                     <span className="mb-1 block text-xs text-muted-foreground">
                       Vulnerabilities
@@ -490,6 +506,16 @@ function ToolchainCard({
                       className={`font-mono text-xl font-bold ${outdatedCount > 0 ? "text-blue-400" : "text-muted-foreground"}`}
                     >
                       {outdatedCount}
+                    </span>
+                  </div>
+                  <div className="rounded-xl border border-border/40 bg-muted/30 p-3.5 text-center">
+                    <span className="mb-1 block text-xs text-muted-foreground">
+                      Issues
+                    </span>
+                    <span
+                      className={`font-mono text-xl font-bold ${issuesCount > 0 ? "text-yellow-400" : "text-muted-foreground"}`}
+                    >
+                      {issuesCount}
                     </span>
                   </div>
                   <div className="rounded-xl border border-border/40 bg-muted/30 p-3.5 text-center">
