@@ -15,8 +15,6 @@ import {
   Box,
   CheckCircle,
   Boxes,
-  LayoutGrid,
-  Table as TableIcon,
   Gauge,
   PackageMinus,
   Search,
@@ -30,19 +28,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { DataTable } from "@/components/ui/data-table"
 import type { ColumnDef } from "@tanstack/react-table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScanProgress } from "@/components/scan-progress"
 import { PackageDetailDialog } from "@/components/package-detail-dialog"
 import {
@@ -51,75 +40,30 @@ import {
   sourceLabel,
   updateTypeColor,
   updateTypeLabel,
-  type OutdatedPackage,
 } from "@/lib/outdated"
+import type { OutdatedPackage } from "@/lib/outdated"
 import { SimpleChartTooltip } from "@/components/ui/chart"
+import { ToolchainDetailDialog } from "@/components/toolchain-card"
 import {
-  ToolchainCard,
-  ToolchainDetailDialog,
-  displayName,
-  statusBadge,
-} from "@/components/toolchain-card"
+  ToolchainStatusView,
+  useToolchains,
+} from "@/components/toolchain-status"
+import { StatCard } from "@/components/stat-card"
+import { CATEGORIES, statusBadge } from "@/lib/toolchains"
+import {
+  collectVulnerabilities,
+  countBySeverity,
+  severityColor,
+  severityOrder,
+  vulnerabilityColumns,
+  type VulnerabilityWithToolchain,
+} from "@/lib/vulnerabilities"
 
 export const Route = createFileRoute("/")({ component: App })
-interface VulnerabilityInfo {
-  package: string
-  severity: string
-  title: string
-  cve?: string | null
-  patched_version?: string
-}
-
-interface ToolCategory {
-  name: string
-  tools: string[]
-}
-
-const CATEGORIES: ToolCategory[] = [
-  {
-    name: "System & Runtime",
-    tools: ["brew", "cargo", "docker", "pip", "gem"],
-  },
-  { name: "Web Development", tools: ["npm", "pnpm", "yarn", "bun", "deno"] },
-  {
-    name: "Project Tooling",
-    tools: ["project", "security", "supply_chain", "audit", "ci"],
-  },
-]
-
-function severityColor(s: string): string {
-  switch (s.toLowerCase()) {
-    case "critical":
-      return "bg-red-500/10 text-red-600 border-red-500/20 dark:bg-red-500/15 dark:text-red-400 dark:border-red-500/25"
-    case "high":
-      return "bg-orange-500/10 text-orange-600 border-orange-500/20 dark:bg-orange-500/15 dark:text-orange-400 dark:border-orange-500/25"
-    case "medium":
-    case "moderate":
-      return "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/25"
-    case "low":
-      return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/25"
-    default:
-      return "bg-muted text-muted-foreground border-border"
-  }
-}
-
-function severityOrder(s: string): number {
-  switch (s.toLowerCase()) {
-    case "critical":
-      return 0
-    case "high":
-      return 1
-    case "medium":
-      return 2
-    case "low":
-      return 3
-    default:
-      return 4
-  }
-}
 
 function App() {
   const { report, loading, refetch: fetchReport } = useScanData()
+  const { groups } = useToolchains()
   const [compactView, setCompactView] = useState(false)
   const [openDialog, setOpenDialog] = useState<string | null>(null)
   const [selectedPackage, setSelectedPackage] = useState<{
@@ -129,18 +73,7 @@ function App() {
   const [outdatedSearch, setOutdatedSearch] = useState("")
   const [vulnSearch, setVulnSearch] = useState("")
   const allVulnerabilities = useMemo(() => {
-    if (!report?.results) return []
-    const vulns: Array<VulnerabilityInfo & { toolchain: string }> = []
-    Object.entries(report.results).forEach(
-      ([toolchain, data]: [string, any]) => {
-        if (data.vulnerabilities) {
-          data.vulnerabilities.forEach((v: VulnerabilityInfo) => {
-            vulns.push({ ...v, toolchain })
-          })
-        }
-      }
-    )
-    return vulns.sort(
+    return collectVulnerabilities(report?.results).sort(
       (a, b) => severityOrder(a.severity) - severityOrder(b.severity)
     )
   }, [report])
@@ -174,22 +107,19 @@ function App() {
 
   // Count active toolchains
   const activeToolchains = useMemo(() => {
-    if (!report?.results) return { active: 0, total: 15 }
+    if (!report?.results) return { active: 0, total: 0 }
+    const total = CATEGORIES.reduce((sum, cat) => sum + cat.tools.length, 0)
     const active = Object.values(report.results).filter(
       (r) => r.status && !r.status.toLowerCase().includes("skip")
     ).length
-    return { active, total: 15 }
+    return { active, total }
   }, [report])
 
   // Severity breakdown
-  const severityCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    for (const v of allVulnerabilities) {
-      const key = v.severity.toLowerCase()
-      counts[key] = (counts[key] || 0) + 1
-    }
-    return counts
-  }, [allVulnerabilities])
+  const severityCounts = useMemo(
+    () => countBySeverity(allVulnerabilities),
+    [allVulnerabilities]
+  )
 
   const vulnCount = allVulnerabilities.length
   const outCount = allOutdated.length
@@ -271,69 +201,12 @@ function App() {
     },
   ]
 
-  const topVulnColumns: ColumnDef<
-    VulnerabilityInfo & { toolchain: string },
-    unknown
-  >[] = [
-    {
-      accessorKey: "toolchain",
-      header: "Toolchain",
-      cell: ({ row }) => (
-        <span className="text-sm font-medium text-muted-foreground/80 capitalize">
-          {row.original.toolchain}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "package",
-      header: "Package",
-      cell: ({ row }) => (
-        <span
-          className="cursor-pointer font-mono text-sm text-primary underline underline-offset-2 hover:text-primary/80"
-          onClick={() =>
-            setSelectedPackage({
-              name: row.original.package,
-              toolchain: row.original.toolchain,
-            })
-          }
-        >
-          {row.original.package || "Unknown"}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "severity",
-      header: "Severity",
-      sortingFn: (a, b) =>
-        severityOrder(a.original.severity) - severityOrder(b.original.severity),
-      cell: ({ row }) => (
-        <Badge
-          variant="outline"
-          className={`shadow-none ${severityColor(row.original.severity)}`}
-        >
-          {row.original.severity}
-        </Badge>
-      ),
-    },
-    {
-      accessorKey: "title",
-      header: "Description",
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
-          {row.original.title || "Security vulnerability found"}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "cve",
-      header: "CVE",
-      cell: ({ row }) => (
-        <span className="font-mono text-xs text-muted-foreground">
-          {row.original.cve || "-"}
-        </span>
-      ),
-    },
-  ]
+  const topVulnColumns: ColumnDef<VulnerabilityWithToolchain, unknown>[] =
+    vulnerabilityColumns({
+      onOpenPackage: (name, toolchain) =>
+        setSelectedPackage({ name, toolchain }),
+      showPatchedVersion: false,
+    })
 
   // Project tooling signals
   const projectTooling = useMemo(() => {
@@ -403,48 +276,6 @@ function App() {
     ]
   }, [severityCounts, projectTooling])
 
-  // Toolchain status data grouped by category
-  const toolchainTableData = useMemo(() => {
-    if (!report?.results) return []
-    return CATEGORIES.map((cat) => ({
-      category: cat.name,
-      tools: cat.tools
-        .map((tool) => {
-          const data = report.results[tool]
-          if (!data) return null
-          return {
-            tool,
-            status: data.status,
-            version:
-              data.version ||
-              data.node_version ||
-              data.python_version ||
-              data.rustc_version ||
-              data.cargo_version ||
-              "-",
-            vulns: data.vulnerabilities?.length || 0,
-            outdated: data.outdated?.length || 0,
-            issues: data.issues?.length || 0,
-          }
-        })
-        .filter((t): t is NonNullable<typeof t> => t !== null),
-    }))
-  }, [report])
-
-  // Full toolchain objects for the cards view
-  const toolchainCards = useMemo(() => {
-    if (!report?.results) return []
-    return CATEGORIES.map((cat) => ({
-      category: cat.name,
-      tools: cat.tools
-        .map((tool) => {
-          const data = report.results[tool]
-          return data ? { ...data, tool } : null
-        })
-        .filter((t): t is NonNullable<typeof t> => t !== null),
-    }))
-  }, [report])
-
   if (loading) {
     return (
       <div className="mx-auto max-w-7xl animate-in duration-700 fade-in">
@@ -492,93 +323,55 @@ function App() {
 
       {/* Top Metric Cards */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {/* Risk Score Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Risk Score
-            </CardTitle>
-            <Gauge className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-3xl font-bold ${
-                healthScore > 70
-                  ? "text-green-500"
-                  : healthScore > 40
-                    ? "text-yellow-500"
-                    : "text-red-500"
-              }`}
-            >
-              {healthScore}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground/60">
-              {healthScore > 70
-                ? "Healthy"
-                : healthScore > 40
-                  ? "Needs attention"
-                  : "Critical"}
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Risk Score"
+          icon={<Gauge className="h-4 w-4 text-muted-foreground" />}
+          value={healthScore}
+          valueClassName={
+            healthScore > 70
+              ? "text-green-500"
+              : healthScore > 40
+                ? "text-yellow-500"
+                : "text-red-500"
+          }
+          subtext={
+            healthScore > 70
+              ? "Healthy"
+              : healthScore > 40
+                ? "Needs attention"
+                : "Critical"
+          }
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Vulnerabilities
-            </CardTitle>
-            <ShieldAlert className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-3xl font-bold ${vulnCount > 0 ? "text-red-500" : "text-foreground"}`}
-            >
-              {vulnCount}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground/60">
-              Across toolchains
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Vulnerabilities"
+          icon={<ShieldAlert className="h-4 w-4 text-muted-foreground" />}
+          value={vulnCount}
+          valueClassName={vulnCount > 0 ? "text-red-500" : "text-foreground"}
+          subtext="Across toolchains"
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Outdated
-            </CardTitle>
-            <Box className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-3xl font-bold ${outCount > 0 ? "text-blue-500" : "text-foreground"}`}
-            >
-              {outCount}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground/60">
-              Updates available
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Outdated"
+          icon={<Box className="h-4 w-4 text-muted-foreground" />}
+          value={outCount}
+          valueClassName={outCount > 0 ? "text-blue-500" : "text-foreground"}
+          subtext="Updates available"
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active Tools
-            </CardTitle>
-            <Boxes className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-foreground">
+        <StatCard
+          title="Active Tools"
+          icon={<Boxes className="h-4 w-4 text-muted-foreground" />}
+          value={
+            <>
               {activeToolchains.active}
               <span className="text-lg text-muted-foreground">
                 /{activeToolchains.total}
               </span>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground/60">
-              Toolchains detected
-            </p>
-          </CardContent>
-        </Card>
+            </>
+          }
+          subtext="Toolchains detected"
+        />
       </div>
 
       {/* Project Tooling Readiness */}
@@ -693,150 +486,11 @@ function App() {
       </Card>
 
       {/* Toolchain Status */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Boxes className="h-4 w-4 shrink-0 text-muted-foreground" />
-                Toolchain Status
-              </CardTitle>
-              <CardDescription className="mt-1">
-                Per-tool status, versions, and issue counts.
-              </CardDescription>
-            </div>
-            <Tabs
-              value={compactView ? "table" : "cards"}
-              onValueChange={(v) => setCompactView(v === "table")}
-            >
-              <TabsList className="h-9">
-                <TabsTrigger
-                  value="table"
-                  className="h-7 w-7 p-0"
-                  title="Table view"
-                >
-                  <TableIcon className="h-4 w-4" />
-                </TabsTrigger>
-                <TabsTrigger
-                  value="cards"
-                  className="h-7 w-7 p-0"
-                  title="Cards view"
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {compactView ? (
-            <div className="overflow-hidden rounded-md border border-border">
-              <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow className="border-border hover:bg-transparent">
-                    <TableHead className="w-[150px]">Tool</TableHead>
-                    <TableHead className="w-[80px]">Status</TableHead>
-                    <TableHead className="w-[120px]">Version</TableHead>
-                    <TableHead className="w-[80px] text-center">
-                      Vulns
-                    </TableHead>
-                    <TableHead className="w-[80px] text-center">
-                      Outdated
-                    </TableHead>
-                    <TableHead className="w-[80px] text-center">
-                      Issues
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {toolchainTableData.map((cat) => (
-                    <>
-                      <TableRow
-                        key={`header-${cat.category}`}
-                        className="border-border bg-muted/30 hover:bg-muted/30"
-                      >
-                        <TableCell
-                          colSpan={6}
-                          className="text-xs font-semibold tracking-wider text-muted-foreground uppercase"
-                        >
-                          {cat.category}
-                        </TableCell>
-                      </TableRow>
-                      {cat.tools.map((t) => (
-                        <TableRow
-                          key={t.tool}
-                          className="cursor-pointer border-border hover:bg-muted/50"
-                          onClick={() => setOpenDialog(t.tool)}
-                        >
-                          <TableCell className="text-sm font-medium capitalize">
-                            {displayName(t.tool)}
-                          </TableCell>
-                          <TableCell>{statusBadge(t.status)}</TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
-                            {t.version}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {t.vulns > 0 ? (
-                              <span className="text-sm font-semibold text-red-500">
-                                {t.vulns}
-                              </span>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">
-                                0
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {t.outdated > 0 ? (
-                              <span className="text-sm font-semibold text-blue-500">
-                                {t.outdated}
-                              </span>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">
-                                0
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {t.issues > 0 ? (
-                              <span className="text-sm font-semibold text-yellow-500">
-                                {t.issues}
-                              </span>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">
-                                0
-                              </span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {toolchainCards.map((cat) => (
-                <div key={cat.category}>
-                  <h4 className="mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                    {cat.category}
-                  </h4>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {cat.tools.map((tc) => (
-                      <ToolchainCard
-                        key={tc.tool}
-                        tc={tc}
-                        onClick={() => setOpenDialog(tc.tool)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <ToolchainStatusView
+        compactView={compactView}
+        onCompactViewChange={setCompactView}
+        onSelectTool={setOpenDialog}
+      />
 
       {/* Outdated Packages */}
       <Card>
@@ -971,16 +625,16 @@ function App() {
       )}
 
       {/* Page-level toolchain dialogs so cards and table rows open in place */}
-      {toolchainCards.flatMap((cat) =>
-        cat.tools.map((tc) => (
+      {groups
+        .flatMap((cat) => cat.tools)
+        .map((tc) => (
           <ToolchainDetailDialog
             key={tc.tool}
             tc={tc}
             open={openDialog === tc.tool}
             onOpenChange={(isOpen) => setOpenDialog(isOpen ? tc.tool : null)}
           />
-        ))
-      )}
+        ))}
     </div>
   )
 }
