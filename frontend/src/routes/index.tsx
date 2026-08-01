@@ -44,6 +44,14 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScanProgress } from "@/components/scan-progress"
 import { PackageDetailDialog } from "@/components/package-detail-dialog"
+import {
+  enrichOutdated,
+  sourceColor,
+  sourceLabel,
+  updateTypeColor,
+  updateTypeLabel,
+  type OutdatedPackage,
+} from "@/lib/outdated"
 import { SimpleChartTooltip } from "@/components/ui/chart"
 import {
   siDocker,
@@ -146,12 +154,6 @@ function getToolIcon(tool: string) {
     />
   )
 }
-interface PackageInfo {
-  name: string
-  current: string
-  latest: string
-}
-
 interface VulnerabilityInfo {
   package: string
   severity: string
@@ -315,19 +317,8 @@ function App() {
   }, [report])
 
   // Aggregate all outdated
-  const allOutdated = useMemo(() => {
-    if (!report?.results) return []
-    const out: Array<PackageInfo & { toolchain: string }> = []
-    Object.entries(report.results).forEach(
-      ([toolchain, data]: [string, any]) => {
-        if (data.outdated) {
-          data.outdated.forEach((o: PackageInfo) => {
-            out.push({ ...o, toolchain })
-          })
-        }
-      }
-    )
-    return out
+  const allOutdated = useMemo((): OutdatedPackage[] => {
+    return enrichOutdated(report?.results)
   }, [report])
 
   // Count active toolchains
@@ -351,10 +342,14 @@ function App() {
 
   const vulnCount = allVulnerabilities.length
   const outCount = allOutdated.length
-  const outdatedColumns: ColumnDef<
-    PackageInfo & { toolchain: string },
-    unknown
-  >[] = [
+  const updateTypeCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const o of allOutdated) {
+      counts[o.updateType] = (counts[o.updateType] || 0) + 1
+    }
+    return counts
+  }, [allOutdated])
+  const outdatedColumns: ColumnDef<OutdatedPackage, unknown>[] = [
     {
       accessorKey: "toolchain",
       header: "Toolchain",
@@ -382,6 +377,18 @@ function App() {
       ),
     },
     {
+      accessorKey: "source",
+      header: "Source",
+      cell: ({ row }) => (
+        <Badge
+          variant="outline"
+          className={`shadow-none ${sourceColor(row.original.source)}`}
+        >
+          {sourceLabel(row.original.source)}
+        </Badge>
+      ),
+    },
+    {
       accessorKey: "current",
       header: "Current",
       cell: ({ row }) => (
@@ -397,6 +404,18 @@ function App() {
         <span className="font-mono text-sm font-medium text-green-500">
           {row.original.latest}
         </span>
+      ),
+    },
+    {
+      accessorKey: "updateType",
+      header: "Update Type",
+      cell: ({ row }) => (
+        <Badge
+          variant="outline"
+          className={`shadow-none ${updateTypeColor(row.original.updateType)}`}
+        >
+          {updateTypeLabel(row.original.updateType)}
+        </Badge>
       ),
     },
   ]
@@ -1077,7 +1096,23 @@ function App() {
             Packages with available updates across all toolchains.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
+          {allOutdated.length > 0 && (
+            <div className="flex flex-wrap gap-3">
+              {(["major", "minor", "patch", "unknown"] as const)
+                .filter((t) => (updateTypeCounts[t] || 0) > 0)
+                .map((t) => (
+                  <Badge
+                    key={t}
+                    variant="outline"
+                    className={`shadow-none ${updateTypeColor(t)}`}
+                  >
+                    {t === "unknown" ? "Unknown" : updateTypeLabel(t)}:{" "}
+                    {updateTypeCounts[t]}
+                  </Badge>
+                ))}
+            </div>
+          )}
           {allOutdated.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60">
               <CheckCircle className="mb-4 h-12 w-12 text-green-500/50" />
