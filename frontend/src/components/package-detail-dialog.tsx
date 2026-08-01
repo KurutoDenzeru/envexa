@@ -241,7 +241,7 @@ export function PackageDetailDialog({
           onValueChange={setActiveTab}
           className="flex flex-1 flex-col overflow-hidden"
         >
-          <TabsList className="border-b bg-muted/30">
+          <TabsList className="w-full border-b bg-muted/30">
             <TabsTrigger
               value="overview"
               className="data-[state=active]:bg-background"
