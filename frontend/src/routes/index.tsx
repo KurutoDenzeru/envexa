@@ -21,6 +21,7 @@ import {
   Gauge,
   PackageMinus,
   Search,
+  Folder,
 } from "lucide-react"
 import {
   Bar,
@@ -66,7 +67,6 @@ import {
   siRubygems,
   siRust,
   siHomebrew,
-  siApple,
   siGithub,
 } from "simple-icons"
 import { cn, formatRelativeTime } from "@/lib/utils"
@@ -119,7 +119,13 @@ const TOOL_ICONS: Record<
   yarn: { icon: siYarn },
   bun: { icon: siBun, invertInDark: true },
   deno: { icon: siDeno, invertInDark: true },
-  project: { icon: siApple, invertInDark: true },
+  project: {
+    icon: {
+      path: "M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z",
+      hex: "71717a",
+    },
+    fallback: <Folder className="h-5 w-5 text-muted-foreground" />,
+  },
   security: {
     icon: {
       path: "M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z",
@@ -631,24 +637,14 @@ function App() {
               : new Date().toLocaleTimeString()}
           </p>
         </div>
-        <div className="flex flex-col items-start gap-3 md:flex-row md:items-end md:gap-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span>
-              Last scanned{" "}
-              {report.timestamp
-                ? formatRelativeTime(report.timestamp)
-                : "just now"}
-            </span>
-          </div>
-          <Button
-            variant="outline"
-            className="gap-2 shadow-xs"
-            onClick={() => fetchReport(true)}
-          >
-            <RefreshCw className="h-4 w-4" />
-            Rescan Now
-          </Button>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Clock className="h-4 w-4" />
+          <span>
+            Last scanned{" "}
+            {report.timestamp
+              ? formatRelativeTime(report.timestamp)
+              : "just now"}
+          </span>
         </div>
       </div>
 
