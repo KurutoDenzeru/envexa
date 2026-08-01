@@ -8,13 +8,11 @@ import { Badge } from "@/components/ui/badge"
 import {
   PackageOpen,
   CheckCircle,
-  RefreshCw,
   Shield,
   FileSearch,
   Boxes,
   Folder,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -663,13 +661,6 @@ function Toolchains() {
             Package managers and runtimes detected in your environment.
           </p>
         </div>
-        <Button
-          variant="outline"
-          className="gap-2 shadow-xs"
-          onClick={() => fetchReport(true)}
-        >
-          <RefreshCw className="h-4 w-4" /> Rescan
-        </Button>
       </div>
 
       {totalTools === 0 ? (

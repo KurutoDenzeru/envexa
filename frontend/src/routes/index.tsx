@@ -15,7 +15,6 @@ import {
   Box,
   CheckCircle,
   Boxes,
-  Clock,
   LayoutGrid,
   Table as TableIcon,
   Gauge,
@@ -69,7 +68,7 @@ import {
   siHomebrew,
   siGithub,
 } from "simple-icons"
-import { cn, formatRelativeTime } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 
 export const Route = createFileRoute("/")({ component: App })
 
@@ -636,15 +635,6 @@ function App() {
               ? new Date(report.timestamp).toLocaleString()
               : new Date().toLocaleTimeString()}
           </p>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock className="h-4 w-4" />
-          <span>
-            Last scanned{" "}
-            {report.timestamp
-              ? formatRelativeTime(report.timestamp)
-              : "just now"}
-          </span>
         </div>
       </div>
 
