@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { useState, useMemo, useEffect } from "react"
+import { Fragment, useState, useMemo, useEffect } from "react"
 import { useScanData } from "@/components/scan-data-context"
 import { useTheme } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
@@ -16,9 +16,11 @@ import {
   CheckCircle,
   Shield,
   ShieldAlert,
+  Table as TableIcon,
   FileSearch,
   Boxes,
   Folder,
+  LayoutGrid,
 } from "lucide-react"
 import {
   Dialog,
@@ -28,7 +30,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DataTable } from "@/components/ui/data-table"
 import type { ColumnDef } from "@tanstack/react-table"
 import {
@@ -660,6 +670,8 @@ function Toolchains() {
   const [openDialog, setOpenDialog] = useState<string | null>(
     searchParams.open ?? null
   )
+  // Toggle between grid (cards) and compact table view
+  const [compactView, setCompactView] = useState(false)
 
   useEffect(() => {
     if (searchParams.open) {
@@ -686,6 +698,21 @@ function Toolchains() {
         .filter((tc): tc is ToolchainResult => tc !== undefined),
     }))
   }, [toolchainMap])
+
+  // Compact per-tool rows for the table view
+  const toolchainTableData = useMemo(() => {
+    return groupedCategories.map((cat) => ({
+      category: cat.name,
+      tools: cat.items.map((tc) => ({
+        tool: tc.tool,
+        status: tc.status,
+        version: getPrimaryVersion(tc),
+        vulns: tc.vulnerabilities?.length || 0,
+        outdated: tc.outdated?.length || 0,
+        issues: tc.issues?.length || 0,
+      })),
+    }))
+  }, [groupedCategories])
 
   const totalTools = groupedCategories.reduce(
     (sum, cat) => sum + cat.items.length,
@@ -802,6 +829,31 @@ function Toolchains() {
             Package managers and runtimes detected in your environment.
           </p>
         </div>
+        {totalTools > 0 && (
+          <div className="flex items-end">
+            <Tabs
+              value={compactView ? "table" : "cards"}
+              onValueChange={(v) => setCompactView(v === "table")}
+            >
+              <TabsList className="h-9">
+                <TabsTrigger
+                  value="table"
+                  className="h-7 w-7 p-0"
+                  title="Table view"
+                >
+                  <TableIcon className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger
+                  value="cards"
+                  className="h-7 w-7 p-0"
+                  title="Cards view"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        )}
       </div>
 
       {/* Summary Stats */}
@@ -938,6 +990,83 @@ function Toolchains() {
         <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-muted/50 py-12">
           <PackageOpen className="mb-4 h-12 w-12 text-neutral-600" />
           <p className="text-muted-foreground">No toolchains detected.</p>
+        </div>
+      ) : compactView ? (
+        <div className="overflow-hidden rounded-md border border-border">
+          <Table>
+            <TableHeader className="bg-muted/50">
+              <TableRow className="border-border hover:bg-transparent">
+                <TableHead className="w-[150px]">Tool</TableHead>
+                <TableHead className="w-[80px]">Status</TableHead>
+                <TableHead className="w-[120px]">Version</TableHead>
+                <TableHead className="w-[80px] text-center">Vulns</TableHead>
+                <TableHead className="w-[80px] text-center">Outdated</TableHead>
+                <TableHead className="w-[80px] text-center">Issues</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {toolchainTableData.map((cat) => (
+                <Fragment key={cat.category}>
+                  <TableRow className="border-border bg-muted/30 hover:bg-muted/30">
+                    <TableCell
+                      colSpan={6}
+                      className="text-xs font-semibold tracking-wider text-muted-foreground uppercase"
+                    >
+                      {cat.category}
+                    </TableCell>
+                  </TableRow>
+                  {cat.tools.map((t) => (
+                    <TableRow
+                      key={t.tool}
+                      className="cursor-pointer border-border hover:bg-muted/50"
+                      onClick={() => setOpenDialog(t.tool)}
+                    >
+                      <TableCell className="text-sm font-medium capitalize">
+                        {displayName(t.tool)}
+                      </TableCell>
+                      <TableCell>{statusBadge(t.status)}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {t.version}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {t.vulns > 0 ? (
+                          <span className="text-sm font-semibold text-red-500">
+                            {t.vulns}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            0
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {t.outdated > 0 ? (
+                          <span className="text-sm font-semibold text-blue-500">
+                            {t.outdated}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            0
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {t.issues > 0 ? (
+                          <span className="text-sm font-semibold text-yellow-500">
+                            {t.issues}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            0
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </Fragment>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       ) : (
         groupedCategories.map((cat) => (
