@@ -272,21 +272,27 @@ export function PackageDetailDialog({
               <span className="mb-1 block text-xs text-muted-foreground">
                 Status
               </span>
-              <span
-                className={`font-mono text-xl font-bold ${
-                  !packageInfo
-                    ? "text-muted-foreground"
-                    : isUpToDate
-                      ? "text-green-400"
-                      : "text-amber-400"
-                }`}
-              >
-                {!packageInfo
-                  ? "-"
-                  : isUpToDate
-                    ? "Up to date"
-                    : "Update available"}
-              </span>
+              <div className="flex justify-center">
+                {!packageInfo ? (
+                  <span className="font-mono text-xl font-bold text-muted-foreground">
+                    -
+                  </span>
+                ) : isUpToDate ? (
+                  <Badge
+                    variant="outline"
+                    className="border-green-500/30 bg-green-500/10 text-green-500 shadow-none"
+                  >
+                    Up to date
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant="outline"
+                    className="border-blue-500/30 bg-blue-500/10 text-blue-400 shadow-none"
+                  >
+                    Update available
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
 
