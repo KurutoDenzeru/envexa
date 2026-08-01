@@ -3,7 +3,13 @@ import { useState, useMemo, useEffect } from "react"
 import { useScanData } from "@/components/scan-data-context"
 import { useTheme } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
   PackageOpen,
@@ -38,6 +44,8 @@ import {
   siGithub,
 } from "simple-icons"
 import { ScanProgress } from "@/components/scan-progress"
+import { DonutChart, CHART_PALETTE } from "@/components/donut-chart"
+
 export const Route = createFileRoute("/toolchains")({
   validateSearch: (search: Record<string, unknown>) => ({
     open: (search.open as string) || undefined,
@@ -252,6 +260,14 @@ function statusBadge(status: string) {
       PASS
     </Badge>
   )
+}
+
+function statusKey(status: string): "pass" | "warn" | "fail" | "skip" {
+  const s = status.toLowerCase()
+  if (s.includes("fail") || s.includes("error")) return "fail"
+  if (s.includes("warn")) return "warn"
+  if (s.includes("skip") || s.includes("not found")) return "skip"
+  return "pass"
 }
 
 function getPrimaryVersion(tc: ToolchainResult): string {
@@ -667,6 +683,71 @@ function Toolchains() {
     0
   )
 
+  // Donut chart data: toolchain status distribution
+  const STATUS_COLORS: Record<string, string> = {
+    pass: "#22c55e",
+    warn: "#eab308",
+    fail: "#ef4444",
+    skip: "#71717a",
+  }
+  const statusPieData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const cat of groupedCategories) {
+      for (const tc of cat.items) {
+        const key = statusKey(tc.status)
+        counts[key] = (counts[key] || 0) + 1
+      }
+    }
+    return Object.entries(counts)
+      .filter(([, count]) => count > 0)
+      .map(([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value,
+        fill: STATUS_COLORS[name],
+      }))
+  }, [groupedCategories])
+
+  // Donut chart data: vulnerabilities per toolchain
+  const vulnPieData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const cat of groupedCategories) {
+      for (const tc of cat.items) {
+        const count = tc.vulnerabilities?.length || 0
+        if (count > 0) counts[tc.tool] = (counts[tc.tool] || 0) + count
+      }
+    }
+    return Object.entries(counts)
+      .map(([name, value], i) => ({
+        name: displayName(name),
+        value,
+        fill: CHART_PALETTE[i % CHART_PALETTE.length],
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+  }, [groupedCategories])
+
+  // Donut chart data: outdated packages per toolchain
+  const outdatedPieData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const cat of groupedCategories) {
+      for (const tc of cat.items) {
+        const count = tc.outdated?.length || 0
+        if (count > 0) counts[tc.tool] = (counts[tc.tool] || 0) + count
+      }
+    }
+    return Object.entries(counts)
+      .map(([name, value], i) => ({
+        name: displayName(name),
+        value,
+        fill: CHART_PALETTE[(i + 3) % CHART_PALETTE.length],
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+  }, [groupedCategories])
+
+  const totalVulns = vulnPieData.reduce((sum, d) => sum + d.value, 0)
+  const totalOutdated = outdatedPieData.reduce((sum, d) => sum + d.value, 0)
+
   if (loading) {
     return (
       <div className="mx-auto max-w-7xl animate-in duration-700 fade-in">
@@ -688,6 +769,55 @@ function Toolchains() {
           </p>
         </div>
       </div>
+
+      {/* Charts Section */}
+      {totalTools > 0 && (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Status Distribution</CardTitle>
+              <CardDescription>
+                Toolchain status across your environment.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DonutChart data={statusPieData} />
+            </CardContent>
+          </Card>
+
+          {totalVulns > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  Vulnerabilities by Toolchain
+                </CardTitle>
+                <CardDescription>
+                  Toolchains with the most vulnerabilities.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DonutChart data={vulnPieData} />
+              </CardContent>
+            </Card>
+          )}
+
+          {totalOutdated > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  Outdated by Toolchain
+                </CardTitle>
+                <CardDescription>
+                  Toolchains with the most outdated packages.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DonutChart data={outdatedPieData} />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {totalTools === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-muted/50 py-12">
