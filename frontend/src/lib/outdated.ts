@@ -47,6 +47,14 @@ export function updateTypeColor(
   }
 }
 
+export const UPDATE_TYPE_COLORS: Record<OutdatedPackage["updateType"], string> =
+  {
+    major: "#ef4444",
+    minor: "#f97316",
+    patch: "#22c55e",
+    unknown: "#71717a",
+  }
+
 export function updateTypeLabel(
   type: "major" | "minor" | "patch" | "unknown"
 ): string {

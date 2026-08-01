@@ -23,8 +23,10 @@ import {
   sourceLabel,
   updateTypeColor,
   updateTypeLabel,
+  UPDATE_TYPE_COLORS,
   type OutdatedPackage,
 } from "@/lib/outdated"
+import { DonutChart, CHART_PALETTE } from "@/components/donut-chart"
 export const Route = createFileRoute("/outdated")({
   component: Outdated,
 })
@@ -136,6 +138,44 @@ function Outdated() {
       })
     )
   }
+
+  const updateTypePieData = useMemo(() => {
+    return (["major", "minor", "patch", "unknown"] as const)
+      .filter((t) => (updateTypeCounts[t] || 0) > 0)
+      .map((t) => ({
+        name: t === "unknown" ? "Unknown" : updateTypeLabel(t),
+        value: updateTypeCounts[t],
+        fill: UPDATE_TYPE_COLORS[t],
+      }))
+  }, [updateTypeCounts])
+
+  const toolchainPieData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const o of allOutdated) {
+      counts[o.toolchain] = (counts[o.toolchain] || 0) + 1
+    }
+    return Object.entries(counts)
+      .map(([name, count], i) => ({
+        name: displayName(name),
+        value: count,
+        fill: CHART_PALETTE[i % CHART_PALETTE.length],
+      }))
+      .sort((a, b) => b.value - a.value)
+  }, [allOutdated])
+
+  const sourcePieData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const o of allOutdated) {
+      counts[o.source] = (counts[o.source] || 0) + 1
+    }
+    return Object.entries(counts)
+      .map(([name, count], i) => ({
+        name: sourceLabel(name),
+        value: count,
+        fill: CHART_PALETTE[(i + 5) % CHART_PALETTE.length],
+      }))
+      .sort((a, b) => b.value - a.value)
+  }, [allOutdated])
 
   const handleUpdateSelected = () => {
     const selected = Array.from(selectedPackages)
@@ -393,6 +433,49 @@ function Outdated() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Charts Section */}
+      {total > 0 && (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Update Type Distribution
+              </CardTitle>
+              <CardDescription>
+                Breakdown of outdated packages by update type.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DonutChart data={updateTypePieData} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">By Toolchain</CardTitle>
+              <CardDescription>
+                Toolchains with the most outdated packages.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DonutChart data={toolchainPieData} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">By Source</CardTitle>
+              <CardDescription>
+                Sources with the most outdated packages.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DonutChart data={sourcePieData} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Outdated Packages Table */}
       <Card>

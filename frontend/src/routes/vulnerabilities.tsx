@@ -14,20 +14,7 @@ import { ShieldAlert, CheckCircle, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { DataTable } from "@/components/ui/data-table"
 import type { ColumnDef } from "@tanstack/react-table"
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts"
-import { SimpleChartTooltip } from "@/components/ui/chart"
+import { DonutChart, CHART_PALETTE } from "@/components/donut-chart"
 import { ScanProgress } from "@/components/scan-progress"
 export const Route = createFileRoute("/vulnerabilities")({
   component: Vulnerabilities,
@@ -150,26 +137,35 @@ function Vulnerabilities() {
       }))
   }, [severityCounts])
 
-  // Bar chart data: vulns per toolchain
-  const toolchainBarData = useMemo(() => {
+  // Pie chart data: vulns per toolchain
+  const toolchainPieData = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const v of allVulnerabilities) {
       counts[v.toolchain] = (counts[v.toolchain] || 0) + 1
     }
     return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
+      .map(([name, count], i) => ({
+        name,
+        value: count,
+        fill: CHART_PALETTE[i % CHART_PALETTE.length],
+      }))
+      .sort((a, b) => b.value - a.value)
       .slice(0, 10)
   }, [allVulnerabilities])
-  // Bar chart data: vulns per package
-  const packageBarData = useMemo(() => {
+
+  // Pie chart data: vulns per package
+  const packagePieData = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const v of allVulnerabilities) {
       counts[v.package] = (counts[v.package] || 0) + 1
     }
     return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
+      .map(([name, count], i) => ({
+        name,
+        value: count,
+        fill: CHART_PALETTE[(i + 3) % CHART_PALETTE.length],
+      }))
+      .sort((a, b) => b.value - a.value)
       .slice(0, 10)
   }, [allVulnerabilities])
 
@@ -350,61 +346,7 @@ function Vulnerabilities() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[260px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={3}
-                      dataKey="value"
-                      stroke="hsl(var(--background))"
-                      strokeWidth={2}
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell
-                          key={index}
-                          fill={entry.fill}
-                          className="cursor-pointer transition-opacity outline-none hover:opacity-80"
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null
-                        const data = payload[0].payload
-                        return (
-                          <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground shadow-xs">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="inline-block h-2 w-2 shrink-0 rounded-full"
-                                style={{ backgroundColor: data.fill }}
-                              />
-                              <span className="font-medium">{data.name}</span>
-                              <span className="ml-1 text-muted-foreground">
-                                : {data.value}
-                              </span>
-                            </div>
-                          </div>
-                        )
-                      }}
-                      cursor={false}
-                    />
-                    <Legend
-                      verticalAlign="bottom"
-                      height={36}
-                      formatter={(value: string) => (
-                        <span className="text-xs text-muted-foreground">
-                          {value}
-                        </span>
-                      )}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              <DonutChart data={pieData} />
             </CardContent>
           </Card>
 
@@ -417,52 +359,7 @@ function Vulnerabilities() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[260px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={toolchainBarData}
-                    layout="vertical"
-                    margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="hsl(var(--border))"
-                      horizontal={false}
-                    />
-                    <XAxis
-                      type="number"
-                      stroke="#a1a1aa"
-                      tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                      axisLine={false}
-                      tickLine={false}
-                      allowDecimals={false}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      stroke="#a1a1aa"
-                      tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={90}
-                      tickFormatter={(v: string) =>
-                        v.length > 10 ? v.slice(0, 10) + "..." : v
-                      }
-                    />
-                    <Tooltip
-                      content={<SimpleChartTooltip />}
-                      cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                    />
-                    <Bar
-                      dataKey="count"
-                      name="Vulnerabilities"
-                      fill="#ef4444"
-                      radius={[0, 4, 4, 0]}
-                      maxBarSize={24}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <DonutChart data={toolchainPieData} />
             </CardContent>
           </Card>
           {/* Vulnerabilities by Package */}
@@ -474,46 +371,7 @@ function Vulnerabilities() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[260px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={packageBarData}
-                    layout="vertical"
-                    margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="hsl(var(--border))"
-                      horizontal={false}
-                    />
-                    <XAxis
-                      type="number"
-                      stroke="#a1a1aa"
-                      tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                      axisLine={false}
-                      tickLine={false}
-                      allowDecimals={false}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      stroke="#a1a1aa"
-                      tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={120}
-                    />
-                    <Tooltip content={<SimpleChartTooltip />} />
-                    <Bar
-                      dataKey="count"
-                      name="Vulnerabilities"
-                      fill="#d97706"
-                      radius={[0, 4, 4, 0]}
-                      maxBarSize={24}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <DonutChart data={packagePieData} />
             </CardContent>
           </Card>
         </div>
