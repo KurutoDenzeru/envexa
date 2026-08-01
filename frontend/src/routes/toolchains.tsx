@@ -28,7 +28,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Table,
@@ -429,19 +428,14 @@ const outdatedColumns: ColumnDef<PackageInfo, unknown>[] = [
 
 function ToolchainCard({
   tc,
-  open,
   onOpenChange,
 }: {
   tc: ToolchainResult
-  open?: boolean
   onOpenChange?: (open: boolean) => void
 }) {
   const vulnCount = tc.vulnerabilities?.length || 0
   const outdatedCount = tc.outdated?.length || 0
   const issuesCount = tc.issues?.length || 0
-  const [activeTab, setActiveTab] = useState<"security" | "updates" | "specs">(
-    vulnCount > 0 ? "security" : outdatedCount > 0 ? "updates" : "specs"
-  )
 
   return (
     <Card className="flex flex-col justify-between border-border bg-card shadow-xs transition-all duration-300 hover:border-border/80">
@@ -499,168 +493,190 @@ function ToolchainCard({
         </div>
 
         <div className="flex justify-end border-t border-border/30 pt-2">
-          <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogTrigger className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-border bg-popover px-4 text-xs font-semibold text-foreground shadow-xs transition-all select-none hover:bg-muted/50 hover:text-foreground">
-              View Details
-            </DialogTrigger>
-            <DialogContent className="flex max-h-[90vh] flex-col border border-border bg-card p-6 shadow-xl sm:max-w-2xl">
-              <DialogHeader className="border-b border-border/50 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg border border-border/60 bg-muted/60 p-2">
-                    {getToolIcon(tc.tool)}
-                  </div>
-                  <div>
-                    <DialogTitle className="text-2xl font-bold text-foreground capitalize">
-                      {displayName(tc.tool)}
-                    </DialogTitle>
-                    <DialogDescription className="mt-0.5 text-muted-foreground">
-                      Vulnerability audit and package state.
-                    </DialogDescription>
-                  </div>
-                </div>
-              </DialogHeader>
-
-              <div className="flex flex-1 flex-col gap-6 overflow-y-auto py-4">
-                {/* Top Stats */}
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="rounded-xl border border-border/40 bg-muted/30 p-3.5 text-center">
-                    <span className="mb-1 block text-xs text-muted-foreground">
-                      Vulnerabilities
-                    </span>
-                    <span
-                      className={`font-mono text-xl font-bold ${vulnCount > 0 ? "text-red-400" : "text-muted-foreground"}`}
-                    >
-                      {vulnCount}
-                    </span>
-                  </div>
-                  <div className="rounded-xl border border-border/40 bg-muted/30 p-3.5 text-center">
-                    <span className="mb-1 block text-xs text-muted-foreground">
-                      Outdated
-                    </span>
-                    <span
-                      className={`font-mono text-xl font-bold ${outdatedCount > 0 ? "text-blue-400" : "text-muted-foreground"}`}
-                    >
-                      {outdatedCount}
-                    </span>
-                  </div>
-                  <div className="rounded-xl border border-border/40 bg-muted/30 p-3.5 text-center">
-                    <span className="mb-1 block text-xs text-muted-foreground">
-                      Issues
-                    </span>
-                    <span
-                      className={`font-mono text-xl font-bold ${issuesCount > 0 ? "text-yellow-400" : "text-muted-foreground"}`}
-                    >
-                      {issuesCount}
-                    </span>
-                  </div>
-                  <div className="rounded-xl border border-border/40 bg-muted/30 p-3.5 text-center">
-                    <span className="mb-1 block text-xs text-muted-foreground">
-                      Status
-                    </span>
-                    <div className="flex justify-center">
-                      {statusBadge(tc.status)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Segmented Tab Buttons */}
-                <div className="flex gap-1 rounded-lg border border-border/40 bg-muted/30 p-1">
-                  {(
-                    [
-                      { key: "security", label: `Security (${vulnCount})` },
-                      { key: "updates", label: `Updates (${outdatedCount})` },
-                      { key: "specs", label: "Specs" },
-                    ] as const
-                  ).map((tab) => (
-                    <button
-                      key={tab.key}
-                      onClick={() => setActiveTab(tab.key)}
-                      className={`flex-1 cursor-pointer rounded-md px-3 py-2 text-xs font-medium transition-all ${
-                        activeTab === tab.key
-                          ? "border border-border/50 bg-background text-foreground shadow-xs"
-                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Tab Content */}
-                {activeTab === "security" && (
-                  <div>
-                    {vulnCount === 0 ? (
-                      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/40 bg-muted/10 py-12 text-center">
-                        <CheckCircle className="mb-3 h-10 w-10 text-green-500/60" />
-                        <h4 className="text-sm font-semibold text-foreground">
-                          No Security Flaws Detected
-                        </h4>
-                        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-                          This toolchain has no known active security alerts.
-                        </p>
-                      </div>
-                    ) : (
-                      <DataTable
-                        columns={vulnColumns}
-                        data={tc.vulnerabilities || []}
-                        defaultPageSize={5}
-                        pageSizeOptions={[5, 10, 25]}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {activeTab === "updates" && (
-                  <div>
-                    {outdatedCount === 0 ? (
-                      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/40 bg-muted/10 py-12 text-center">
-                        <CheckCircle className="mb-3 h-10 w-10 text-green-500/60" />
-                        <h4 className="text-sm font-semibold text-foreground">
-                          All Dependencies Up to Date
-                        </h4>
-                        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-                          This toolchain uses the latest available package
-                          releases.
-                        </p>
-                      </div>
-                    ) : (
-                      <DataTable
-                        columns={outdatedColumns}
-                        data={tc.outdated || []}
-                        defaultPageSize={5}
-                        pageSizeOptions={[5, 10, 25]}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {activeTab === "specs" && (
-                  <div className="overflow-hidden rounded-lg border border-border/40 bg-muted/10">
-                    <Table>
-                      <TableBody>
-                        {getVersionFields(tc).map((v, vIdx) => (
-                          <TableRow
-                            key={vIdx}
-                            className="border-border hover:bg-muted/30"
-                          >
-                            <TableCell className="text-xs font-medium text-muted-foreground">
-                              {v.label}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs text-foreground">
-                              {v.value}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+          <button
+            onClick={() => onOpenChange?.(true)}
+            className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-border bg-popover px-4 text-xs font-semibold text-foreground shadow-xs transition-all select-none hover:bg-muted/50 hover:text-foreground"
+          >
+            View Details
+          </button>
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function ToolchainDetailDialog({
+  tc,
+  open,
+  onOpenChange,
+}: {
+  tc: ToolchainResult
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
+  const vulnCount = tc.vulnerabilities?.length || 0
+  const outdatedCount = tc.outdated?.length || 0
+  const issuesCount = tc.issues?.length || 0
+  const [activeTab, setActiveTab] = useState<"security" | "updates" | "specs">(
+    vulnCount > 0 ? "security" : outdatedCount > 0 ? "updates" : "specs"
+  )
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[90vh] flex-col border border-border bg-card p-6 shadow-xl sm:max-w-2xl">
+        <DialogHeader className="border-b border-border/50 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg border border-border/60 bg-muted/60 p-2">
+              {getToolIcon(tc.tool)}
+            </div>
+            <div>
+              <DialogTitle className="text-2xl font-bold text-foreground capitalize">
+                {displayName(tc.tool)}
+              </DialogTitle>
+              <DialogDescription className="mt-0.5 text-muted-foreground">
+                Vulnerability audit and package state.
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="flex flex-1 flex-col gap-6 overflow-y-auto py-4">
+          {/* Top Stats */}
+          <div className="grid grid-cols-4 gap-4">
+            <div className="rounded-xl border border-border/40 bg-muted/30 p-3.5 text-center">
+              <span className="mb-1 block text-xs text-muted-foreground">
+                Vulnerabilities
+              </span>
+              <span
+                className={`font-mono text-xl font-bold ${vulnCount > 0 ? "text-red-400" : "text-muted-foreground"}`}
+              >
+                {vulnCount}
+              </span>
+            </div>
+            <div className="rounded-xl border border-border/40 bg-muted/30 p-3.5 text-center">
+              <span className="mb-1 block text-xs text-muted-foreground">
+                Outdated
+              </span>
+              <span
+                className={`font-mono text-xl font-bold ${outdatedCount > 0 ? "text-blue-400" : "text-muted-foreground"}`}
+              >
+                {outdatedCount}
+              </span>
+            </div>
+            <div className="rounded-xl border border-border/40 bg-muted/30 p-3.5 text-center">
+              <span className="mb-1 block text-xs text-muted-foreground">
+                Issues
+              </span>
+              <span
+                className={`font-mono text-xl font-bold ${issuesCount > 0 ? "text-yellow-400" : "text-muted-foreground"}`}
+              >
+                {issuesCount}
+              </span>
+            </div>
+            <div className="rounded-xl border border-border/40 bg-muted/30 p-3.5 text-center">
+              <span className="mb-1 block text-xs text-muted-foreground">
+                Status
+              </span>
+              <div className="flex justify-center">
+                {statusBadge(tc.status)}
+              </div>
+            </div>
+          </div>
+
+          {/* Segmented Tab Buttons */}
+          <div className="flex gap-1 rounded-lg border border-border/40 bg-muted/30 p-1">
+            {(
+              [
+                { key: "security", label: `Security (${vulnCount})` },
+                { key: "updates", label: `Updates (${outdatedCount})` },
+                { key: "specs", label: "Specs" },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex-1 cursor-pointer rounded-md px-3 py-2 text-xs font-medium transition-all ${
+                  activeTab === tab.key
+                    ? "border border-border/50 bg-background text-foreground shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab Content */}
+          {activeTab === "security" && (
+            <div>
+              {vulnCount === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/40 bg-muted/10 py-12 text-center">
+                  <CheckCircle className="mb-3 h-10 w-10 text-green-500/60" />
+                  <h4 className="text-sm font-semibold text-foreground">
+                    No Security Flaws Detected
+                  </h4>
+                  <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                    This toolchain has no known active security alerts.
+                  </p>
+                </div>
+              ) : (
+                <DataTable
+                  columns={vulnColumns}
+                  data={tc.vulnerabilities || []}
+                  defaultPageSize={5}
+                  pageSizeOptions={[5, 10, 25]}
+                />
+              )}
+            </div>
+          )}
+
+          {activeTab === "updates" && (
+            <div>
+              {outdatedCount === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/40 bg-muted/10 py-12 text-center">
+                  <CheckCircle className="mb-3 h-10 w-10 text-green-500/60" />
+                  <h4 className="text-sm font-semibold text-foreground">
+                    All Dependencies Up to Date
+                  </h4>
+                  <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                    This toolchain uses the latest available package releases.
+                  </p>
+                </div>
+              ) : (
+                <DataTable
+                  columns={outdatedColumns}
+                  data={tc.outdated || []}
+                  defaultPageSize={5}
+                  pageSizeOptions={[5, 10, 25]}
+                />
+              )}
+            </div>
+          )}
+
+          {activeTab === "specs" && (
+            <div className="overflow-hidden rounded-lg border border-border/40 bg-muted/10">
+              <Table>
+                <TableBody>
+                  {getVersionFields(tc).map((v, vIdx) => (
+                    <TableRow
+                      key={vIdx}
+                      className="border-border hover:bg-muted/30"
+                    >
+                      <TableCell className="text-xs font-medium text-muted-foreground">
+                        {v.label}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs text-foreground">
+                        {v.value}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -784,30 +800,33 @@ function Toolchains() {
   const totalVulns = vulnPieData.reduce((sum, d) => sum + d.value, 0)
   const totalOutdated = outdatedPieData.reduce((sum, d) => sum + d.value, 0)
 
-  // Aggregated vulnerability stats for the summary cards
-  const vulnStats = useMemo(() => {
-    const severityCounts: Record<string, number> = {}
-    let total = 0
+  // Aggregated vulnerability stats for the summary cards + severity breakdown
+  const severityCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
     for (const cat of groupedCategories) {
       for (const tc of cat.items) {
         for (const v of tc.vulnerabilities || []) {
-          total += 1
           const sev = v.severity.toLowerCase()
-          severityCounts[sev] = (severityCounts[sev] || 0) + 1
+          counts[sev] = (counts[sev] || 0) + 1
         }
       }
     }
-    const riskScore = Object.entries(severityCounts).reduce(
-      (sum, [sev, count]) => sum + (RISK_WEIGHTS[sev] || 1) * count,
-      0
-    )
+    return counts
+  }, [groupedCategories])
+
+  // All vulnerabilities across toolchains
+  const vulnStats = useMemo(() => {
+    const total = Object.values(severityCounts).reduce((sum, n) => sum + n, 0)
     return {
       total,
       critical: severityCounts["critical"] || 0,
       high: severityCounts["high"] || 0,
-      riskScore,
+      riskScore: Object.entries(severityCounts).reduce(
+        (sum, [sev, count]) => sum + (RISK_WEIGHTS[sev] || 1) * count,
+        0
+      ),
     }
-  }, [groupedCategories])
+  }, [severityCounts])
 
   if (loading) {
     return (
@@ -992,82 +1011,105 @@ function Toolchains() {
           <p className="text-muted-foreground">No toolchains detected.</p>
         </div>
       ) : compactView ? (
-        <div className="overflow-hidden rounded-md border border-border">
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="w-[150px]">Tool</TableHead>
-                <TableHead className="w-[80px]">Status</TableHead>
-                <TableHead className="w-[120px]">Version</TableHead>
-                <TableHead className="w-[80px] text-center">Vulns</TableHead>
-                <TableHead className="w-[80px] text-center">Outdated</TableHead>
-                <TableHead className="w-[80px] text-center">Issues</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {toolchainTableData.map((cat) => (
-                <Fragment key={cat.category}>
-                  <TableRow className="border-border bg-muted/30 hover:bg-muted/30">
-                    <TableCell
-                      colSpan={6}
-                      className="text-xs font-semibold tracking-wider text-muted-foreground uppercase"
-                    >
-                      {cat.category}
-                    </TableCell>
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Boxes className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  Toolchain Status
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  Per-tool status, versions, and issue counts.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-hidden rounded-md border border-border">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="w-[150px]">Tool</TableHead>
+                    <TableHead className="w-[80px]">Status</TableHead>
+                    <TableHead className="w-[120px]">Version</TableHead>
+                    <TableHead className="w-[80px] text-center">
+                      Vulns
+                    </TableHead>
+                    <TableHead className="w-[80px] text-center">
+                      Outdated
+                    </TableHead>
+                    <TableHead className="w-[80px] text-center">
+                      Issues
+                    </TableHead>
                   </TableRow>
-                  {cat.tools.map((t) => (
-                    <TableRow
-                      key={t.tool}
-                      className="cursor-pointer border-border hover:bg-muted/50"
-                      onClick={() => setOpenDialog(t.tool)}
-                    >
-                      <TableCell className="text-sm font-medium capitalize">
-                        {displayName(t.tool)}
-                      </TableCell>
-                      <TableCell>{statusBadge(t.status)}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {t.version}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {t.vulns > 0 ? (
-                          <span className="text-sm font-semibold text-red-500">
-                            {t.vulns}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">
-                            0
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {t.outdated > 0 ? (
-                          <span className="text-sm font-semibold text-blue-500">
-                            {t.outdated}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">
-                            0
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {t.issues > 0 ? (
-                          <span className="text-sm font-semibold text-yellow-500">
-                            {t.issues}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">
-                            0
-                          </span>
-                        )}
-                      </TableCell>
-                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {toolchainTableData.map((cat) => (
+                    <Fragment key={cat.category}>
+                      <TableRow className="border-border bg-muted/30 hover:bg-muted/30">
+                        <TableCell
+                          colSpan={6}
+                          className="text-xs font-semibold tracking-wider text-muted-foreground uppercase"
+                        >
+                          {cat.category}
+                        </TableCell>
+                      </TableRow>
+                      {cat.tools.map((t) => (
+                        <TableRow
+                          key={t.tool}
+                          className="cursor-pointer border-border hover:bg-muted/50"
+                          onClick={() => setOpenDialog(t.tool)}
+                        >
+                          <TableCell className="text-sm font-medium capitalize">
+                            {displayName(t.tool)}
+                          </TableCell>
+                          <TableCell>{statusBadge(t.status)}</TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">
+                            {t.version}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {t.vulns > 0 ? (
+                              <span className="text-sm font-semibold text-red-500">
+                                {t.vulns}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">
+                                0
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {t.outdated > 0 ? (
+                              <span className="text-sm font-semibold text-blue-500">
+                                {t.outdated}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">
+                                0
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {t.issues > 0 ? (
+                              <span className="text-sm font-semibold text-yellow-500">
+                                {t.issues}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">
+                                0
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </Fragment>
                   ))}
-                </Fragment>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         groupedCategories.map((cat) => (
           <div key={cat.name} className="flex flex-col gap-4">
@@ -1086,7 +1128,6 @@ function Toolchains() {
                   <ToolchainCard
                     key={tc.tool}
                     tc={tc}
-                    open={openDialog === tc.tool}
                     onOpenChange={(isOpen) =>
                       setOpenDialog(isOpen ? tc.tool : null)
                     }
@@ -1097,6 +1138,18 @@ function Toolchains() {
           </div>
         ))
       )}
+
+      {/* Page-level dialogs so row clicks work in both views */}
+      {groupedCategories
+        .flatMap((cat) => cat.items)
+        .map((tc) => (
+          <ToolchainDetailDialog
+            key={tc.tool}
+            tc={tc}
+            open={openDialog === tc.tool}
+            onOpenChange={(isOpen) => setOpenDialog(isOpen ? tc.tool : null)}
+          />
+        ))}
     </div>
   )
 }
