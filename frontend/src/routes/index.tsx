@@ -18,6 +18,7 @@ import {
   Gauge,
   PackageMinus,
   Search,
+  Home,
 } from "lucide-react"
 import {
   Bar,
@@ -56,8 +57,8 @@ import {
   severityColor,
   severityOrder,
   vulnerabilityColumns,
-  type VulnerabilityWithToolchain,
 } from "@/lib/vulnerabilities"
+import type { VulnerabilityWithToolchain } from "@/lib/vulnerabilities"
 
 export const Route = createFileRoute("/")({ component: App })
 
@@ -308,7 +309,8 @@ function App() {
       {/* Header */}
       <div className="flex flex-col justify-between gap-4 border-b border-border pb-6 md:flex-row md:items-end">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight text-foreground">
+            <Home className="h-8 w-8 text-foreground" />
             Workspace Overview
           </h1>
           <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
