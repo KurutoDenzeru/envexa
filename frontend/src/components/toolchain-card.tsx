@@ -249,17 +249,28 @@ export function getPrimaryVersion(tc: ToolchainResult): string {
 
 export function ToolchainCard({
   tc,
-  onViewDetails,
+  onClick,
 }: {
   tc: ToolchainResult
-  onViewDetails: () => void
+  onClick: () => void
 }) {
   const vulnCount = tc.vulnerabilities?.length || 0
   const outdatedCount = tc.outdated?.length || 0
   const issuesCount = tc.issues?.length || 0
 
   return (
-    <Card className="flex flex-col justify-between border-border bg-card shadow-xs transition-all duration-300 hover:border-border/80">
+    <Card
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+      className="flex cursor-pointer flex-col justify-between border-border bg-card shadow-xs transition-all duration-300 hover:border-border/90 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+    >
       <CardHeader className="border-b border-border/50 pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-lg text-foreground capitalize">
@@ -311,15 +322,6 @@ export function ToolchainCard({
               {issuesCount}
             </div>
           </div>
-        </div>
-
-        <div className="flex justify-end border-t border-border/30 pt-2">
-          <button
-            onClick={onViewDetails}
-            className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-border bg-popover px-4 text-xs font-semibold text-foreground shadow-xs transition-all select-none hover:bg-muted/50 hover:text-foreground"
-          >
-            View Details
-          </button>
         </div>
       </CardContent>
     </Card>

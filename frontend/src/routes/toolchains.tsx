@@ -523,7 +523,7 @@ function Toolchains() {
                   <ToolchainCard
                     key={tc.tool}
                     tc={tc}
-                    onViewDetails={() => setOpenDialog(tc.tool)}
+                    onClick={() => setOpenDialog(tc.tool)}
                   />
                 ))}
               </div>
