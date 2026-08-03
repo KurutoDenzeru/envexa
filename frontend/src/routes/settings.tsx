@@ -361,12 +361,6 @@ function SettingsPage() {
             Configure Envexa scanner behavior.
           </p>
         </div>
-        {dirty && (
-          <span className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-600 dark:text-amber-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-            Unsaved changes
-          </span>
-        )}
       </div>
 
       <Tabs defaultValue="general" className="space-y-6">
