@@ -71,7 +71,6 @@ interface UserConfig {
   verbose_logs: boolean
   scan_timeout_secs: number
   daemon_interval_secs: number
-  export_format: string
   enabled_scanners: string[] | null
   log_retention_days: number
 }
@@ -82,7 +81,6 @@ interface SettingsState {
   daemonInterval: string
   cacheTtl: string
   enabledScanners: string[]
-  exportFormat: string
   verboseLogs: boolean
   logRetention: string
 }
@@ -117,7 +115,6 @@ function SettingsPage() {
     daemonInterval: "14400",
     cacheTtl: "30",
     enabledScanners: ALL_SCANNERS.map((s) => s.id),
-    exportFormat: "markdown",
     verboseLogs: false,
     logRetention: "7",
   })
@@ -172,7 +169,6 @@ function SettingsPage() {
         daemonInterval: String(cfg.daemon_interval_secs ?? 14400),
         cacheTtl: String(cfg.cache_ttl_minutes ?? 30),
         enabledScanners: cfg.enabled_scanners ?? ALL_SCANNERS.map((s) => s.id),
-        exportFormat: cfg.export_format ?? "markdown",
         verboseLogs: cfg.verbose_logs ?? false,
         logRetention: String(cfg.log_retention_days ?? 7),
       }
@@ -236,7 +232,6 @@ function SettingsPage() {
           verbose_logs: settings.verboseLogs,
           scan_timeout_secs: Number(settings.scanTimeout),
           daemon_interval_secs: Number(settings.daemonInterval),
-          export_format: settings.exportFormat,
           enabled_scanners: settings.enabledScanners,
           log_retention_days: Number(settings.logRetention),
         }),
@@ -331,7 +326,6 @@ function SettingsPage() {
       daemonInterval: "14400",
       cacheTtl: "30",
       enabledScanners: ALL_SCANNERS.map((s) => s.id),
-      exportFormat: "markdown",
       verboseLogs: false,
       logRetention: "7",
     })
@@ -473,30 +467,6 @@ function SettingsPage() {
                     <SelectItem value="15">15 min</SelectItem>
                     <SelectItem value="30">30 min</SelectItem>
                     <SelectItem value="60">1 hour</SelectItem>
-                  </SelectContent>
-                </Select>
-              </FieldRow>
-
-              <FieldRow
-                label="Export format"
-                description="Default format for scan result exports."
-              >
-                <Select
-                  value={settings.exportFormat}
-                  onValueChange={(v) =>
-                    setSettings((p) => ({
-                      ...p,
-                      exportFormat: v ?? p.exportFormat,
-                    }))
-                  }
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="json">JSON</SelectItem>
-                    <SelectItem value="markdown">Markdown</SelectItem>
-                    <SelectItem value="csv">CSV</SelectItem>
                   </SelectContent>
                 </Select>
               </FieldRow>
