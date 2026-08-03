@@ -873,7 +873,7 @@ function SettingsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {blocker.status === "blocked" && (
+      {dirty && (
         <div className="fixed right-4 bottom-4 z-[100] w-[360px] max-w-[calc(100vw-2rem)] animate-in duration-300 slide-in-from-bottom-5 fade-in">
           <div className="rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-2xl">
             <div className="flex items-start gap-3">
