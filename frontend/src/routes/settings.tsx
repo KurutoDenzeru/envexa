@@ -1,4 +1,9 @@
-import { createFileRoute, useBlocker } from "@tanstack/react-router"
+import {
+  createFileRoute,
+  useBlocker,
+  useNavigate,
+  useSearch,
+} from "@tanstack/react-router"
 import { useState, useEffect, useRef } from "react"
 import {
   Card,
@@ -51,7 +56,23 @@ import { toast } from "sonner"
 import { CATEGORIES, displayName } from "@/lib/toolchains"
 import { siGithub, siInstagram } from "simple-icons"
 
-export const Route = createFileRoute("/settings")({ component: SettingsPage })
+const SETTINGS_TABS = ["general", "scanners", "about"] as const
+type SettingsTab = (typeof SETTINGS_TABS)[number]
+
+type SettingsSearch = {
+  tab?: SettingsTab
+}
+
+export const Route = createFileRoute("/settings")({
+  // Keep the active tab in the URL (?tab=) so refreshes and deep links
+  // restore it instead of always landing on General
+  validateSearch: (search: Record<string, unknown>): SettingsSearch => ({
+    tab: SETTINGS_TABS.includes(search.tab as SettingsTab)
+      ? (search.tab as SettingsTab)
+      : undefined,
+  }),
+  component: SettingsPage,
+})
 
 // Scanner toggles mirror the toolchain dashboard catalog (ids + display names)
 const SCANNER_CATEGORIES = CATEGORIES.map((c) => ({
@@ -114,6 +135,8 @@ function FieldRow({
 }
 
 function SettingsPage() {
+  const { tab } = useSearch({ from: "/settings" })
+  const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -148,9 +171,10 @@ function SettingsPage() {
 
   // Block navigation away while there are unsaved changes; the prompt
   // below resolves the blocker with Save (proceed) or Discard (proceed too,
-  // after reverting to the committed snapshot)
+  // after reverting to the committed snapshot). Tab switches stay on
+  // /settings (only the ?tab= search param changes) so they don't block.
   const blocker = useBlocker({
-    shouldBlockFn: () => dirty,
+    shouldBlockFn: ({ next }) => next.pathname !== "/settings" && dirty,
     disabled: !dirty,
     enableBeforeUnload: () => dirty,
     withResolver: true,
@@ -376,7 +400,18 @@ function SettingsPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="general" className="space-y-6">
+      <Tabs
+        value={tab ?? "general"}
+        onValueChange={(v) => {
+          if (!v) return
+          navigate({
+            to: "/settings",
+            search: (prev) => ({ ...prev, tab: v as SettingsTab }),
+            replace: true,
+          })
+        }}
+        className="space-y-6"
+      >
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="scanners">Scanners</TabsTrigger>
