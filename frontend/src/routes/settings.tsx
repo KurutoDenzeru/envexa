@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router"
-import { useState, useEffect } from "react"
+import { createFileRoute, useBlocker } from "@tanstack/react-router"
+import { useState, useEffect, useRef } from "react"
 import {
   Card,
   CardContent,
@@ -24,6 +24,7 @@ import {
   Sun,
   Moon,
   AlertTriangle,
+  X,
 } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
@@ -123,12 +124,38 @@ function SettingsPage() {
   const [resetDefaultsOpen, setResetDefaultsOpen] = useState(false)
   const [appVersion, setAppVersion] = useState("")
 
+  // Unsaved-change tracking: dirty until the current state is committed
+  // (loaded from the backend or persisted by a successful save)
+  const [dirty, setDirty] = useState(false)
+  const committedRef = useRef<{
+    settings: SettingsState
+    theme: "dark" | "light" | "system"
+  } | null>(null)
+
+  useEffect(() => {
+    if (!committedRef.current) return
+    setDirty(
+      JSON.stringify({ settings, theme }) !==
+        JSON.stringify(committedRef.current)
+    )
+  }, [settings, theme])
+
+  // Block navigation away while there are unsaved changes; the prompt
+  // below resolves the blocker with Save (proceed) or Discard (proceed too,
+  // after reverting to the committed snapshot)
+  const blocker = useBlocker({
+    shouldBlockFn: () => dirty,
+    disabled: !dirty,
+    enableBeforeUnload: () => dirty,
+    withResolver: true,
+  })
+
   const loadConfig = async () => {
     try {
       const res = await fetch("/api/config")
       if (!res.ok) throw new Error("Failed to load config")
       const cfg: UserConfig = await res.json()
-      setSettings({
+      const loadedSettings: SettingsState = {
         autoScan: cfg.auto_scan_on_startup ?? false,
         scanTimeout: String(cfg.scan_timeout_secs ?? 30),
         daemonInterval: String(cfg.daemon_interval_secs ?? 14400),
@@ -137,9 +164,14 @@ function SettingsPage() {
         exportFormat: cfg.export_format ?? "markdown",
         verboseLogs: cfg.verbose_logs ?? false,
         logRetention: String(cfg.log_retention_days ?? 7),
-      })
-      if (cfg.theme && ["dark", "light", "system"].includes(cfg.theme))
-        setTheme(cfg.theme as "dark" | "light" | "system")
+      }
+      const loadedTheme =
+        cfg.theme && ["dark", "light", "system"].includes(cfg.theme)
+          ? (cfg.theme as "dark" | "light" | "system")
+          : theme
+      committedRef.current = { settings: loadedSettings, theme: loadedTheme }
+      setSettings(loadedSettings)
+      setTheme(loadedTheme)
     } catch (e) {
       console.error("Failed to load config:", e)
     } finally {
@@ -199,16 +231,27 @@ function SettingsPage() {
         }),
       })
       if (!res.ok) throw new Error("Failed to save")
+      committedRef.current = { settings, theme }
+      setDirty(false)
       toast.success("Settings saved", {
         description: "Configuration updated successfully.",
       })
+      if (blocker.status === "blocked") blocker.proceed()
     } catch (e) {
       toast.error("Failed to save", {
         description: e instanceof Error ? e.message : "Unknown error",
       })
+      if (blocker.status === "blocked") blocker.reset()
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleDiscardChanges = () => {
+    if (!committedRef.current) return
+    setSettings(committedRef.current.settings)
+    setTheme(committedRef.current.theme)
+    if (blocker.status === "blocked") blocker.proceed()
   }
 
   const [updateInfo, setUpdateInfo] = useState<{
@@ -318,15 +361,12 @@ function SettingsPage() {
             Configure Envexa scanner behavior.
           </p>
         </div>
-        <Button
-          onClick={handleSave}
-          disabled={saving}
-          className="gap-2"
-          size="lg"
-        >
-          <Save className="h-4 w-4" />
-          {saving ? "Saving..." : "Save Changes"}
-        </Button>
+        {dirty && (
+          <span className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            Unsaved changes
+          </span>
+        )}
       </div>
 
       <Tabs defaultValue="general" className="space-y-6">
@@ -832,6 +872,38 @@ function SettingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {blocker.status === "blocked" && (
+        <div className="fixed right-4 bottom-4 z-[100] w-[360px] max-w-[calc(100vw-2rem)] animate-in duration-300 slide-in-from-bottom-5 fade-in">
+          <div className="rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-2xl">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Unsaved changes</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  You have unsaved settings changes. Save them before leaving,
+                  or discard them.
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDiscardChanges}
+                disabled={saving}
+              >
+                <X className="h-3.5 w-3.5" />
+                Discard
+              </Button>
+              <Button size="sm" onClick={handleSave} disabled={saving}>
+                <Save className="h-3.5 w-3.5" />
+                {saving ? "Saving..." : "Save changes"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
