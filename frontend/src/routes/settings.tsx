@@ -61,6 +61,14 @@ const SCANNER_CATEGORIES = CATEGORIES.map((c) => ({
 
 const ALL_SCANNERS = SCANNER_CATEGORIES.flatMap((c) => c.scanners)
 
+// Human-readable daemon interval label: hours plus comma-grouped seconds and
+// minutes (e.g. "4 hours (14,400s / 240 min)")
+const formatDaemonInterval = (secs: number) => {
+  const hours = secs / 3600
+  const hoursLabel = `${hours} hour${hours === 1 ? "" : "s"}`
+  return `${hoursLabel} (${secs.toLocaleString("en-US")}s / ${(secs / 60).toLocaleString("en-US")} min)`
+}
+
 interface UserConfig {
   cache_ttl_minutes: number
   project_path: string | null
@@ -425,8 +433,8 @@ function SettingsPage() {
               </FieldRow>
 
               <FieldRow
-                label="Daemon interval (seconds)"
-                description="How often the background daemon rescans. 14400 = 4 hours."
+                label="Daemon interval"
+                description="How often the background daemon rescans."
               >
                 <Select
                   value={settings.daemonInterval}
@@ -437,14 +445,29 @@ function SettingsPage() {
                     }))
                   }
                 >
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue />
+                  <SelectTrigger className="w-[240px]">
+                    <SelectValue>
+                      {() =>
+                        formatDaemonInterval(Number(settings.daemonInterval))
+                      }
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="3600">1 hour (3600s)</SelectItem>
-                    <SelectItem value="14400">4 hours (14400s)</SelectItem>
-                    <SelectItem value="28800">8 hours (28800s)</SelectItem>
-                    <SelectItem value="86400">24 hours (86400s)</SelectItem>
+                    <SelectItem value="3600">
+                      {formatDaemonInterval(3600)}
+                    </SelectItem>
+                    <SelectItem value="7200">
+                      {formatDaemonInterval(7200)}
+                    </SelectItem>
+                    <SelectItem value="14400">
+                      {formatDaemonInterval(14400)}
+                    </SelectItem>
+                    <SelectItem value="28800">
+                      {formatDaemonInterval(28800)}
+                    </SelectItem>
+                    <SelectItem value="86400">
+                      {formatDaemonInterval(86400)}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </FieldRow>
