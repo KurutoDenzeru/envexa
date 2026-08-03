@@ -151,20 +151,14 @@ function SettingsPage() {
     withResolver: true,
   })
 
-  // Re-arm the prompt's jump animation and hard-alert each time a leave is
-  // blocked, so the interference with navigation is impossible to miss.
-  // `blocker.next` is rebuilt on every blocked attempt (even for the same
-  // target), so the effect re-fires per attempt, not just on idle -> blocked.
+  // Re-arm the prompt's jump animation each time a leave is blocked, so the
+  // interference with navigation is impossible to miss. `blocker.next` is
+  // rebuilt on every blocked attempt (even for the same target), so the
+  // effect re-fires per attempt, not just on idle -> blocked.
   const [jumpKey, setJumpKey] = useState(0)
   useEffect(() => {
     if (blocker.status !== "blocked") return
     setJumpKey((k) => k + 1)
-    // Let the jump animation paint before the blocking dialog takes over
-    setTimeout(() => {
-      window.alert(
-        "Unsaved changes — save or discard them before leaving this page."
-      )
-    }, 50)
   }, [blocker.status, blocker.next])
 
   const loadConfig = async () => {
@@ -895,14 +889,16 @@ function SettingsPage() {
       {dirty && (
         <div
           key={jumpKey}
-          className={cn(
-            "fixed right-4 bottom-4 z-[100] w-[360px] max-w-[calc(100vw-2rem)]",
-            blocker.status === "blocked"
-              ? "animate-[unsaved-jump_0.7s_ease-in-out] ring-2 ring-amber-500/60"
-              : "animate-in duration-300 slide-in-from-bottom-5 fade-in"
-          )}
+          className="fixed right-4 bottom-4 z-[100] w-[360px] max-w-[calc(100vw-2rem)]"
         >
-          <div className="rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-2xl">
+          <div
+            className={cn(
+              "rounded-lg border border-border bg-popover p-4 text-popover-foreground shadow-2xl",
+              blocker.status === "blocked"
+                ? "animate-[unsaved-jump_0.7s_ease-in-out] ring-2 ring-amber-500/60"
+                : "animate-in duration-300 slide-in-from-bottom-5 fade-in"
+            )}
+          >
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
               <div className="min-w-0 flex-1">
