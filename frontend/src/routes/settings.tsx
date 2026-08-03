@@ -45,42 +45,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
+
+import { CATEGORIES, displayName } from "@/lib/toolchains"
 import { siGithub, siInstagram } from "simple-icons"
 
 export const Route = createFileRoute("/settings")({ component: SettingsPage })
 
-const SCANNER_CATEGORIES = [
-  {
-    name: "System & Runtime",
-    scanners: [
-      { id: "brew", label: "Brew" },
-      { id: "cargo", label: "Cargo" },
-      { id: "docker", label: "Docker" },
-      { id: "pip", label: "pip" },
-      { id: "gem", label: "Gem" },
-    ],
-  },
-  {
-    name: "Web Development",
-    scanners: [
-      { id: "npm", label: "npm" },
-      { id: "pnpm", label: "pnpm" },
-      { id: "yarn", label: "Yarn" },
-      { id: "bun", label: "Bun" },
-      { id: "deno", label: "Deno" },
-    ],
-  },
-  {
-    name: "Project Tooling",
-    scanners: [
-      { id: "project", label: "Project" },
-      { id: "security", label: "Security" },
-      { id: "supply_chain", label: "Supply Chain" },
-      { id: "audit", label: "Audit" },
-      { id: "ci", label: "CI/CD" },
-    ],
-  },
-]
+// Scanner toggles mirror the toolchain dashboard catalog (ids + display names)
+const SCANNER_CATEGORIES = CATEGORIES.map((c) => ({
+  name: c.name,
+  scanners: c.tools.map((id) => ({ id, label: displayName(id) })),
+}))
 
 const ALL_SCANNERS = SCANNER_CATEGORIES.flatMap((c) => c.scanners)
 
@@ -163,7 +138,8 @@ function SettingsPage() {
         verboseLogs: cfg.verbose_logs ?? false,
         logRetention: String(cfg.log_retention_days ?? 7),
       })
-      if (cfg.theme && ["dark", "light", "system"].includes(cfg.theme)) setTheme(cfg.theme as "dark" | "light" | "system")
+      if (cfg.theme && ["dark", "light", "system"].includes(cfg.theme))
+        setTheme(cfg.theme as "dark" | "light" | "system")
     } catch (e) {
       console.error("Failed to load config:", e)
     } finally {
@@ -286,7 +262,10 @@ function SettingsPage() {
     setClearCacheOpen(false)
     const id = toast.loading("Clearing caches...")
     setTimeout(() => {
-      toast.success("Caches cleared", { id, description: "All cached scan data and logs removed." })
+      toast.success("Caches cleared", {
+        id,
+        description: "All cached scan data and logs removed.",
+      })
     }, 1000)
   }
 
@@ -303,16 +282,18 @@ function SettingsPage() {
       logRetention: "7",
     })
     setTheme("system")
-    toast.success("Settings reset", { description: "All settings restored to factory defaults." })
+    toast.success("Settings reset", {
+      description: "All settings restored to factory defaults.",
+    })
   }
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto flex flex-col gap-6 animate-in fade-in duration-700">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
+      <div className="mx-auto flex max-w-7xl animate-in flex-col gap-6 duration-700 fade-in">
+        <div className="flex flex-col justify-between gap-4 border-b border-border pb-6 md:flex-row md:items-end">
           <div>
             <Skeleton className="h-10 w-48 bg-muted" />
-            <Skeleton className="h-4 w-72 mt-3 bg-muted" />
+            <Skeleton className="mt-3 h-4 w-72 bg-muted" />
           </div>
           <Skeleton className="h-9 w-36 bg-muted" />
         </div>
@@ -326,19 +307,24 @@ function SettingsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto flex flex-col gap-6">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6">
+      <div className="flex flex-col justify-between gap-4 border-b border-border pb-6 md:flex-row md:items-end">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-            <SettingsIcon className="w-8 h-8 text-foreground" />
+          <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight text-foreground">
+            <SettingsIcon className="h-8 w-8 text-foreground" />
             Settings
           </h1>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="mt-2 text-sm text-muted-foreground">
             Configure Envexa scanner behavior.
           </p>
         </div>
-        <Button onClick={handleSave} disabled={saving} className="gap-2" size="lg">
-          <Save className="w-4 h-4" />
+        <Button
+          onClick={handleSave}
+          disabled={saving}
+          className="gap-2"
+          size="lg"
+        >
+          <Save className="h-4 w-4" />
           {saving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
@@ -350,14 +336,16 @@ function SettingsPage() {
           <TabsTrigger value="about">About</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" className="space-y-6 animate-in fade-in">
+        <TabsContent value="general" className="animate-in space-y-6 fade-in">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Sliders className="w-5 h-5" />
+                <Sliders className="h-5 w-5" />
                 General
               </CardTitle>
-              <CardDescription>Core scanner behavior and defaults.</CardDescription>
+              <CardDescription>
+                Core scanner behavior and defaults.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <FieldRow
@@ -378,7 +366,12 @@ function SettingsPage() {
               >
                 <Select
                   value={settings.scanTimeout}
-                  onValueChange={(v) => setSettings((p) => ({ ...p, scanTimeout: v ?? p.scanTimeout }))}
+                  onValueChange={(v) =>
+                    setSettings((p) => ({
+                      ...p,
+                      scanTimeout: v ?? p.scanTimeout,
+                    }))
+                  }
                 >
                   <SelectTrigger className="w-[160px]">
                     <SelectValue />
@@ -398,7 +391,12 @@ function SettingsPage() {
               >
                 <Select
                   value={settings.daemonInterval}
-                  onValueChange={(v) => setSettings((p) => ({ ...p, daemonInterval: v ?? p.daemonInterval }))}
+                  onValueChange={(v) =>
+                    setSettings((p) => ({
+                      ...p,
+                      daemonInterval: v ?? p.daemonInterval,
+                    }))
+                  }
                 >
                   <SelectTrigger className="w-[160px]">
                     <SelectValue />
@@ -418,7 +416,9 @@ function SettingsPage() {
               >
                 <Select
                   value={settings.cacheTtl}
-                  onValueChange={(v) => setSettings((p) => ({ ...p, cacheTtl: v ?? p.cacheTtl }))}
+                  onValueChange={(v) =>
+                    setSettings((p) => ({ ...p, cacheTtl: v ?? p.cacheTtl }))
+                  }
                 >
                   <SelectTrigger className="w-[160px]">
                     <SelectValue />
@@ -438,7 +438,12 @@ function SettingsPage() {
               >
                 <Select
                   value={settings.exportFormat}
-                  onValueChange={(v) => setSettings((p) => ({ ...p, exportFormat: v ?? p.exportFormat }))}
+                  onValueChange={(v) =>
+                    setSettings((p) => ({
+                      ...p,
+                      exportFormat: v ?? p.exportFormat,
+                    }))
+                  }
                 >
                   <SelectTrigger className="w-[180px]">
                     <SelectValue />
@@ -451,19 +456,33 @@ function SettingsPage() {
                 </Select>
               </FieldRow>
 
-              <FieldRow
-                label="Theme"
-                description="Application color theme."
-              >
-                <Tabs value={theme} onValueChange={(v) => { if (v) setTheme(v as "dark" | "light" | "system") }}>
+              <FieldRow label="Theme" description="Application color theme.">
+                <Tabs
+                  value={theme}
+                  onValueChange={(v) => {
+                    if (v) setTheme(v as "dark" | "light" | "system")
+                  }}
+                >
                   <TabsList className="h-9">
-                    <TabsTrigger value="system" className="h-7 w-7 p-0" title="System">
+                    <TabsTrigger
+                      value="system"
+                      className="h-7 w-7 p-0"
+                      title="System"
+                    >
                       <Monitor className="h-4 w-4" />
                     </TabsTrigger>
-                    <TabsTrigger value="light" className="h-7 w-7 p-0" title="Light">
+                    <TabsTrigger
+                      value="light"
+                      className="h-7 w-7 p-0"
+                      title="Light"
+                    >
                       <Sun className="h-4 w-4" />
                     </TabsTrigger>
-                    <TabsTrigger value="dark" className="h-7 w-7 p-0" title="Dark">
+                    <TabsTrigger
+                      value="dark"
+                      className="h-7 w-7 p-0"
+                      title="Dark"
+                    >
                       <Moon className="h-4 w-4" />
                     </TabsTrigger>
                   </TabsList>
@@ -475,10 +494,12 @@ function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Database className="w-5 h-5" />
+                <Database className="h-5 w-5" />
                 Logging
               </CardTitle>
-              <CardDescription>Verbosity and retention settings.</CardDescription>
+              <CardDescription>
+                Verbosity and retention settings.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <FieldRow
@@ -499,7 +520,12 @@ function SettingsPage() {
               >
                 <Select
                   value={settings.logRetention}
-                  onValueChange={(v) => setSettings((p) => ({ ...p, logRetention: v ?? p.logRetention }))}
+                  onValueChange={(v) =>
+                    setSettings((p) => ({
+                      ...p,
+                      logRetention: v ?? p.logRetention,
+                    }))
+                  }
                 >
                   <SelectTrigger className="w-[160px]">
                     <SelectValue />
@@ -517,24 +543,33 @@ function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="scanners" className="space-y-6 animate-in fade-in">
+        <TabsContent value="scanners" className="animate-in space-y-6 fade-in">
           <Card>
             <CardHeader>
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    <Boxes className="w-5 h-5" />
+                    <Boxes className="h-5 w-5" />
                     Enabled Scanners
                   </CardTitle>
                   <CardDescription className="mt-1">
-                    {settings.enabledScanners.length} of {ALL_SCANNERS.length} scanners enabled.
+                    {settings.enabledScanners.length} of {ALL_SCANNERS.length}{" "}
+                    scanners enabled.
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={enableAllScanners}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={enableAllScanners}
+                  >
                     Enable All
                   </Button>
-                  <Button variant="outline" size="sm" onClick={disableAllScanners}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={disableAllScanners}
+                  >
                     Disable All
                   </Button>
                 </div>
@@ -543,20 +578,24 @@ function SettingsPage() {
             <CardContent className="space-y-6">
               {SCANNER_CATEGORIES.map((category) => (
                 <div key={category.name}>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                  <h4 className="mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                     {category.name}
                   </h4>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
                     {category.scanners.map((scanner) => (
                       <label
                         key={scanner.id}
-                        className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/50 p-3 transition-colors hover:bg-muted cursor-pointer"
+                        className="flex cursor-pointer items-center gap-3 rounded-lg border border-border/50 bg-muted/50 p-3 transition-colors hover:bg-muted"
                       >
                         <Checkbox
-                          checked={settings.enabledScanners.includes(scanner.id)}
+                          checked={settings.enabledScanners.includes(
+                            scanner.id
+                          )}
                           onCheckedChange={() => toggleScanner(scanner.id)}
                         />
-                        <span className="text-sm text-foreground/90">{scanner.label}</span>
+                        <span className="text-sm text-foreground/90">
+                          {scanner.label}
+                        </span>
                       </label>
                     ))}
                   </div>
@@ -566,30 +605,34 @@ function SettingsPage() {
           </Card>
         </TabsContent>
 
-
-        <TabsContent value="about" className="space-y-6 animate-in fade-in">
+        <TabsContent value="about" className="animate-in space-y-6 fade-in">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Info className="w-5 h-5" />
+                <Info className="h-5 w-5" />
                 About Envexa
               </CardTitle>
               <CardDescription>Version information and links.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-4 rounded-lg border border-border/50 bg-muted/50 p-4">
-                <Boxes className="w-12 h-12 text-muted-foreground/50" />
+                <Boxes className="h-12 w-12 text-muted-foreground/50" />
                 <div>
                   <h3 className="font-semibold text-foreground">Envexa</h3>
-                  <p className="text-sm text-muted-foreground">Blazing-fast Rust TUI, scriptable CLI, and Web Dashboard for monitoring local developer tooling health.</p>
-                  <p className="text-sm font-mono text-muted-foreground mt-1">v{appVersion || "?.?.?"}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Blazing-fast Rust TUI, scriptable CLI, and Web Dashboard for
+                    monitoring local developer tooling health.
+                  </p>
+                  <p className="mt-1 font-mono text-sm text-muted-foreground">
+                    v{appVersion || "?.?.?"}
+                  </p>
                 </div>
               </div>
-              <div className="rounded-lg border border-border/50 bg-muted/50 p-4 space-y-4">
-                <p className="text-sm text-muted-foreground/80 mb-3">
+              <div className="space-y-4 rounded-lg border border-border/50 bg-muted/50 p-4">
+                <p className="mb-3 text-sm text-muted-foreground/80">
                   Configuration file location:
                 </p>
-                <code className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded block break-all">
+                <code className="block rounded bg-muted px-2 py-1 font-mono text-xs break-all text-muted-foreground">
                   ~/.config/envexa/config.json
                 </code>
               </div>
@@ -598,22 +641,24 @@ function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <ExternalLink className="w-5 h-5" />
+                <ExternalLink className="h-5 w-5" />
                 Actions
               </CardTitle>
-              <CardDescription>Maintenance actions and utilities.</CardDescription>
+              <CardDescription>
+                Maintenance actions and utilities.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {updateInfo.updateAvailable ? (
-                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+                <div className="space-y-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
                     <span className="text-sm font-medium text-emerald-500">
                       Update available: Envexa v{updateInfo.latestVersion}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    You&apos;re currently on v{updateInfo.currentVersion}.{' '}
+                    You&apos;re currently on v{updateInfo.currentVersion}.{" "}
                     <a
                       href="https://github.com/KurutoDenzeru/envexa/releases/latest"
                       target="_blank"
@@ -621,21 +666,28 @@ function SettingsPage() {
                       className="underline hover:text-foreground"
                     >
                       Download the latest release
-                    </a>
-                    {' '}and restart the server to update.
+                    </a>{" "}
+                    and restart the server to update.
                   </p>
                   {updateInfo.releaseBody && (
                     <details className="text-xs text-muted-foreground">
-                      <summary className="cursor-pointer hover:text-foreground">Release notes</summary>
-                      <pre className="mt-2 whitespace-pre-wrap font-mono text-[11px] leading-relaxed max-h-40 overflow-y-auto bg-black/10 dark:bg-white/5 rounded p-2">
+                      <summary className="cursor-pointer hover:text-foreground">
+                        Release notes
+                      </summary>
+                      <pre className="mt-2 max-h-40 overflow-y-auto rounded bg-black/10 p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap dark:bg-white/5">
                         {updateInfo.releaseBody}
                       </pre>
                     </details>
                   )}
                 </div>
               ) : null}
-              <Button variant="outline" onClick={handleCheckUpdates} disabled={updateInfo.checking} className="w-full justify-start gap-4 h-auto py-4">
-                <Info className="w-5 h-5 shrink-0" />
+              <Button
+                variant="outline"
+                onClick={handleCheckUpdates}
+                disabled={updateInfo.checking}
+                className="h-auto w-full justify-start gap-4 py-4"
+              >
+                <Info className="h-5 w-5 shrink-0" />
                 <div className="text-left">
                   <div className="font-medium">
                     {updateInfo.checking ? "Checking..." : "Check for Updates"}
@@ -647,54 +699,110 @@ function SettingsPage() {
                   </div>
                 </div>
               </Button>
-              <Button variant="outline" onClick={() => setClearCacheOpen(true)} className="w-full justify-start gap-4 h-auto py-4 text-destructive hover:bg-destructive/10 hover:text-destructive">
-                <Database className="w-5 h-5 shrink-0" />
+              <Button
+                variant="outline"
+                onClick={() => setClearCacheOpen(true)}
+                className="h-auto w-full justify-start gap-4 py-4 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Database className="h-5 w-5 shrink-0" />
                 <div className="text-left">
                   <div className="font-medium">Clear All Caches</div>
-                  <div className="text-xs text-muted-foreground">Remove all cached scan data and logs</div>
+                  <div className="text-xs text-muted-foreground">
+                    Remove all cached scan data and logs
+                  </div>
                 </div>
               </Button>
-              <Button variant="outline" onClick={() => setResetDefaultsOpen(true)} className="w-full justify-start gap-4 h-auto py-4 text-destructive hover:bg-destructive/10 hover:text-destructive">
-                <ExternalLink className="w-5 h-5 shrink-0" />
+              <Button
+                variant="outline"
+                onClick={() => setResetDefaultsOpen(true)}
+                className="h-auto w-full justify-start gap-4 py-4 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <ExternalLink className="h-5 w-5 shrink-0" />
                 <div className="text-left">
                   <div className="font-medium">Reset to Defaults</div>
-                  <div className="text-xs text-muted-foreground">Reset all settings to factory defaults</div>
+                  <div className="text-xs text-muted-foreground">
+                    Reset all settings to factory defaults
+                  </div>
                 </div>
               </Button>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-      <div className="text-center py-6 border-t border-border/50 space-y-4">
+      <div className="space-y-4 border-t border-border/50 py-6 text-center">
         <div className="flex items-center justify-center gap-4">
-          <a href="https://github.com/KurutoDenzeru" target="_blank" rel="noopener noreferrer" className="text-muted-foreground/60 hover:text-foreground transition-colors" title="GitHub">
-            <svg role="img" viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor"><path d={siGithub.path} /></svg>
+          <a
+            href="https://github.com/KurutoDenzeru"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground/60 transition-colors hover:text-foreground"
+            title="GitHub"
+          >
+            <svg
+              role="img"
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="currentColor"
+            >
+              <path d={siGithub.path} />
+            </svg>
           </a>
-          <a href="https://linkedin.com/in/kurtcalacday" target="_blank" rel="noopener noreferrer" className="text-muted-foreground/60 hover:text-foreground transition-colors" title="LinkedIn">
-            <svg role="img" viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>
+          <a
+            href="https://linkedin.com/in/kurtcalacday"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground/60 transition-colors hover:text-foreground"
+            title="LinkedIn"
+          >
+            <svg
+              role="img"
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="currentColor"
+            >
+              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+            </svg>
           </a>
-          <a href="https://instagram.com/krtclcdy" target="_blank" rel="noopener noreferrer" className="text-muted-foreground/60 hover:text-foreground transition-colors" title="Instagram">
-            <svg role="img" viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor"><path d={siInstagram.path} /></svg>
+          <a
+            href="https://instagram.com/krtclcdy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground/60 transition-colors hover:text-foreground"
+            title="Instagram"
+          >
+            <svg
+              role="img"
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="currentColor"
+            >
+              <path d={siInstagram.path} />
+            </svg>
           </a>
         </div>
         <p className="text-sm text-muted-foreground/60">
-          © 2026 All rights reserved by <span className="text-muted-foreground/80">KurutoDenzeru</span>
+          © 2026 All rights reserved by{" "}
+          <span className="text-muted-foreground/80">KurutoDenzeru</span>
         </p>
       </div>
       <AlertDialog open={clearCacheOpen} onOpenChange={setClearCacheOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-destructive" />
+              <AlertTriangle className="h-5 w-5 text-destructive" />
               Clear All Caches?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove all cached scan data and logs. You'll need to run a new scan to rebuild the cache.
+              This will remove all cached scan data and logs. You'll need to run
+              a new scan to rebuild the cache.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleClearCache} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleClearCache}
+              className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
+            >
               Clear Caches
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -705,16 +813,20 @@ function SettingsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-destructive" />
+              <AlertTriangle className="h-5 w-5 text-destructive" />
               Reset to Defaults?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will reset all settings to factory defaults, including theme, scanner toggles, and all preferences. This cannot be undone.
+              This will reset all settings to factory defaults, including theme,
+              scanner toggles, and all preferences. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleResetDefaults} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleResetDefaults}
+              className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
+            >
               Reset Settings
             </AlertDialogAction>
           </AlertDialogFooter>
