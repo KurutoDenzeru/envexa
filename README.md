@@ -8,9 +8,12 @@
   <strong>Blazing-fast Rust TUI, CLI, and Web Dashboard for monitoring local developer tooling health</strong>
 </p>
 
-| Terminal UI (TUI) | Web Dashboard |
-| :---: | :---: |
-| ![Envexa TUI](assets/envexa-tui.png) | ![Envexa Dashboard](assets/dashboard.webp) |
+| Terminal UI (TUI) |
+| :---: |
+| ![Envexa TUI](assets/envexa-tui.png) |
+| Web Dashboard |
+| :---: |
+| ![Envexa Dashboard](assets/dashboard.webp) |
 
 ---
 
