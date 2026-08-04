@@ -689,7 +689,11 @@ function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-4 rounded-lg border border-border/50 bg-muted/50 p-4">
-                <Boxes className="h-12 w-12 text-muted-foreground/50" />
+                <img
+                  src="/bulldozer.png"
+                  alt="Envexa"
+                  className="h-12 w-12 rounded-lg object-cover"
+                />
                 <div>
                   <h3 className="font-semibold text-foreground">Envexa</h3>
                   <p className="text-sm text-muted-foreground">
