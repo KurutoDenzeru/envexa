@@ -8,13 +8,13 @@
   <strong>Blazing-fast Rust TUI, CLI, and Web Dashboard for monitoring local developer tooling health</strong>
 </p>
 
-<p align="center">
-  <img src="assets/envexa-tui.png" alt="Envexa TUI Screenshot" width="800" />
-</p>
+| Terminal UI (TUI) | Web Dashboard |
+| :---: | :---: |
+| ![Envexa TUI](assets/envexa-tui.png) | ![Envexa Dashboard](assets/dashboard.webp) |
 
 ---
 
-Blazing-fast Rust TUI, scriptable CLI, and Web Dashboard for monitoring local developer tooling health. Instantly track outdated packages, audit security risks across 15 toolchains, and visualize reports in an interactive web interface.
+Blazing-fast Rust TUI, scriptable CLI, and live web dashboard for monitoring local developer tooling health. Instantly track outdated packages and audit security risks across 14+ toolchains.
 
 ## 📚 Table of Contents
 

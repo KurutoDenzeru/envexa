@@ -10,6 +10,7 @@ import {
   ToolchainStatusView,
   useToolchains,
 } from "@/components/toolchain-status"
+import { cn } from "@/lib/utils"
 import { displayName, statusKey } from "@/lib/toolchains"
 import {
   RISK_WEIGHTS,
@@ -184,7 +185,12 @@ function Toolchains() {
 
       {/* Charts Section */}
       {totalTools > 0 && (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div
+          className={cn(
+            "grid grid-cols-1 gap-6 md:grid-cols-2",
+            totalVulns > 0 && totalOutdated > 0 && "lg:grid-cols-3"
+          )}
+        >
           <DonutCard
             title="Status Distribution"
             description="Toolchain status across your environment."
