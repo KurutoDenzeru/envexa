@@ -14,7 +14,7 @@
 
 ---
 
-Blazing-fast Rust TUI, scriptable CLI, and Web Dashboard for monitoring local developer tooling health. Instantly track outdated packages, audit security risks across 15 toolchains, and visualize reports in an interactive web interface.
+Blazing-fast Rust TUI, scriptable CLI, and live web dashboard for monitoring local developer tooling health. Instantly track outdated packages and audit security risks across 14+ toolchains.
 
 ## 📚 Table of Contents
 
