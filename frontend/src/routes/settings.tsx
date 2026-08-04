@@ -809,7 +809,7 @@ function SettingsPage() {
       <div className="space-y-4 border-t border-border/50 py-6 text-center">
         <div className="flex items-center justify-center gap-4">
           <a
-            href="https://github.com/KurutoDenzeru"
+            href="https://github.com/KurutoDenzeru/Envexa"
             target="_blank"
             rel="noopener noreferrer"
             className="text-muted-foreground/60 transition-colors hover:text-foreground"
