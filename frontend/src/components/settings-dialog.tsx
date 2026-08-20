@@ -60,6 +60,7 @@ import { siGithub, siInstagram } from "simple-icons"
 export const SETTINGS_TABS = [
   "general",
   "scanners",
+  "data",
   "shortcuts",
   "about",
 ] as const
@@ -120,12 +121,8 @@ const CATEGORY_META: {
       "startup",
       "scan timeout",
       "daemon interval",
-      "cache ttl",
       "theme",
       "appearance",
-      "verbose logs",
-      "log retention",
-      "logging",
     ],
   },
   {
@@ -136,6 +133,20 @@ const CATEGORY_META: {
       "enable all",
       "disable all",
       ...ALL_SCANNERS.map((s) => s.label.toLowerCase()),
+    ],
+  },
+  {
+    id: "data",
+    label: "Data Controls",
+    icon: Database,
+    keywords: [
+      "cache ttl",
+      "verbose logs",
+      "log retention",
+      "logging",
+      "clear caches",
+      "reset defaults",
+      "storage",
     ],
   },
   {
@@ -159,14 +170,7 @@ const CATEGORY_META: {
     id: "about",
     label: "About",
     icon: Info,
-    keywords: [
-      "version",
-      "updates",
-      "clear caches",
-      "reset defaults",
-      "config",
-      "links",
-    ],
+    keywords: ["version", "updates", "config", "links"],
   },
 ]
 
@@ -725,31 +729,6 @@ function SettingsDialog({
                         </FieldRow>
 
                         <FieldRow
-                          label="Cache TTL (minutes)"
-                          description="How long to cache scan results before re-scanning."
-                        >
-                          <Select
-                            value={settings.cacheTtl}
-                            onValueChange={(v) =>
-                              setSettings((p) => ({
-                                ...p,
-                                cacheTtl: v ?? p.cacheTtl,
-                              }))
-                            }
-                          >
-                            <SelectTrigger className="w-[160px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="5">5 min</SelectItem>
-                              <SelectItem value="15">15 min</SelectItem>
-                              <SelectItem value="30">30 min</SelectItem>
-                              <SelectItem value="60">1 hour</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </FieldRow>
-
-                        <FieldRow
                           label="Theme"
                           description="Application color theme."
                         >
@@ -783,50 +762,6 @@ function SettingsDialog({
                               </TabsTrigger>
                             </TabsList>
                           </Tabs>
-                        </FieldRow>
-                      </div>
-
-                      <SectionHeading>Logging</SectionHeading>
-                      <div className="divide-y divide-border/50">
-                        <FieldRow
-                          label="Verbose logs"
-                          description="Enable detailed debug logging for troubleshooting."
-                        >
-                          <Switch
-                            checked={settings.verboseLogs}
-                            onCheckedChange={(checked) =>
-                              setSettings((prev) => ({
-                                ...prev,
-                                verboseLogs: checked,
-                              }))
-                            }
-                          />
-                        </FieldRow>
-
-                        <FieldRow
-                          label="Log retention (days)"
-                          description="How many days to keep log files before rotation."
-                        >
-                          <Select
-                            value={settings.logRetention}
-                            onValueChange={(v) =>
-                              setSettings((p) => ({
-                                ...p,
-                                logRetention: v ?? p.logRetention,
-                              }))
-                            }
-                          >
-                            <SelectTrigger className="w-[160px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="1">1 day</SelectItem>
-                              <SelectItem value="7">1 week</SelectItem>
-                              <SelectItem value="14">2 weeks</SelectItem>
-                              <SelectItem value="30">1 month</SelectItem>
-                              <SelectItem value="90">3 months</SelectItem>
-                            </SelectContent>
-                          </Select>
                         </FieldRow>
                       </div>
                     </>
@@ -881,6 +816,109 @@ function SettingsDialog({
                           </div>
                         </div>
                       ))}
+                    </>
+                  )}
+
+                  {category === "data" && (
+                    <>
+                      <SectionHeading>Cache & Logs</SectionHeading>
+                      <div className="divide-y divide-border/50">
+                        <FieldRow
+                          label="Cache TTL (minutes)"
+                          description="How long to cache scan results before re-scanning."
+                        >
+                          <Select
+                            value={settings.cacheTtl}
+                            onValueChange={(v) =>
+                              setSettings((p) => ({
+                                ...p,
+                                cacheTtl: v ?? p.cacheTtl,
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="w-[160px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="5">5 min</SelectItem>
+                              <SelectItem value="15">15 min</SelectItem>
+                              <SelectItem value="30">30 min</SelectItem>
+                              <SelectItem value="60">1 hour</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FieldRow>
+
+                        <FieldRow
+                          label="Verbose logs"
+                          description="Enable detailed debug logging for troubleshooting."
+                        >
+                          <Switch
+                            checked={settings.verboseLogs}
+                            onCheckedChange={(checked) =>
+                              setSettings((prev) => ({
+                                ...prev,
+                                verboseLogs: checked,
+                              }))
+                            }
+                          />
+                        </FieldRow>
+
+                        <FieldRow
+                          label="Log retention (days)"
+                          description="How many days to keep log files before rotation."
+                        >
+                          <Select
+                            value={settings.logRetention}
+                            onValueChange={(v) =>
+                              setSettings((p) => ({
+                                ...p,
+                                logRetention: v ?? p.logRetention,
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="w-[160px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">1 day</SelectItem>
+                              <SelectItem value="7">1 week</SelectItem>
+                              <SelectItem value="14">2 weeks</SelectItem>
+                              <SelectItem value="30">1 month</SelectItem>
+                              <SelectItem value="90">3 months</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FieldRow>
+                      </div>
+
+                      <SectionHeading>Resets</SectionHeading>
+                      <div className="flex flex-col gap-3">
+                        <Button
+                          variant="outline"
+                          onClick={() => setClearCacheOpen(true)}
+                          className="h-auto w-full justify-start gap-4 py-4 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Database className="h-5 w-5 shrink-0" />
+                          <div className="text-left">
+                            <div className="font-medium">Clear All Caches</div>
+                            <div className="text-xs text-muted-foreground">
+                              Remove all cached scan data and logs
+                            </div>
+                          </div>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setResetDefaultsOpen(true)}
+                          className="h-auto w-full justify-start gap-4 py-4 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <ExternalLink className="h-5 w-5 shrink-0" />
+                          <div className="text-left">
+                            <div className="font-medium">Reset to Defaults</div>
+                            <div className="text-xs text-muted-foreground">
+                              Reset all settings to factory defaults
+                            </div>
+                          </div>
+                        </Button>
+                      </div>
                     </>
                   )}
 
@@ -1057,32 +1095,6 @@ function SettingsDialog({
                               {updateInfo.latestVersion && !updateInfo.checking
                                 ? `Latest: v${updateInfo.latestVersion} — Current: v${updateInfo.currentVersion}`
                                 : "Check if a new version of Envexa is available"}
-                            </div>
-                          </div>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => setClearCacheOpen(true)}
-                          className="h-auto w-full justify-start gap-4 py-4 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        >
-                          <Database className="h-5 w-5 shrink-0" />
-                          <div className="text-left">
-                            <div className="font-medium">Clear All Caches</div>
-                            <div className="text-xs text-muted-foreground">
-                              Remove all cached scan data and logs
-                            </div>
-                          </div>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => setResetDefaultsOpen(true)}
-                          className="h-auto w-full justify-start gap-4 py-4 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        >
-                          <ExternalLink className="h-5 w-5 shrink-0" />
-                          <div className="text-left">
-                            <div className="font-medium">Reset to Defaults</div>
-                            <div className="text-xs text-muted-foreground">
-                              Reset all settings to factory defaults
                             </div>
                           </div>
                         </Button>
