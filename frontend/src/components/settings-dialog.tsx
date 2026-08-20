@@ -15,6 +15,7 @@ import {
   Save,
   Info,
   ExternalLink,
+  ArrowUpCircle,
   Monitor,
   Sun,
   Moon,
@@ -1084,7 +1085,7 @@ function SettingsDialog({
                           disabled={updateInfo.checking}
                           className="h-auto w-full justify-start gap-4 py-4"
                         >
-                          <Info className="h-5 w-5 shrink-0" />
+                          <ArrowUpCircle className="h-5 w-5 shrink-0" />
                           <div className="text-left">
                             <div className="font-medium">
                               {updateInfo.checking
