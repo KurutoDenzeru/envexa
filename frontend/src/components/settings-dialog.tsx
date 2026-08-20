@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   X,
   Search,
+  Keyboard,
 } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -51,10 +52,17 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 
+import { Kbd, KbdGroup } from "@/components/ui/kbd"
+import { shortcutGroups } from "@/components/shortcuts-dialog"
 import { CATEGORIES, displayName } from "@/lib/toolchains"
 import { siGithub, siInstagram } from "simple-icons"
 
-export const SETTINGS_TABS = ["general", "scanners", "about"] as const
+export const SETTINGS_TABS = [
+  "general",
+  "scanners",
+  "shortcuts",
+  "about",
+] as const
 export type SettingsTab = (typeof SETTINGS_TABS)[number]
 
 // Scanner toggles mirror the toolchain dashboard catalog (ids + display names)
@@ -128,6 +136,23 @@ const CATEGORY_META: {
       "enable all",
       "disable all",
       ...ALL_SCANNERS.map((s) => s.label.toLowerCase()),
+    ],
+  },
+  {
+    id: "shortcuts",
+    label: "Keyboard Shortcuts",
+    icon: Keyboard,
+    keywords: [
+      "hotkeys",
+      "keys",
+      "command palette",
+      "rescan",
+      "focus search",
+      "toggle sidebar",
+      "navigation",
+      ...shortcutGroups.flatMap((g) =>
+        g.shortcuts.map((s) => s.description.toLowerCase())
+      ),
     ],
   },
   {
@@ -496,6 +521,27 @@ function SettingsDialog({
 
   const activeMeta = CATEGORY_META.find((c) => c.id === category)
 
+  // About is pinned to the rail footer; the rest stay at the top
+  const mainCategories = visibleCategories.filter((c) => c.id !== "about")
+  const footerCategories = visibleCategories.filter((c) => c.id === "about")
+
+  const renderCategoryButton = (c: (typeof CATEGORY_META)[number]) => (
+    <button
+      key={c.id}
+      type="button"
+      onClick={() => onCategoryChange(c.id)}
+      className={cn(
+        "flex shrink-0 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+        category === c.id
+          ? "bg-muted font-medium text-foreground"
+          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+      )}
+    >
+      <c.icon className="h-4 w-4 shrink-0" />
+      {c.label}
+    </button>
+  )
+
   return (
     <Dialog
       open={open}
@@ -549,23 +595,13 @@ function SettingsDialog({
                 <X />
               </DialogClose>
             </div>
-            <nav className="flex gap-1 overflow-x-auto sm:min-h-0 sm:flex-col sm:overflow-x-visible sm:overflow-y-auto">
-              {visibleCategories.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => onCategoryChange(c.id)}
-                  className={cn(
-                    "flex shrink-0 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                    category === c.id
-                      ? "bg-muted font-medium text-foreground"
-                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                  )}
-                >
-                  <c.icon className="h-4 w-4 shrink-0" />
-                  {c.label}
-                </button>
-              ))}
+            <nav className="flex gap-1 overflow-x-auto sm:min-h-0 sm:flex-1 sm:flex-col sm:overflow-x-visible sm:overflow-y-auto">
+              {mainCategories.map((c) => renderCategoryButton(c))}
+              {footerCategories.length > 0 && (
+                <div className="flex shrink-0 gap-1 sm:mt-auto sm:flex-col sm:border-t sm:border-border/50 sm:pt-2">
+                  {footerCategories.map((c) => renderCategoryButton(c))}
+                </div>
+              )}
               {visibleCategories.length === 0 && (
                 <p className="px-3 py-2 text-xs text-muted-foreground/60">
                   No settings match &quot;{query}&quot;.
@@ -841,6 +877,45 @@ function SettingsDialog({
                                   {scanner.label}
                                 </span>
                               </label>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {category === "shortcuts" && (
+                    <>
+                      {shortcutGroups.map((group) => (
+                        <div key={group.heading}>
+                          <SectionHeading>{group.heading}</SectionHeading>
+                          <div className="mt-1 divide-y divide-border/50">
+                            {group.shortcuts.map((shortcut) => (
+                              <div
+                                key={shortcut.description}
+                                className="flex items-center justify-between py-2.5 text-sm"
+                              >
+                                <span>{shortcut.description}</span>
+                                <KbdGroup>
+                                  {shortcut.keys.map((combo) => (
+                                    <KbdGroup key={combo.join("+")}>
+                                      {combo.map((key, index) => (
+                                        <span
+                                          key={key}
+                                          className="flex items-center gap-1"
+                                        >
+                                          {index > 0 && (
+                                            <span className="text-xs text-muted-foreground">
+                                              +
+                                            </span>
+                                          )}
+                                          <Kbd>{key}</Kbd>
+                                        </span>
+                                      ))}
+                                    </KbdGroup>
+                                  ))}
+                                </KbdGroup>
+                              </div>
                             ))}
                           </div>
                         </div>

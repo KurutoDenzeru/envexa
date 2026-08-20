@@ -8,10 +8,12 @@ import {
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
 import { modLabel } from "@/lib/platform"
 
-const shortcutGroups: {
+export interface ShortcutGroup {
   heading: string
   shortcuts: { keys: string[][]; description: string }[]
-}[] = [
+}
+
+export const shortcutGroups: ShortcutGroup[] = [
   {
     heading: "General",
     shortcuts: [
