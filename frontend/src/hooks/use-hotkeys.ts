@@ -12,6 +12,7 @@ export const VIEW_ROUTES = [
 interface HotkeyHandlers {
   onRescan: () => void
   onNavigate: (to: string) => void
+  onSettings: () => void
   onPalette: () => void
   onShortcuts: () => void
 }
@@ -62,7 +63,7 @@ export function useHotkeys(handlers: HotkeyHandlers) {
         // mod+b is handled by the sidebar's own listener.
         if (event.key === ",") {
           event.preventDefault()
-          latest.current.onNavigate("/settings")
+          latest.current.onSettings()
           return
         }
         const index = Number.parseInt(event.key, 10) - 1

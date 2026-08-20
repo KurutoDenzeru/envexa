@@ -1,0 +1,1211 @@
+import { useNavigate, useSearch } from "@tanstack/react-router"
+import { createContext, useContext, useState, useEffect, useRef } from "react"
+import type { ReactNode } from "react"
+import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils"
+import { Switch } from "@/components/ui/switch"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Sliders,
+  Boxes,
+  Database,
+  Save,
+  Info,
+  ExternalLink,
+  ArrowUpCircle,
+  Monitor,
+  Sun,
+  Moon,
+  AlertTriangle,
+  X,
+  Search,
+  Keyboard,
+} from "lucide-react"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { useTheme } from "@/components/theme-provider"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { toast } from "sonner"
+
+import { Kbd, KbdGroup } from "@/components/ui/kbd"
+import { shortcutGroups } from "@/components/shortcuts-dialog"
+import { CATEGORIES, displayName } from "@/lib/toolchains"
+import { siGithub, siInstagram } from "simple-icons"
+
+export const SETTINGS_TABS = [
+  "general",
+  "scanners",
+  "data",
+  "shortcuts",
+  "about",
+] as const
+export type SettingsTab = (typeof SETTINGS_TABS)[number]
+
+// Scanner toggles mirror the toolchain dashboard catalog (ids + display names)
+const SCANNER_CATEGORIES = CATEGORIES.map((c) => ({
+  name: c.name,
+  scanners: c.tools.map((id) => ({ id, label: displayName(id) })),
+}))
+
+const ALL_SCANNERS = SCANNER_CATEGORIES.flatMap((c) => c.scanners)
+
+// Human-readable daemon interval label: hours plus comma-grouped seconds and
+// minutes (e.g. "4 hours (14,400s / 240 min)")
+const formatDaemonInterval = (secs: number) => {
+  const hours = secs / 3600
+  const hoursLabel = `${hours} hour${hours === 1 ? "" : "s"}`
+  return `${hoursLabel} (${secs.toLocaleString("en-US")}s / ${(secs / 60).toLocaleString("en-US")} min)`
+}
+
+interface UserConfig {
+  cache_ttl_minutes?: number
+  project_path: string | null
+  recent_project_paths: string[]
+  favorite_project_paths: string[]
+  auto_scan_on_startup?: boolean
+  theme: string
+  verbose_logs?: boolean
+  scan_timeout_secs?: number
+  daemon_interval_secs?: number
+  enabled_scanners: string[] | null
+  log_retention_days?: number
+}
+
+interface SettingsState {
+  autoScan: boolean
+  scanTimeout: string
+  daemonInterval: string
+  cacheTtl: string
+  enabledScanners: string[]
+  verboseLogs: boolean
+  logRetention: string
+}
+
+const CATEGORY_META: {
+  id: SettingsTab
+  label: string
+  icon: typeof Sliders
+  keywords: string[]
+}[] = [
+  {
+    id: "general",
+    label: "General",
+    icon: Sliders,
+    keywords: [
+      "auto-scan",
+      "startup",
+      "scan timeout",
+      "daemon interval",
+      "theme",
+      "appearance",
+    ],
+  },
+  {
+    id: "scanners",
+    label: "Scanners",
+    icon: Boxes,
+    keywords: [
+      "enable all",
+      "disable all",
+      ...ALL_SCANNERS.map((s) => s.label.toLowerCase()),
+    ],
+  },
+  {
+    id: "data",
+    label: "Data Controls",
+    icon: Database,
+    keywords: [
+      "cache ttl",
+      "verbose logs",
+      "log retention",
+      "logging",
+      "clear caches",
+      "reset defaults",
+      "storage",
+    ],
+  },
+  {
+    id: "shortcuts",
+    label: "Keyboard Shortcuts",
+    icon: Keyboard,
+    keywords: [
+      "hotkeys",
+      "keys",
+      "command palette",
+      "rescan",
+      "focus search",
+      "toggle sidebar",
+      "navigation",
+      ...shortcutGroups.flatMap((g) =>
+        g.shortcuts.map((s) => s.description.toLowerCase())
+      ),
+    ],
+  },
+  {
+    id: "about",
+    label: "About",
+    icon: Info,
+    keywords: ["version", "updates", "config", "links"],
+  },
+]
+
+interface SettingsDialogContextValue {
+  openSettings: (category?: SettingsTab) => void
+}
+
+const SettingsDialogContext = createContext<SettingsDialogContextValue | null>(
+  null
+)
+
+export function useSettingsDialog() {
+  const ctx = useContext(SettingsDialogContext)
+  if (!ctx)
+    throw new Error(
+      "useSettingsDialog must be used within SettingsDialogProvider"
+    )
+  return ctx
+}
+
+export function SettingsDialogProvider({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const [category, setCategory] = useState<SettingsTab>("general")
+  const navigate = useNavigate()
+  const search = useSearch({ from: "__root__" })
+
+  // Deep link: any navigation carrying ?settings=<category> opens the dialog
+  useEffect(() => {
+    if (search.settings && SETTINGS_TABS.includes(search.settings)) {
+      setCategory(search.settings)
+      setOpen(true)
+    }
+  }, [search.settings])
+
+  const syncSearch = (cat: SettingsTab | undefined) =>
+    navigate({
+      to: ".",
+      search: (prev) => ({ ...prev, settings: cat }),
+      replace: true,
+    })
+
+  const openSettings = (cat: SettingsTab = "general") => {
+    setCategory(cat)
+    setOpen(true)
+    syncSearch(cat)
+  }
+
+  const handleCategoryChange = (cat: SettingsTab) => {
+    setCategory(cat)
+    syncSearch(cat)
+  }
+
+  const handleClose = () => {
+    setOpen(false)
+    syncSearch(undefined)
+  }
+
+  return (
+    <SettingsDialogContext.Provider value={{ openSettings }}>
+      {children}
+      <SettingsDialog
+        open={open}
+        category={category}
+        onCategoryChange={handleCategoryChange}
+        onClose={handleClose}
+      />
+    </SettingsDialogContext.Provider>
+  )
+}
+
+// Flat label-left/control-right row; the parent groups rows with divide-y
+// hairlines instead of boxing each one, matching the reference dialog style
+function FieldRow({
+  label,
+  description,
+  children,
+}: {
+  label: string
+  description: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-4">
+      <div className="space-y-0.5">
+        <Label className="text-base text-foreground/90">{label}</Label>
+        <p className="text-sm text-muted-foreground/60">{description}</p>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="pt-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+      {children}
+    </h3>
+  )
+}
+
+interface SettingsDialogProps {
+  open: boolean
+  category: SettingsTab
+  onCategoryChange: (category: SettingsTab) => void
+  onClose: () => void
+}
+
+function SettingsDialog({
+  open,
+  category,
+  onCategoryChange,
+  onClose,
+}: SettingsDialogProps) {
+  const { theme, setTheme } = useTheme()
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [settings, setSettings] = useState<SettingsState>({
+    autoScan: false,
+    scanTimeout: "30",
+    daemonInterval: "14400",
+    cacheTtl: "30",
+    enabledScanners: ALL_SCANNERS.map((s) => s.id),
+    verboseLogs: false,
+    logRetention: "7",
+  })
+  const [clearCacheOpen, setClearCacheOpen] = useState(false)
+  const [resetDefaultsOpen, setResetDefaultsOpen] = useState(false)
+  const [appVersion, setAppVersion] = useState("")
+  const [query, setQuery] = useState("")
+
+  // Unsaved-change tracking: dirty until the current state is committed
+  // (loaded from the backend or persisted by a successful save)
+  const [dirty, setDirty] = useState(false)
+  const committedRef = useRef<{
+    settings: SettingsState
+    theme: "dark" | "light" | "system"
+  } | null>(null)
+
+  // Close requests while dirty don't close the dialog; they surface the
+  // unsaved-changes prompt (jump animation) and remember the intent, so
+  // Save/Discard completes the close afterwards.
+  const [pendingClose, setPendingClose] = useState(false)
+  const [jumpKey, setJumpKey] = useState(0)
+
+  useEffect(() => {
+    if (!committedRef.current) return
+    setDirty(
+      JSON.stringify({ settings, theme }) !==
+        JSON.stringify(committedRef.current)
+    )
+    setPendingClose(false)
+  }, [settings, theme])
+
+  // Parity with the old route's enableBeforeUnload: warn on refresh/close
+  useEffect(() => {
+    if (!dirty) return
+    const handler = (e: BeforeUnloadEvent) => e.preventDefault()
+    window.addEventListener("beforeunload", handler)
+    return () => window.removeEventListener("beforeunload", handler)
+  }, [dirty])
+
+  const loadConfig = async () => {
+    try {
+      const res = await fetch("/api/config")
+      if (!res.ok) throw new Error("Failed to load config")
+      const cfg: UserConfig = await res.json()
+      const loadedSettings: SettingsState = {
+        autoScan: cfg.auto_scan_on_startup ?? false,
+        scanTimeout: String(cfg.scan_timeout_secs ?? 30),
+        daemonInterval: String(cfg.daemon_interval_secs ?? 14400),
+        cacheTtl: String(cfg.cache_ttl_minutes ?? 30),
+        enabledScanners: cfg.enabled_scanners ?? ALL_SCANNERS.map((s) => s.id),
+        verboseLogs: cfg.verbose_logs ?? false,
+        logRetention: String(cfg.log_retention_days ?? 7),
+      }
+      const loadedTheme =
+        cfg.theme && ["dark", "light", "system"].includes(cfg.theme)
+          ? (cfg.theme as "dark" | "light" | "system")
+          : theme
+      committedRef.current = { settings: loadedSettings, theme: loadedTheme }
+      setSettings(loadedSettings)
+      setTheme(loadedTheme)
+    } catch (e) {
+      console.error("Failed to load config:", e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Reload latest config each time the dialog opens
+  useEffect(() => {
+    if (open) {
+      setLoading(true)
+      loadConfig()
+    }
+  }, [open])
+
+  useEffect(() => {
+    fetch("/api/version")
+      .then((r) => r.json())
+      .then((d) => setAppVersion(d.version))
+      .catch(() => {})
+  }, [])
+
+  const toggleScanner = (id: string) => {
+    setSettings((prev) => ({
+      ...prev,
+      enabledScanners: prev.enabledScanners.includes(id)
+        ? prev.enabledScanners.filter((s) => s !== id)
+        : [...prev.enabledScanners, id],
+    }))
+  }
+  const enableAllScanners = () => {
+    setSettings((prev) => ({
+      ...prev,
+      enabledScanners: ALL_SCANNERS.map((s) => s.id),
+    }))
+  }
+
+  const disableAllScanners = () => {
+    setSettings((prev) => ({
+      ...prev,
+      enabledScanners: [],
+    }))
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch("/api/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cache_ttl_minutes: Number(settings.cacheTtl),
+          project_path: null,
+          recent_project_paths: [],
+          favorite_project_paths: [],
+          auto_scan_on_startup: settings.autoScan,
+          theme: theme,
+          verbose_logs: settings.verboseLogs,
+          scan_timeout_secs: Number(settings.scanTimeout),
+          daemon_interval_secs: Number(settings.daemonInterval),
+          enabled_scanners: settings.enabledScanners,
+          log_retention_days: Number(settings.logRetention),
+        }),
+      })
+      if (!res.ok) throw new Error("Failed to save")
+      committedRef.current = { settings, theme }
+      setDirty(false)
+      toast.success("Settings saved", {
+        description: "Configuration updated successfully.",
+      })
+      if (pendingClose) onClose()
+    } catch (e) {
+      toast.error("Failed to save", {
+        description: e instanceof Error ? e.message : "Unknown error",
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDiscardChanges = () => {
+    if (!committedRef.current) return
+    setSettings(committedRef.current.settings)
+    setTheme(committedRef.current.theme)
+    if (pendingClose) onClose()
+  }
+
+  const [updateInfo, setUpdateInfo] = useState<{
+    checking: boolean
+    currentVersion: string
+    latestVersion: string
+    updateAvailable: boolean
+    releaseBody: string
+  }>({
+    checking: false,
+    currentVersion: "",
+    latestVersion: "",
+    updateAvailable: false,
+    releaseBody: "",
+  })
+
+  const handleCheckUpdates = async () => {
+    setUpdateInfo((prev) => ({ ...prev, checking: true }))
+    const id = toast.loading("Checking for updates...")
+    try {
+      const res = await fetch("/api/update/check")
+      const data = await res.json()
+      if (data.update_available) {
+        toast.success("Update available!", {
+          id,
+          description: `Envexa v${data.latest_version} is available (you're on v${data.current_version}).`,
+          duration: 8000,
+        })
+      } else {
+        toast.success("You're up to date", {
+          id,
+          description: `Envexa v${data.current_version} is the latest version.`,
+        })
+      }
+      setUpdateInfo({
+        checking: false,
+        currentVersion: data.current_version,
+        latestVersion: data.latest_version,
+        updateAvailable: data.update_available,
+        releaseBody: data.release_body,
+      })
+    } catch {
+      toast.error("Failed to check for updates", {
+        id,
+        description: "Could not reach GitHub release API.",
+      })
+      setUpdateInfo((prev) => ({ ...prev, checking: false }))
+    }
+  }
+  const handleClearCache = () => {
+    setClearCacheOpen(false)
+    const id = toast.loading("Clearing caches...")
+    setTimeout(() => {
+      toast.success("Caches cleared", {
+        id,
+        description: "All cached scan data and logs removed.",
+      })
+    }, 1000)
+  }
+
+  const handleResetDefaults = () => {
+    setResetDefaultsOpen(false)
+    setSettings({
+      autoScan: false,
+      scanTimeout: "30",
+      daemonInterval: "14400",
+      cacheTtl: "30",
+      enabledScanners: ALL_SCANNERS.map((s) => s.id),
+      verboseLogs: false,
+      logRetention: "7",
+    })
+    setTheme("system")
+    toast.success("Settings reset", {
+      description: "All settings restored to factory defaults.",
+    })
+  }
+
+  const q = query.trim().toLowerCase()
+  const visibleCategories = CATEGORY_META.filter(
+    (c) =>
+      !q ||
+      c.label.toLowerCase().includes(q) ||
+      c.keywords.some((k) => k.includes(q))
+  )
+
+  const activeMeta = CATEGORY_META.find((c) => c.id === category)
+
+  // About is pinned to the rail footer; the rest stay at the top
+  const mainCategories = visibleCategories.filter((c) => c.id !== "about")
+  const footerCategories = visibleCategories.filter((c) => c.id === "about")
+
+  const renderCategoryButton = (c: (typeof CATEGORY_META)[number]) => (
+    <button
+      key={c.id}
+      type="button"
+      onClick={() => onCategoryChange(c.id)}
+      className={cn(
+        "flex shrink-0 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+        category === c.id
+          ? "bg-muted font-medium text-foreground"
+          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+      )}
+    >
+      <c.icon className="h-4 w-4 shrink-0" />
+      {c.label}
+    </button>
+  )
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) return
+        if (dirty) {
+          setPendingClose(true)
+          setJumpKey((k) => k + 1)
+          return
+        }
+        onClose()
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        className="gap-0 overflow-hidden p-0 sm:max-w-4xl"
+      >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Settings</DialogTitle>
+          <DialogDescription>
+            Configure Envexa scanner behavior.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid h-[min(680px,85vh)] grid-rows-[auto_1fr] sm:grid-cols-[240px_1fr] sm:grid-rows-1">
+          {/* Left rail: search + category buttons */}
+          <div className="flex min-h-0 flex-col gap-3 border-b border-border bg-muted/40 p-3 sm:border-r sm:border-b-0">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute top-2 left-2.5 h-3.5 w-3.5 text-muted-foreground/60" />
+                <Input
+                  type="text"
+                  placeholder="Search settings"
+                  className="h-8 border-border bg-background/50 pl-8 text-xs"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </div>
+              {/* Below sm the rail stacks above the pane header, so the close
+                  button lives here to stay at the dialog's top-right corner */}
+              <DialogClose
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Close settings"
+                    className="shrink-0 sm:hidden"
+                  />
+                }
+              >
+                <X />
+              </DialogClose>
+            </div>
+            <nav className="flex gap-1 overflow-x-auto sm:min-h-0 sm:flex-1 sm:flex-col sm:overflow-x-visible sm:overflow-y-auto">
+              {mainCategories.map((c) => renderCategoryButton(c))}
+              {footerCategories.length > 0 && (
+                <div className="flex shrink-0 gap-1 sm:mt-auto sm:flex-col sm:border-t sm:border-border/50 sm:pt-2">
+                  {footerCategories.map((c) => renderCategoryButton(c))}
+                </div>
+              )}
+              {visibleCategories.length === 0 && (
+                <p className="px-3 py-2 text-xs text-muted-foreground/60">
+                  No settings match &quot;{query}&quot;.
+                </p>
+              )}
+            </nav>
+          </div>
+
+          {/* Right pane: category title + close, flat content */}
+          <div className="flex min-h-0 flex-col">
+            <div className="flex items-center justify-between border-b border-border px-6 py-3">
+              <h2 className="flex items-center gap-2 text-lg font-semibold">
+                {activeMeta && <activeMeta.icon className="h-5 w-5" />}
+                {activeMeta?.label}
+              </h2>
+              <DialogClose
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Close settings"
+                    className="hidden sm:inline-flex"
+                  />
+                }
+              >
+                <X />
+              </DialogClose>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
+              {loading ? (
+                <>
+                  <Skeleton className="h-40 w-full rounded-xl bg-muted/50" />
+                  <Skeleton className="h-48 w-full rounded-xl bg-muted/50" />
+                  <Skeleton className="h-32 w-full rounded-xl bg-muted/50" />
+                </>
+              ) : (
+                <>
+                  {category === "general" && (
+                    <>
+                      <div className="divide-y divide-border/50">
+                        <FieldRow
+                          label="Auto-scan on startup"
+                          description="Automatically run a full scan when the dashboard opens."
+                        >
+                          <Switch
+                            checked={settings.autoScan}
+                            onCheckedChange={(checked) =>
+                              setSettings((prev) => ({
+                                ...prev,
+                                autoScan: checked,
+                              }))
+                            }
+                          />
+                        </FieldRow>
+
+                        <FieldRow
+                          label="Scan timeout (seconds)"
+                          description="Maximum time to wait for a single scan to complete."
+                        >
+                          <Select
+                            value={settings.scanTimeout}
+                            onValueChange={(v) =>
+                              setSettings((p) => ({
+                                ...p,
+                                scanTimeout: v ?? p.scanTimeout,
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="w-[160px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="15">15s</SelectItem>
+                              <SelectItem value="30">30s</SelectItem>
+                              <SelectItem value="60">60s</SelectItem>
+                              <SelectItem value="120">120s</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FieldRow>
+
+                        <FieldRow
+                          label="Daemon interval"
+                          description="How often the background daemon rescans."
+                        >
+                          <Select
+                            value={settings.daemonInterval}
+                            onValueChange={(v) =>
+                              setSettings((p) => ({
+                                ...p,
+                                daemonInterval: v ?? p.daemonInterval,
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="w-[240px]">
+                              <SelectValue>
+                                {() =>
+                                  formatDaemonInterval(
+                                    Number(settings.daemonInterval)
+                                  )
+                                }
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="3600">
+                                {formatDaemonInterval(3600)}
+                              </SelectItem>
+                              <SelectItem value="7200">
+                                {formatDaemonInterval(7200)}
+                              </SelectItem>
+                              <SelectItem value="14400">
+                                {formatDaemonInterval(14400)}
+                              </SelectItem>
+                              <SelectItem value="28800">
+                                {formatDaemonInterval(28800)}
+                              </SelectItem>
+                              <SelectItem value="86400">
+                                {formatDaemonInterval(86400)}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FieldRow>
+
+                        <FieldRow
+                          label="Theme"
+                          description="Application color theme."
+                        >
+                          <Tabs
+                            value={theme}
+                            onValueChange={(v) => {
+                              if (v) setTheme(v as "dark" | "light" | "system")
+                            }}
+                          >
+                            <TabsList className="h-9">
+                              <TabsTrigger
+                                value="system"
+                                className="h-7 w-7 p-0"
+                                title="System"
+                              >
+                                <Monitor className="h-4 w-4" />
+                              </TabsTrigger>
+                              <TabsTrigger
+                                value="light"
+                                className="h-7 w-7 p-0"
+                                title="Light"
+                              >
+                                <Sun className="h-4 w-4" />
+                              </TabsTrigger>
+                              <TabsTrigger
+                                value="dark"
+                                className="h-7 w-7 p-0"
+                                title="Dark"
+                              >
+                                <Moon className="h-4 w-4" />
+                              </TabsTrigger>
+                            </TabsList>
+                          </Tabs>
+                        </FieldRow>
+                      </div>
+                    </>
+                  )}
+
+                  {category === "scanners" && (
+                    <>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm text-muted-foreground">
+                          {settings.enabledScanners.length} of{" "}
+                          {ALL_SCANNERS.length} scanners enabled.
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={enableAllScanners}
+                          >
+                            Enable All
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={disableAllScanners}
+                          >
+                            Disable All
+                          </Button>
+                        </div>
+                      </div>
+                      {SCANNER_CATEGORIES.map((c) => (
+                        <div key={c.name}>
+                          <SectionHeading>{c.name}</SectionHeading>
+                          <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                            {c.scanners.map((scanner) => (
+                              <label
+                                key={scanner.id}
+                                className="flex cursor-pointer items-center gap-3 rounded-lg border border-border/50 bg-muted/50 p-3 transition-colors hover:bg-muted"
+                              >
+                                <Checkbox
+                                  checked={settings.enabledScanners.includes(
+                                    scanner.id
+                                  )}
+                                  onCheckedChange={() =>
+                                    toggleScanner(scanner.id)
+                                  }
+                                />
+                                <span className="text-sm text-foreground/90">
+                                  {scanner.label}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {category === "data" && (
+                    <>
+                      <SectionHeading>Cache & Logs</SectionHeading>
+                      <div className="divide-y divide-border/50">
+                        <FieldRow
+                          label="Cache TTL (minutes)"
+                          description="How long to cache scan results before re-scanning."
+                        >
+                          <Select
+                            value={settings.cacheTtl}
+                            onValueChange={(v) =>
+                              setSettings((p) => ({
+                                ...p,
+                                cacheTtl: v ?? p.cacheTtl,
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="w-[160px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="5">5 min</SelectItem>
+                              <SelectItem value="15">15 min</SelectItem>
+                              <SelectItem value="30">30 min</SelectItem>
+                              <SelectItem value="60">1 hour</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FieldRow>
+
+                        <FieldRow
+                          label="Verbose logs"
+                          description="Enable detailed debug logging for troubleshooting."
+                        >
+                          <Switch
+                            checked={settings.verboseLogs}
+                            onCheckedChange={(checked) =>
+                              setSettings((prev) => ({
+                                ...prev,
+                                verboseLogs: checked,
+                              }))
+                            }
+                          />
+                        </FieldRow>
+
+                        <FieldRow
+                          label="Log retention (days)"
+                          description="How many days to keep log files before rotation."
+                        >
+                          <Select
+                            value={settings.logRetention}
+                            onValueChange={(v) =>
+                              setSettings((p) => ({
+                                ...p,
+                                logRetention: v ?? p.logRetention,
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="w-[160px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">1 day</SelectItem>
+                              <SelectItem value="7">1 week</SelectItem>
+                              <SelectItem value="14">2 weeks</SelectItem>
+                              <SelectItem value="30">1 month</SelectItem>
+                              <SelectItem value="90">3 months</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FieldRow>
+                      </div>
+
+                      <SectionHeading>Resets</SectionHeading>
+                      <div className="flex flex-col gap-3">
+                        <Button
+                          variant="outline"
+                          onClick={() => setClearCacheOpen(true)}
+                          className="h-auto w-full justify-start gap-4 py-4 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Database className="h-5 w-5 shrink-0" />
+                          <div className="text-left">
+                            <div className="font-medium">Clear All Caches</div>
+                            <div className="text-xs text-muted-foreground">
+                              Remove all cached scan data and logs
+                            </div>
+                          </div>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setResetDefaultsOpen(true)}
+                          className="h-auto w-full justify-start gap-4 py-4 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <ExternalLink className="h-5 w-5 shrink-0" />
+                          <div className="text-left">
+                            <div className="font-medium">Reset to Defaults</div>
+                            <div className="text-xs text-muted-foreground">
+                              Reset all settings to factory defaults
+                            </div>
+                          </div>
+                        </Button>
+                      </div>
+                    </>
+                  )}
+
+                  {category === "shortcuts" && (
+                    <>
+                      {shortcutGroups.map((group) => (
+                        <div key={group.heading}>
+                          <SectionHeading>{group.heading}</SectionHeading>
+                          <div className="mt-1 divide-y divide-border/50">
+                            {group.shortcuts.map((shortcut) => (
+                              <div
+                                key={shortcut.description}
+                                className="flex items-center justify-between py-2.5 text-sm"
+                              >
+                                <span>{shortcut.description}</span>
+                                <KbdGroup>
+                                  {shortcut.keys.map((combo) => (
+                                    <KbdGroup key={combo.join("+")}>
+                                      {combo.map((key, index) => (
+                                        <span
+                                          key={key}
+                                          className="flex items-center gap-1"
+                                        >
+                                          {index > 0 && (
+                                            <span className="text-xs text-muted-foreground">
+                                              +
+                                            </span>
+                                          )}
+                                          <Kbd>{key}</Kbd>
+                                        </span>
+                                      ))}
+                                    </KbdGroup>
+                                  ))}
+                                </KbdGroup>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {category === "about" && (
+                    <>
+                      <div className="flex items-center gap-4">
+                        <img
+                          src="/bulldozer.png"
+                          alt="Envexa"
+                          className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                        />
+                        <div>
+                          <h3 className="font-semibold text-foreground">
+                            Envexa
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            Blazing-fast Rust TUI, scriptable CLI, and Web
+                            Dashboard for monitoring local developer tooling
+                            health.
+                          </p>
+                          <p className="mt-1 font-mono text-sm text-muted-foreground">
+                            v{appVersion || "?.?.?"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <p className="text-sm text-muted-foreground/80">
+                          Configuration file location:
+                        </p>
+                        <code className="block rounded bg-muted px-2 py-1 font-mono text-xs break-all text-muted-foreground">
+                          ~/.config/envexa/config.json
+                        </code>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <a
+                          href="https://github.com/KurutoDenzeru/Envexa"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground/60 transition-colors hover:text-foreground"
+                          title="GitHub"
+                        >
+                          <svg
+                            role="img"
+                            viewBox="0 0 24 24"
+                            className="h-5 w-5"
+                            fill="currentColor"
+                          >
+                            <path d={siGithub.path} />
+                          </svg>
+                        </a>
+                        <a
+                          href="https://linkedin.com/in/kurtcalacday"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground/60 transition-colors hover:text-foreground"
+                          title="LinkedIn"
+                        >
+                          <svg
+                            role="img"
+                            viewBox="0 0 24 24"
+                            className="h-5 w-5"
+                            fill="currentColor"
+                          >
+                            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                          </svg>
+                        </a>
+                        <a
+                          href="https://instagram.com/krtclcdy"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground/60 transition-colors hover:text-foreground"
+                          title="Instagram"
+                        >
+                          <svg
+                            role="img"
+                            viewBox="0 0 24 24"
+                            className="h-5 w-5"
+                            fill="currentColor"
+                          >
+                            <path d={siInstagram.path} />
+                          </svg>
+                        </a>
+                      </div>
+
+                      <SectionHeading>Actions</SectionHeading>
+                      <div className="flex flex-col gap-3">
+                        {updateInfo.updateAvailable ? (
+                          <div className="flex flex-col gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+                            <div className="flex items-center gap-2">
+                              <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                              <span className="text-sm font-medium text-emerald-500">
+                                Update available: Envexa v
+                                {updateInfo.latestVersion}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              You&apos;re currently on v
+                              {updateInfo.currentVersion}.{" "}
+                              <a
+                                href="https://github.com/KurutoDenzeru/envexa/releases/latest"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline hover:text-foreground"
+                              >
+                                Download the latest release
+                              </a>{" "}
+                              and restart the server to update.
+                            </p>
+                            {updateInfo.releaseBody && (
+                              <details className="text-xs text-muted-foreground">
+                                <summary className="cursor-pointer hover:text-foreground">
+                                  Release notes
+                                </summary>
+                                <pre className="mt-2 max-h-40 overflow-y-auto rounded bg-black/10 p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap dark:bg-white/5">
+                                  {updateInfo.releaseBody}
+                                </pre>
+                              </details>
+                            )}
+                          </div>
+                        ) : null}
+                        <Button
+                          variant="outline"
+                          onClick={handleCheckUpdates}
+                          disabled={updateInfo.checking}
+                          className="h-auto w-full justify-start gap-4 py-4"
+                        >
+                          <ArrowUpCircle className="h-5 w-5 shrink-0" />
+                          <div className="text-left">
+                            <div className="font-medium">
+                              {updateInfo.checking
+                                ? "Checking..."
+                                : "Check for Updates"}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {updateInfo.latestVersion && !updateInfo.checking
+                                ? `Latest: v${updateInfo.latestVersion} — Current: v${updateInfo.currentVersion}`
+                                : "Check if a new version of Envexa is available"}
+                            </div>
+                          </div>
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+
+      <AlertDialog open={clearCacheOpen} onOpenChange={setClearCacheOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Clear All Caches?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove all cached scan data and logs. You'll need to run
+              a new scan to rebuild the cache.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleClearCache}
+              className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
+            >
+              Clear Caches
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={resetDefaultsOpen} onOpenChange={setResetDefaultsOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Reset to Defaults?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reset all settings to factory defaults, including theme,
+              scanner toggles, and all preferences. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetDefaults}
+              className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
+            >
+              Reset Settings
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <style>{`@keyframes unsaved-jump {
+        0%, 100% { transform: translateY(0); }
+        20% { transform: translateY(-16px); }
+        40% { transform: translateY(8px); }
+        60% { transform: translateY(-8px); }
+        80% { transform: translateY(4px); }
+      }`}</style>
+
+      {dirty && (
+        <div
+          key={jumpKey}
+          className="fixed right-4 bottom-4 z-[100] w-[360px] max-w-[calc(100vw-2rem)]"
+        >
+          <div
+            className={cn(
+              "rounded-lg border border-border bg-popover p-4 text-popover-foreground shadow-2xl",
+              pendingClose
+                ? "animate-[unsaved-jump_0.7s_ease-in-out] ring-2 ring-amber-500/60"
+                : "animate-in duration-300 slide-in-from-bottom-5 fade-in"
+            )}
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Unsaved changes</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  You have unsaved settings changes. Save them before closing,
+                  or discard them.
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDiscardChanges}
+                disabled={saving}
+              >
+                <X className="h-3.5 w-3.5" />
+                Discard
+              </Button>
+              <Button size="sm" onClick={handleSave} disabled={saving}>
+                <Save className="h-3.5 w-3.5" />
+                {saving ? "Saving..." : "Save changes"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </Dialog>
+  )
+}

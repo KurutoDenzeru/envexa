@@ -21,6 +21,7 @@ import {
 import { Link } from "@tanstack/react-router"
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
 import { useModifierHeld } from "@/hooks/use-hotkeys"
+import { useSettingsDialog } from "@/components/settings-dialog"
 import { modLabel } from "@/lib/platform"
 
 const navItems = [
@@ -38,6 +39,7 @@ const navItems = [
 
 export function AppSidebar() {
   const modHeld = useModifierHeld()
+  const { openSettings } = useSettingsDialog()
 
   return (
     <Sidebar
@@ -100,19 +102,8 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="Settings"
-              render={
-                <Link
-                  to="/settings"
-                  className="flex w-full items-center gap-3 transition-colors duration-200 group-data-[collapsible=icon]:justify-center"
-                  activeProps={{
-                    className: "bg-muted text-foreground font-medium",
-                  }}
-                  inactiveProps={{
-                    className:
-                      "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-                  }}
-                />
-              }
+              onClick={() => openSettings()}
+              className="flex w-full items-center gap-3 text-muted-foreground transition-colors duration-200 group-data-[collapsible=icon]:justify-center hover:bg-muted/50 hover:text-foreground"
             >
               <Settings className="h-4 w-4 shrink-0" />
               <span className="group-data-[collapsible=icon]:hidden">
