@@ -20,16 +20,24 @@ import { modLabel } from "@/lib/platform"
 import { RefreshCw } from "lucide-react"
 import { formatRelativeTime } from "@/lib/utils"
 import { useState } from "react"
+import {
+  SETTINGS_TABS,
+  SettingsDialogProvider,
+  useSettingsDialog,
+  type SettingsTab,
+} from "@/components/settings-dialog"
 
 function HotkeyLayer() {
   const navigate = useNavigate()
   const { refetch } = useScanData()
+  const { openSettings } = useSettingsDialog()
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   useHotkeys({
     onRescan: () => refetch(true),
     onNavigate: (to) => navigate({ to }),
+    onSettings: () => openSettings(),
     onPalette: () => setPaletteOpen((open) => !open),
     onShortcuts: () => setShortcutsOpen(true),
   })
@@ -75,6 +83,14 @@ function NavbarScanStatus() {
 }
 
 export const Route = createRootRoute({
+  // Deep-link into the settings dialog: ?settings=general|scanners|about
+  validateSearch: (
+    search: Record<string, unknown>
+  ): { settings?: SettingsTab } => ({
+    settings: SETTINGS_TABS.includes(search.settings as SettingsTab)
+      ? (search.settings as SettingsTab)
+      : undefined,
+  }),
   component: () => {
     const defaultOpen =
       document.cookie
@@ -87,35 +103,37 @@ export const Route = createRootRoute({
         <NextThemesProvider attribute="class" defaultTheme="dark" enableSystem>
           <ScanDataProvider>
             <Toaster position="top-right" />
-            <HotkeyLayer />
-            <SidebarProvider defaultOpen={defaultOpen}>
-              <div className="flex min-h-screen w-full bg-background font-sans text-foreground">
-                <AppSidebar />
-                <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-                  <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center border-b border-border bg-background/80 px-4 backdrop-blur-md">
-                    <div className="flex items-center">
-                      <Tooltip>
-                        <TooltipTrigger render={<SidebarTrigger />} />
-                        <TooltipContent side="bottom">
-                          Toggle sidebar
-                          <KbdGroup>
-                            <Kbd>{modLabel}</Kbd>
-                            <Kbd>B</Kbd>
-                          </KbdGroup>
-                        </TooltipContent>
-                      </Tooltip>
+            <SettingsDialogProvider>
+              <HotkeyLayer />
+              <SidebarProvider defaultOpen={defaultOpen}>
+                <div className="flex min-h-screen w-full bg-background font-sans text-foreground">
+                  <AppSidebar />
+                  <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+                    <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center border-b border-border bg-background/80 px-4 backdrop-blur-md">
+                      <div className="flex items-center">
+                        <Tooltip>
+                          <TooltipTrigger render={<SidebarTrigger />} />
+                          <TooltipContent side="bottom">
+                            Toggle sidebar
+                            <KbdGroup>
+                              <Kbd>{modLabel}</Kbd>
+                              <Kbd>B</Kbd>
+                            </KbdGroup>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <div className="flex flex-1 justify-center">
+                        <ProjectPathWithScan />
+                      </div>
+                      <NavbarScanStatus />
+                    </header>
+                    <div className="flex-1 overflow-auto p-4 md:p-8">
+                      <Outlet />
                     </div>
-                    <div className="flex flex-1 justify-center">
-                      <ProjectPathWithScan />
-                    </div>
-                    <NavbarScanStatus />
-                  </header>
-                  <div className="flex-1 overflow-auto p-4 md:p-8">
-                    <Outlet />
-                  </div>
-                </main>
-              </div>
-            </SidebarProvider>
+                  </main>
+                </div>
+              </SidebarProvider>
+            </SettingsDialogProvider>
           </ScanDataProvider>
         </NextThemesProvider>
       </ThemeProvider>

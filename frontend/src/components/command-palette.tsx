@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/command"
 import { Kbd } from "@/components/ui/kbd"
 import { useScanData } from "@/components/scan-data-context"
+import { useSettingsDialog } from "@/components/settings-dialog"
 import { modLabel } from "@/lib/platform"
 
 const views = [
@@ -52,12 +53,6 @@ const views = [
     icon: ScrollText,
     keys: [modLabel, "5"],
   },
-  {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
-    keys: [modLabel, ","],
-  },
 ]
 
 interface CommandPaletteProps {
@@ -68,6 +63,7 @@ interface CommandPaletteProps {
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const navigate = useNavigate()
   const { refetch } = useScanData()
+  const { openSettings } = useSettingsDialog()
   const { resolvedTheme, setTheme } = useTheme()
 
   const run = (action: () => void) => {
@@ -124,6 +120,17 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             ))}
           </CommandGroup>
           <CommandGroup heading="Actions">
+            <CommandItem
+              value="Open settings"
+              onSelect={() => run(() => openSettings())}
+            >
+              <Settings />
+              <span>Open settings</span>
+              <CommandShortcut className="flex gap-1 tracking-normal">
+                <Kbd>{modLabel}</Kbd>
+                <Kbd>,</Kbd>
+              </CommandShortcut>
+            </CommandItem>
             <CommandItem
               value="Rescan now"
               onSelect={() => run(() => refetch(true))}
