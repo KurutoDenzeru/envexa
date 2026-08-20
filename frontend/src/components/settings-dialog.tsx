@@ -1,19 +1,6 @@
 import { useNavigate, useSearch } from "@tanstack/react-router"
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useRef,
-} from "react"
+import { createContext, useContext, useState, useEffect, useRef } from "react"
 import type { ReactNode } from "react"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { Switch } from "@/components/ui/switch"
@@ -225,6 +212,8 @@ export function SettingsDialogProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// Flat label-left/control-right row; the parent groups rows with divide-y
+// hairlines instead of boxing each one, matching the reference dialog style
 function FieldRow({
   label,
   description,
@@ -235,13 +224,21 @@ function FieldRow({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-border/50 bg-muted/50 p-4 transition-colors hover:bg-muted">
+    <div className="flex items-center justify-between gap-4 py-4">
       <div className="space-y-0.5">
         <Label className="text-base text-foreground/90">{label}</Label>
         <p className="text-sm text-muted-foreground/60">{description}</p>
       </div>
       {children}
     </div>
+  )
+}
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="pt-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+      {children}
+    </h3>
   )
 }
 
@@ -514,7 +511,7 @@ function SettingsDialog({
     >
       <DialogContent
         showCloseButton={false}
-        className="gap-0 overflow-hidden p-0 sm:max-w-3xl"
+        className="gap-0 overflow-hidden p-0 sm:max-w-4xl"
       >
         <DialogHeader className="sr-only">
           <DialogTitle>Settings</DialogTitle>
@@ -523,31 +520,18 @@ function SettingsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid h-[min(640px,85vh)] grid-rows-[auto_1fr] sm:grid-cols-[220px_1fr] sm:grid-rows-1">
-          {/* Left rail: close, search, category buttons */}
+        <div className="grid h-[min(680px,85vh)] grid-rows-[auto_1fr] sm:grid-cols-[240px_1fr] sm:grid-rows-1">
+          {/* Left rail: search + category buttons */}
           <div className="flex min-h-0 flex-col gap-3 border-b border-border bg-muted/40 p-3 sm:border-r sm:border-b-0">
-            <div className="flex items-center gap-2">
-              <DialogClose
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Close settings"
-                  />
-                }
-              >
-                <X />
-              </DialogClose>
-              <div className="relative flex-1">
-                <Search className="absolute top-2 left-2.5 h-3.5 w-3.5 text-muted-foreground/60" />
-                <Input
-                  type="text"
-                  placeholder="Search settings"
-                  className="h-8 border-border bg-background/50 pl-8 text-xs"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </div>
+            <div className="relative">
+              <Search className="absolute top-2 left-2.5 h-3.5 w-3.5 text-muted-foreground/60" />
+              <Input
+                type="text"
+                placeholder="Search settings"
+                className="h-8 border-border bg-background/50 pl-8 text-xs"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
             </div>
             <nav className="flex gap-1 overflow-x-auto sm:min-h-0 sm:flex-col sm:overflow-x-visible sm:overflow-y-auto">
               {visibleCategories.map((c) => (
@@ -574,15 +558,26 @@ function SettingsDialog({
             </nav>
           </div>
 
-          {/* Right pane: active category content */}
+          {/* Right pane: category title + close, flat content */}
           <div className="flex min-h-0 flex-col">
-            <div className="border-b border-border px-6 py-4">
+            <div className="flex items-center justify-between border-b border-border px-6 py-3">
               <h2 className="flex items-center gap-2 text-lg font-semibold">
                 {activeMeta && <activeMeta.icon className="h-5 w-5" />}
                 {activeMeta?.label}
               </h2>
+              <DialogClose
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Close settings"
+                  />
+                }
+              >
+                <X />
+              </DialogClose>
             </div>
-            <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6">
+            <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
               {loading ? (
                 <>
                   <Skeleton className="h-40 w-full rounded-xl bg-muted/50" />
@@ -593,474 +588,413 @@ function SettingsDialog({
                 <>
                   {category === "general" && (
                     <>
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <Sliders className="h-5 w-5" />
-                            General
-                          </CardTitle>
-                          <CardDescription>
-                            Core scanner behavior and defaults.
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-4">
-                          <FieldRow
-                            label="Auto-scan on startup"
-                            description="Automatically run a full scan when the dashboard opens."
-                          >
-                            <Switch
-                              checked={settings.autoScan}
-                              onCheckedChange={(checked) =>
-                                setSettings((prev) => ({
-                                  ...prev,
-                                  autoScan: checked,
-                                }))
-                              }
-                            />
-                          </FieldRow>
+                      <div className="divide-y divide-border/50">
+                        <FieldRow
+                          label="Auto-scan on startup"
+                          description="Automatically run a full scan when the dashboard opens."
+                        >
+                          <Switch
+                            checked={settings.autoScan}
+                            onCheckedChange={(checked) =>
+                              setSettings((prev) => ({
+                                ...prev,
+                                autoScan: checked,
+                              }))
+                            }
+                          />
+                        </FieldRow>
 
-                          <FieldRow
-                            label="Scan timeout (seconds)"
-                            description="Maximum time to wait for a single scan to complete."
+                        <FieldRow
+                          label="Scan timeout (seconds)"
+                          description="Maximum time to wait for a single scan to complete."
+                        >
+                          <Select
+                            value={settings.scanTimeout}
+                            onValueChange={(v) =>
+                              setSettings((p) => ({
+                                ...p,
+                                scanTimeout: v ?? p.scanTimeout,
+                              }))
+                            }
                           >
-                            <Select
-                              value={settings.scanTimeout}
-                              onValueChange={(v) =>
-                                setSettings((p) => ({
-                                  ...p,
-                                  scanTimeout: v ?? p.scanTimeout,
-                                }))
-                              }
-                            >
-                              <SelectTrigger className="w-[160px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="15">15s</SelectItem>
-                                <SelectItem value="30">30s</SelectItem>
-                                <SelectItem value="60">60s</SelectItem>
-                                <SelectItem value="120">120s</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </FieldRow>
+                            <SelectTrigger className="w-[160px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="15">15s</SelectItem>
+                              <SelectItem value="30">30s</SelectItem>
+                              <SelectItem value="60">60s</SelectItem>
+                              <SelectItem value="120">120s</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FieldRow>
 
-                          <FieldRow
-                            label="Daemon interval"
-                            description="How often the background daemon rescans."
+                        <FieldRow
+                          label="Daemon interval"
+                          description="How often the background daemon rescans."
+                        >
+                          <Select
+                            value={settings.daemonInterval}
+                            onValueChange={(v) =>
+                              setSettings((p) => ({
+                                ...p,
+                                daemonInterval: v ?? p.daemonInterval,
+                              }))
+                            }
                           >
-                            <Select
-                              value={settings.daemonInterval}
-                              onValueChange={(v) =>
-                                setSettings((p) => ({
-                                  ...p,
-                                  daemonInterval: v ?? p.daemonInterval,
-                                }))
-                              }
-                            >
-                              <SelectTrigger className="w-[240px]">
-                                <SelectValue>
-                                  {() =>
-                                    formatDaemonInterval(
-                                      Number(settings.daemonInterval)
-                                    )
-                                  }
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="3600">
-                                  {formatDaemonInterval(3600)}
-                                </SelectItem>
-                                <SelectItem value="7200">
-                                  {formatDaemonInterval(7200)}
-                                </SelectItem>
-                                <SelectItem value="14400">
-                                  {formatDaemonInterval(14400)}
-                                </SelectItem>
-                                <SelectItem value="28800">
-                                  {formatDaemonInterval(28800)}
-                                </SelectItem>
-                                <SelectItem value="86400">
-                                  {formatDaemonInterval(86400)}
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </FieldRow>
+                            <SelectTrigger className="w-[240px]">
+                              <SelectValue>
+                                {() =>
+                                  formatDaemonInterval(
+                                    Number(settings.daemonInterval)
+                                  )
+                                }
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="3600">
+                                {formatDaemonInterval(3600)}
+                              </SelectItem>
+                              <SelectItem value="7200">
+                                {formatDaemonInterval(7200)}
+                              </SelectItem>
+                              <SelectItem value="14400">
+                                {formatDaemonInterval(14400)}
+                              </SelectItem>
+                              <SelectItem value="28800">
+                                {formatDaemonInterval(28800)}
+                              </SelectItem>
+                              <SelectItem value="86400">
+                                {formatDaemonInterval(86400)}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FieldRow>
 
-                          <FieldRow
-                            label="Cache TTL (minutes)"
-                            description="How long to cache scan results before re-scanning."
+                        <FieldRow
+                          label="Cache TTL (minutes)"
+                          description="How long to cache scan results before re-scanning."
+                        >
+                          <Select
+                            value={settings.cacheTtl}
+                            onValueChange={(v) =>
+                              setSettings((p) => ({
+                                ...p,
+                                cacheTtl: v ?? p.cacheTtl,
+                              }))
+                            }
                           >
-                            <Select
-                              value={settings.cacheTtl}
-                              onValueChange={(v) =>
-                                setSettings((p) => ({
-                                  ...p,
-                                  cacheTtl: v ?? p.cacheTtl,
-                                }))
-                              }
-                            >
-                              <SelectTrigger className="w-[160px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="5">5 min</SelectItem>
-                                <SelectItem value="15">15 min</SelectItem>
-                                <SelectItem value="30">30 min</SelectItem>
-                                <SelectItem value="60">1 hour</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </FieldRow>
+                            <SelectTrigger className="w-[160px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="5">5 min</SelectItem>
+                              <SelectItem value="15">15 min</SelectItem>
+                              <SelectItem value="30">30 min</SelectItem>
+                              <SelectItem value="60">1 hour</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FieldRow>
 
-                          <FieldRow
-                            label="Theme"
-                            description="Application color theme."
+                        <FieldRow
+                          label="Theme"
+                          description="Application color theme."
+                        >
+                          <Tabs
+                            value={theme}
+                            onValueChange={(v) => {
+                              if (v) setTheme(v as "dark" | "light" | "system")
+                            }}
                           >
-                            <Tabs
-                              value={theme}
-                              onValueChange={(v) => {
-                                if (v)
-                                  setTheme(v as "dark" | "light" | "system")
-                              }}
-                            >
-                              <TabsList className="h-9">
-                                <TabsTrigger
-                                  value="system"
-                                  className="h-7 w-7 p-0"
-                                  title="System"
-                                >
-                                  <Monitor className="h-4 w-4" />
-                                </TabsTrigger>
-                                <TabsTrigger
-                                  value="light"
-                                  className="h-7 w-7 p-0"
-                                  title="Light"
-                                >
-                                  <Sun className="h-4 w-4" />
-                                </TabsTrigger>
-                                <TabsTrigger
-                                  value="dark"
-                                  className="h-7 w-7 p-0"
-                                  title="Dark"
-                                >
-                                  <Moon className="h-4 w-4" />
-                                </TabsTrigger>
-                              </TabsList>
-                            </Tabs>
-                          </FieldRow>
-                        </CardContent>
-                      </Card>
+                            <TabsList className="h-9">
+                              <TabsTrigger
+                                value="system"
+                                className="h-7 w-7 p-0"
+                                title="System"
+                              >
+                                <Monitor className="h-4 w-4" />
+                              </TabsTrigger>
+                              <TabsTrigger
+                                value="light"
+                                className="h-7 w-7 p-0"
+                                title="Light"
+                              >
+                                <Sun className="h-4 w-4" />
+                              </TabsTrigger>
+                              <TabsTrigger
+                                value="dark"
+                                className="h-7 w-7 p-0"
+                                title="Dark"
+                              >
+                                <Moon className="h-4 w-4" />
+                              </TabsTrigger>
+                            </TabsList>
+                          </Tabs>
+                        </FieldRow>
+                      </div>
 
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <Database className="h-5 w-5" />
-                            Logging
-                          </CardTitle>
-                          <CardDescription>
-                            Verbosity and retention settings.
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-4">
-                          <FieldRow
-                            label="Verbose logs"
-                            description="Enable detailed debug logging for troubleshooting."
-                          >
-                            <Switch
-                              checked={settings.verboseLogs}
-                              onCheckedChange={(checked) =>
-                                setSettings((prev) => ({
-                                  ...prev,
-                                  verboseLogs: checked,
-                                }))
-                              }
-                            />
-                          </FieldRow>
+                      <SectionHeading>Logging</SectionHeading>
+                      <div className="divide-y divide-border/50">
+                        <FieldRow
+                          label="Verbose logs"
+                          description="Enable detailed debug logging for troubleshooting."
+                        >
+                          <Switch
+                            checked={settings.verboseLogs}
+                            onCheckedChange={(checked) =>
+                              setSettings((prev) => ({
+                                ...prev,
+                                verboseLogs: checked,
+                              }))
+                            }
+                          />
+                        </FieldRow>
 
-                          <FieldRow
-                            label="Log retention (days)"
-                            description="How many days to keep log files before rotation."
+                        <FieldRow
+                          label="Log retention (days)"
+                          description="How many days to keep log files before rotation."
+                        >
+                          <Select
+                            value={settings.logRetention}
+                            onValueChange={(v) =>
+                              setSettings((p) => ({
+                                ...p,
+                                logRetention: v ?? p.logRetention,
+                              }))
+                            }
                           >
-                            <Select
-                              value={settings.logRetention}
-                              onValueChange={(v) =>
-                                setSettings((p) => ({
-                                  ...p,
-                                  logRetention: v ?? p.logRetention,
-                                }))
-                              }
-                            >
-                              <SelectTrigger className="w-[160px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="1">1 day</SelectItem>
-                                <SelectItem value="7">1 week</SelectItem>
-                                <SelectItem value="14">2 weeks</SelectItem>
-                                <SelectItem value="30">1 month</SelectItem>
-                                <SelectItem value="90">3 months</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </FieldRow>
-                        </CardContent>
-                      </Card>
+                            <SelectTrigger className="w-[160px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">1 day</SelectItem>
+                              <SelectItem value="7">1 week</SelectItem>
+                              <SelectItem value="14">2 weeks</SelectItem>
+                              <SelectItem value="30">1 month</SelectItem>
+                              <SelectItem value="90">3 months</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FieldRow>
+                      </div>
                     </>
                   )}
 
                   {category === "scanners" && (
-                    <Card>
-                      <CardHeader>
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <CardTitle className="flex items-center gap-2">
-                              <Boxes className="h-5 w-5" />
-                              Enabled Scanners
-                            </CardTitle>
-                            <CardDescription className="mt-1">
-                              {settings.enabledScanners.length} of{" "}
-                              {ALL_SCANNERS.length} scanners enabled.
-                            </CardDescription>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={enableAllScanners}
-                            >
-                              Enable All
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={disableAllScanners}
-                            >
-                              Disable All
-                            </Button>
+                    <>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm text-muted-foreground">
+                          {settings.enabledScanners.length} of{" "}
+                          {ALL_SCANNERS.length} scanners enabled.
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={enableAllScanners}
+                          >
+                            Enable All
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={disableAllScanners}
+                          >
+                            Disable All
+                          </Button>
+                        </div>
+                      </div>
+                      {SCANNER_CATEGORIES.map((c) => (
+                        <div key={c.name}>
+                          <SectionHeading>{c.name}</SectionHeading>
+                          <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                            {c.scanners.map((scanner) => (
+                              <label
+                                key={scanner.id}
+                                className="flex cursor-pointer items-center gap-3 rounded-lg border border-border/50 bg-muted/50 p-3 transition-colors hover:bg-muted"
+                              >
+                                <Checkbox
+                                  checked={settings.enabledScanners.includes(
+                                    scanner.id
+                                  )}
+                                  onCheckedChange={() =>
+                                    toggleScanner(scanner.id)
+                                  }
+                                />
+                                <span className="text-sm text-foreground/90">
+                                  {scanner.label}
+                                </span>
+                              </label>
+                            ))}
                           </div>
                         </div>
-                      </CardHeader>
-                      <CardContent className="flex flex-col gap-6">
-                        {SCANNER_CATEGORIES.map((c) => (
-                          <div key={c.name}>
-                            <h4 className="mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                              {c.name}
-                            </h4>
-                            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-                              {c.scanners.map((scanner) => (
-                                <label
-                                  key={scanner.id}
-                                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-border/50 bg-muted/50 p-3 transition-colors hover:bg-muted"
-                                >
-                                  <Checkbox
-                                    checked={settings.enabledScanners.includes(
-                                      scanner.id
-                                    )}
-                                    onCheckedChange={() =>
-                                      toggleScanner(scanner.id)
-                                    }
-                                  />
-                                  <span className="text-sm text-foreground/90">
-                                    {scanner.label}
-                                  </span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </CardContent>
-                    </Card>
+                      ))}
+                    </>
                   )}
 
                   {category === "about" && (
                     <>
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <Info className="h-5 w-5" />
-                            About Envexa
-                          </CardTitle>
-                          <CardDescription>
-                            Version information and links.
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-4">
-                          <div className="flex items-center gap-4 rounded-lg border border-border/50 bg-muted/50 p-4">
-                            <img
-                              src="/bulldozer.png"
-                              alt="Envexa"
-                              className="h-12 w-12 rounded-lg object-cover"
-                            />
-                            <div>
-                              <h3 className="font-semibold text-foreground">
-                                Envexa
-                              </h3>
-                              <p className="text-sm text-muted-foreground">
-                                Blazing-fast Rust TUI, scriptable CLI, and Web
-                                Dashboard for monitoring local developer tooling
-                                health.
-                              </p>
-                              <p className="mt-1 font-mono text-sm text-muted-foreground">
-                                v{appVersion || "?.?.?"}
-                              </p>
+                      <div className="flex items-center gap-4">
+                        <img
+                          src="/bulldozer.png"
+                          alt="Envexa"
+                          className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                        />
+                        <div>
+                          <h3 className="font-semibold text-foreground">
+                            Envexa
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            Blazing-fast Rust TUI, scriptable CLI, and Web
+                            Dashboard for monitoring local developer tooling
+                            health.
+                          </p>
+                          <p className="mt-1 font-mono text-sm text-muted-foreground">
+                            v{appVersion || "?.?.?"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <p className="text-sm text-muted-foreground/80">
+                          Configuration file location:
+                        </p>
+                        <code className="block rounded bg-muted px-2 py-1 font-mono text-xs break-all text-muted-foreground">
+                          ~/.config/envexa/config.json
+                        </code>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <a
+                          href="https://github.com/KurutoDenzeru/Envexa"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground/60 transition-colors hover:text-foreground"
+                          title="GitHub"
+                        >
+                          <svg
+                            role="img"
+                            viewBox="0 0 24 24"
+                            className="h-5 w-5"
+                            fill="currentColor"
+                          >
+                            <path d={siGithub.path} />
+                          </svg>
+                        </a>
+                        <a
+                          href="https://linkedin.com/in/kurtcalacday"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground/60 transition-colors hover:text-foreground"
+                          title="LinkedIn"
+                        >
+                          <svg
+                            role="img"
+                            viewBox="0 0 24 24"
+                            className="h-5 w-5"
+                            fill="currentColor"
+                          >
+                            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                          </svg>
+                        </a>
+                        <a
+                          href="https://instagram.com/krtclcdy"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground/60 transition-colors hover:text-foreground"
+                          title="Instagram"
+                        >
+                          <svg
+                            role="img"
+                            viewBox="0 0 24 24"
+                            className="h-5 w-5"
+                            fill="currentColor"
+                          >
+                            <path d={siInstagram.path} />
+                          </svg>
+                        </a>
+                      </div>
+
+                      <SectionHeading>Actions</SectionHeading>
+                      <div className="flex flex-col gap-3">
+                        {updateInfo.updateAvailable ? (
+                          <div className="flex flex-col gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+                            <div className="flex items-center gap-2">
+                              <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                              <span className="text-sm font-medium text-emerald-500">
+                                Update available: Envexa v
+                                {updateInfo.latestVersion}
+                              </span>
                             </div>
-                          </div>
-                          <div className="flex flex-col gap-4 rounded-lg border border-border/50 bg-muted/50 p-4">
-                            <p className="text-sm text-muted-foreground/80">
-                              Configuration file location:
+                            <p className="text-xs text-muted-foreground">
+                              You&apos;re currently on v
+                              {updateInfo.currentVersion}.{" "}
+                              <a
+                                href="https://github.com/KurutoDenzeru/envexa/releases/latest"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline hover:text-foreground"
+                              >
+                                Download the latest release
+                              </a>{" "}
+                              and restart the server to update.
                             </p>
-                            <code className="block rounded bg-muted px-2 py-1 font-mono text-xs break-all text-muted-foreground">
-                              ~/.config/envexa/config.json
-                            </code>
+                            {updateInfo.releaseBody && (
+                              <details className="text-xs text-muted-foreground">
+                                <summary className="cursor-pointer hover:text-foreground">
+                                  Release notes
+                                </summary>
+                                <pre className="mt-2 max-h-40 overflow-y-auto rounded bg-black/10 p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap dark:bg-white/5">
+                                  {updateInfo.releaseBody}
+                                </pre>
+                              </details>
+                            )}
                           </div>
-                          <div className="flex items-center justify-center gap-4">
-                            <a
-                              href="https://github.com/KurutoDenzeru/Envexa"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-muted-foreground/60 transition-colors hover:text-foreground"
-                              title="GitHub"
-                            >
-                              <svg
-                                role="img"
-                                viewBox="0 0 24 24"
-                                className="h-5 w-5"
-                                fill="currentColor"
-                              >
-                                <path d={siGithub.path} />
-                              </svg>
-                            </a>
-                            <a
-                              href="https://linkedin.com/in/kurtcalacday"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-muted-foreground/60 transition-colors hover:text-foreground"
-                              title="LinkedIn"
-                            >
-                              <svg
-                                role="img"
-                                viewBox="0 0 24 24"
-                                className="h-5 w-5"
-                                fill="currentColor"
-                              >
-                                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-                              </svg>
-                            </a>
-                            <a
-                              href="https://instagram.com/krtclcdy"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-muted-foreground/60 transition-colors hover:text-foreground"
-                              title="Instagram"
-                            >
-                              <svg
-                                role="img"
-                                viewBox="0 0 24 24"
-                                className="h-5 w-5"
-                                fill="currentColor"
-                              >
-                                <path d={siInstagram.path} />
-                              </svg>
-                            </a>
+                        ) : null}
+                        <Button
+                          variant="outline"
+                          onClick={handleCheckUpdates}
+                          disabled={updateInfo.checking}
+                          className="h-auto w-full justify-start gap-4 py-4"
+                        >
+                          <Info className="h-5 w-5 shrink-0" />
+                          <div className="text-left">
+                            <div className="font-medium">
+                              {updateInfo.checking
+                                ? "Checking..."
+                                : "Check for Updates"}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {updateInfo.latestVersion && !updateInfo.checking
+                                ? `Latest: v${updateInfo.latestVersion} — Current: v${updateInfo.currentVersion}`
+                                : "Check if a new version of Envexa is available"}
+                            </div>
                           </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <ExternalLink className="h-5 w-5" />
-                            Actions
-                          </CardTitle>
-                          <CardDescription>
-                            Maintenance actions and utilities.
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-4">
-                          {updateInfo.updateAvailable ? (
-                            <div className="flex flex-col gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
-                              <div className="flex items-center gap-2">
-                                <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-                                <span className="text-sm font-medium text-emerald-500">
-                                  Update available: Envexa v
-                                  {updateInfo.latestVersion}
-                                </span>
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                You&apos;re currently on v
-                                {updateInfo.currentVersion}.{" "}
-                                <a
-                                  href="https://github.com/KurutoDenzeru/envexa/releases/latest"
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="underline hover:text-foreground"
-                                >
-                                  Download the latest release
-                                </a>{" "}
-                                and restart the server to update.
-                              </p>
-                              {updateInfo.releaseBody && (
-                                <details className="text-xs text-muted-foreground">
-                                  <summary className="cursor-pointer hover:text-foreground">
-                                    Release notes
-                                  </summary>
-                                  <pre className="mt-2 max-h-40 overflow-y-auto rounded bg-black/10 p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap dark:bg-white/5">
-                                    {updateInfo.releaseBody}
-                                  </pre>
-                                </details>
-                              )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setClearCacheOpen(true)}
+                          className="h-auto w-full justify-start gap-4 py-4 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Database className="h-5 w-5 shrink-0" />
+                          <div className="text-left">
+                            <div className="font-medium">Clear All Caches</div>
+                            <div className="text-xs text-muted-foreground">
+                              Remove all cached scan data and logs
                             </div>
-                          ) : null}
-                          <Button
-                            variant="outline"
-                            onClick={handleCheckUpdates}
-                            disabled={updateInfo.checking}
-                            className="h-auto w-full justify-start gap-4 py-4"
-                          >
-                            <Info className="h-5 w-5 shrink-0" />
-                            <div className="text-left">
-                              <div className="font-medium">
-                                {updateInfo.checking
-                                  ? "Checking..."
-                                  : "Check for Updates"}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {updateInfo.latestVersion &&
-                                !updateInfo.checking
-                                  ? `Latest: v${updateInfo.latestVersion} — Current: v${updateInfo.currentVersion}`
-                                  : "Check if a new version of Envexa is available"}
-                              </div>
+                          </div>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setResetDefaultsOpen(true)}
+                          className="h-auto w-full justify-start gap-4 py-4 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <ExternalLink className="h-5 w-5 shrink-0" />
+                          <div className="text-left">
+                            <div className="font-medium">Reset to Defaults</div>
+                            <div className="text-xs text-muted-foreground">
+                              Reset all settings to factory defaults
                             </div>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => setClearCacheOpen(true)}
-                            className="h-auto w-full justify-start gap-4 py-4 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <Database className="h-5 w-5 shrink-0" />
-                            <div className="text-left">
-                              <div className="font-medium">
-                                Clear All Caches
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Remove all cached scan data and logs
-                              </div>
-                            </div>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => setResetDefaultsOpen(true)}
-                            className="h-auto w-full justify-start gap-4 py-4 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <ExternalLink className="h-5 w-5 shrink-0" />
-                            <div className="text-left">
-                              <div className="font-medium">
-                                Reset to Defaults
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Reset all settings to factory defaults
-                              </div>
-                            </div>
-                          </Button>
-                        </CardContent>
-                      </Card>
+                          </div>
+                        </Button>
+                      </div>
                     </>
                   )}
                 </>
