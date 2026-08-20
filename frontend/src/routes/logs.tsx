@@ -201,6 +201,7 @@ function LogsPage() {
             <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground/60" />
             <Input
               type="text"
+              data-search-input
               placeholder="Search logs..."
               className="h-9 w-full border-border bg-background/50 pl-9 focus-visible:ring-blue-500"
               value={search}

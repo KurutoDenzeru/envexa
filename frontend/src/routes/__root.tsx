@@ -1,4 +1,4 @@
-import { createRootRoute, Outlet } from "@tanstack/react-router"
+import { createRootRoute, Outlet, useNavigate } from "@tanstack/react-router"
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -6,9 +6,41 @@ import { ThemeProvider as NextThemesProvider } from "next-themes"
 import { Toaster } from "@/components/ui/sonner"
 import { ProjectPathSelector } from "@/components/project-path-selector"
 import { ScanDataProvider, useScanData } from "@/components/scan-data-context"
+import { CommandPalette } from "@/components/command-palette"
+import { ShortcutsDialog } from "@/components/shortcuts-dialog"
+import { useHotkeys } from "@/hooks/use-hotkeys"
 import { Button } from "@/components/ui/button"
+import { Kbd, KbdGroup } from "@/components/ui/kbd"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { modLabel } from "@/lib/platform"
 import { RefreshCw } from "lucide-react"
 import { formatRelativeTime } from "@/lib/utils"
+import { useState } from "react"
+
+function HotkeyLayer() {
+  const navigate = useNavigate()
+  const { refetch } = useScanData()
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+
+  useHotkeys({
+    onRescan: () => refetch(true),
+    onNavigate: (to) => navigate({ to }),
+    onPalette: () => setPaletteOpen((open) => !open),
+    onShortcuts: () => setShortcutsOpen(true),
+  })
+
+  return (
+    <>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+    </>
+  )
+}
 
 function ProjectPathWithScan() {
   const { refetch } = useScanData()
@@ -36,6 +68,7 @@ function NavbarScanStatus() {
       >
         <RefreshCw className="h-3.5 w-3.5" />
         Rescan Now
+        <Kbd>R</Kbd>
       </Button>
     </div>
   )
@@ -54,13 +87,23 @@ export const Route = createRootRoute({
         <NextThemesProvider attribute="class" defaultTheme="dark" enableSystem>
           <ScanDataProvider>
             <Toaster position="top-right" />
+            <HotkeyLayer />
             <SidebarProvider defaultOpen={defaultOpen}>
               <div className="flex min-h-screen w-full bg-background font-sans text-foreground">
                 <AppSidebar />
                 <main className="flex min-h-0 min-w-0 flex-1 flex-col">
                   <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center border-b border-border bg-background/80 px-4 backdrop-blur-md">
                     <div className="flex items-center">
-                      <SidebarTrigger />
+                      <Tooltip>
+                        <TooltipTrigger render={<SidebarTrigger />} />
+                        <TooltipContent side="bottom">
+                          Toggle sidebar
+                          <KbdGroup>
+                            <Kbd>{modLabel}</Kbd>
+                            <Kbd>B</Kbd>
+                          </KbdGroup>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                     <div className="flex flex-1 justify-center">
                       <ProjectPathWithScan />

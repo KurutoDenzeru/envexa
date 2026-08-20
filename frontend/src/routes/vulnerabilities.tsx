@@ -199,6 +199,7 @@ function Vulnerabilities() {
               <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground/60" />
               <Input
                 type="text"
+                data-search-input
                 placeholder="Search packages..."
                 className="border-border bg-background/50 pl-9"
                 value={search}
