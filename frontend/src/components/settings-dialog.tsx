@@ -523,15 +523,31 @@ function SettingsDialog({
         <div className="grid h-[min(680px,85vh)] grid-rows-[auto_1fr] sm:grid-cols-[240px_1fr] sm:grid-rows-1">
           {/* Left rail: search + category buttons */}
           <div className="flex min-h-0 flex-col gap-3 border-b border-border bg-muted/40 p-3 sm:border-r sm:border-b-0">
-            <div className="relative">
-              <Search className="absolute top-2 left-2.5 h-3.5 w-3.5 text-muted-foreground/60" />
-              <Input
-                type="text"
-                placeholder="Search settings"
-                className="h-8 border-border bg-background/50 pl-8 text-xs"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute top-2 left-2.5 h-3.5 w-3.5 text-muted-foreground/60" />
+                <Input
+                  type="text"
+                  placeholder="Search settings"
+                  className="h-8 border-border bg-background/50 pl-8 text-xs"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </div>
+              {/* Below sm the rail stacks above the pane header, so the close
+                  button lives here to stay at the dialog's top-right corner */}
+              <DialogClose
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Close settings"
+                    className="shrink-0 sm:hidden"
+                  />
+                }
+              >
+                <X />
+              </DialogClose>
             </div>
             <nav className="flex gap-1 overflow-x-auto sm:min-h-0 sm:flex-col sm:overflow-x-visible sm:overflow-y-auto">
               {visibleCategories.map((c) => (
@@ -571,6 +587,7 @@ function SettingsDialog({
                     variant="ghost"
                     size="icon-sm"
                     aria-label="Close settings"
+                    className="hidden sm:inline-flex"
                   />
                 }
               >
