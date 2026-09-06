@@ -11,13 +11,14 @@ import (
 	"github.com/KurutoDenzeru/envexa/internal/scanner"
 )
 
-// View mirrors the Rust App View enum (src/tui/app.rs) minus PackageDetail/
-// Updating, which arrive with the update-runner phase.
+// View mirrors the Rust App View enum (src/tui/app.rs).
 type View int
 
 const (
 	ViewDashboard View = iota
 	ViewOutdated
+	ViewPackageDetail
+	ViewUpdating
 	ViewLogs
 	ViewSettings
 )
@@ -32,6 +33,16 @@ const (
 
 type scanDoneMsg struct{ report Report }
 type tickMsg time.Time
+type updateDoneMsg struct{ errMsg string }
+
+// detail mirrors the Rust detail model: the package selected in the outdated
+// view, opened into ViewPackageDetail.
+type detail struct {
+	source  string
+	name    string
+	current string
+	latest  string
+}
 
 type Model struct {
 	view      View
@@ -40,6 +51,9 @@ type Model struct {
 	height    int
 	report    Report
 	scanning  bool
+	detail    detail
+	updating  bool
+	updateMsg string
 	spinner   spinner.Model
 	ready     progress.Model
 	health    progress.Model

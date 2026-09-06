@@ -11,9 +11,14 @@ func (m Model) View() string {
 	if m.scanning {
 		return m.viewScanning()
 	}
+	if m.view == ViewUpdating {
+		return m.viewUpdating()
+	}
 	switch m.view {
 	case ViewOutdated:
 		return m.viewOutdated()
+	case ViewPackageDetail:
+		return m.viewPackageDetail()
 	case ViewLogs:
 		return m.viewLogs()
 	case ViewSettings:
@@ -21,6 +26,34 @@ func (m Model) View() string {
 	default:
 		return m.viewDashboard()
 	}
+}
+
+// viewPackageDetail shows the selected outdated package (Rust detail view);
+// `y` confirms the update, Esc returns to the outdated list.
+func (m Model) viewPackageDetail() string {
+	var b strings.Builder
+	b.WriteString(titleStyle.Render("Package detail") + "\n\n")
+	rows := [][2]string{
+		{"package", m.detail.name},
+		{"source", m.detail.source},
+		{"current", m.detail.current},
+		{"latest", m.detail.latest},
+	}
+	for _, r := range rows {
+		b.WriteString(okStyle.Render(pad(r[0], 10)) + r[1] + "\n")
+	}
+	if m.updateMsg != "" {
+		b.WriteString("\n" + statusStyle("error").Render(m.updateMsg) + "\n")
+	}
+	b.WriteString("\n" + dimStyle.Render("y update · esc back"))
+	return b.String()
+}
+
+func (m Model) viewUpdating() string {
+	return fmt.Sprintf("%s\n\n%s %s\n\n%s",
+		titleStyle.Render("Updating"),
+		m.spinner.View(), m.updateMsg,
+		dimStyle.Render("q quit"))
 }
 
 func tabs(view View, width int) string {

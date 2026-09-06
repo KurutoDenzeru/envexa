@@ -25,8 +25,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.syncTables()
 		return m, nil
 
+	case updateDoneMsg:
+		m.updating = false
+		if msg.errMsg != "" {
+			m.updateMsg = msg.errMsg
+			m.view = ViewPackageDetail
+			return m, nil
+		}
+		m.updateMsg = ""
+		m.view = ViewOutdated
+		m.scanning = true
+		return m, tea.Batch(m.spinner.Tick, scanCmd())
+
 	case spinner.TickMsg:
-		if m.scanning {
+		if m.scanning || m.updating {
 			sp, cmd := m.spinner.Update(msg)
 			m.spinner = sp
 			return m, cmd
@@ -34,6 +46,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// Updating blocks input like the Rust Scanning/Updating guard.
+		if m.view == ViewUpdating {
+			switch msg.String() {
+			case "q", "ctrl+c":
+				return m, tea.Quit
+			}
+			return m, nil
+		}
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -50,7 +70,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.view = ViewSettings
 			return m, nil
 		case "h", "esc":
+			if m.view == ViewPackageDetail {
+				m.view = ViewOutdated
+				return m, nil
+			}
 			m.view = ViewDashboard
+			return m, nil
+		case "enter":
+			if m.view == ViewOutdated && len(m.report.Outdated) > 0 && m.outSel < len(m.report.Outdated) {
+				o := m.report.Outdated[m.outSel]
+				m.detail = detail{source: o.Source, name: o.Name, current: o.Current, latest: o.Latest}
+				m.view = ViewPackageDetail
+				return m, nil
+			}
+			return m, nil
+		case "y":
+			if m.view == ViewPackageDetail && !m.updating {
+				if _, err := updateArgs(m.detail.source, m.detail.name); err != nil {
+					m.updateMsg = err.Error()
+					return m, nil
+				}
+				m.updating = true
+				m.view = ViewUpdating
+				m.updateMsg = fmt.Sprintf("Updating %s (%s → %s) via %s…",
+					m.detail.name, m.detail.current, m.detail.latest, m.detail.source)
+				return m, tea.Batch(m.spinner.Tick, updateCmd(m.detail.source, m.detail.name))
+			}
 			return m, nil
 		case "tab":
 			if m.view == ViewDashboard {

@@ -3,6 +3,8 @@ package tui
 import (
 	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // Frame-cost benchmark for the Phase 0 spike gate memo: a frame is one View()
@@ -83,6 +85,54 @@ func TestNewViews(t *testing.T) {
 	m.view = ViewSettings
 	if got := m.View(); !contains(got, "scan_timeout_secs") || !contains(got, "theme") {
 		t.Fatalf("settings view missing config fields: %q", got)
+	}
+}
+
+func TestUpdateViewsAndRunner(t *testing.T) {
+	t.Setenv("ENVEXA_DATA_DIR", t.TempDir())
+
+	m := benchModel(100, 40)
+	m.report = mockReport()
+	m.syncTables()
+
+	// Enter on outdated opens PackageDetail with the selected row.
+	m.view = ViewOutdated
+	m.outSel = 0
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	dm := next.(Model)
+	if dm.view != ViewPackageDetail || dm.detail.name != "typescript" || dm.detail.source != "npm" {
+		t.Fatalf("enter did not open package detail: %+v %+v", dm.view, dm.detail)
+	}
+	if got := dm.View(); !contains(got, "typescript") || !contains(got, "y update") {
+		t.Fatalf("detail view missing fields: %q", got)
+	}
+
+	// y in detail starts the update: Updating view blocks, spinner runs.
+	next, cmd := dm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	um := next.(Model)
+	if um.view != ViewUpdating || !um.updating || !contains(um.updateMsg, "typescript") {
+		t.Fatalf("y did not start update: %+v %q", um.view, um.updateMsg)
+	}
+	if cmd == nil {
+		t.Fatal("update command missing")
+	}
+
+	// updateDoneMsg returns to outdated and rescans.
+	next, cmd2 := um.Update(updateDoneMsg{})
+	fm := next.(Model)
+	if fm.view != ViewOutdated || fm.updating || !fm.scanning {
+		t.Fatalf("updateDoneMsg did not return to outdated+rescan: %+v %+v %+v", fm.view, fm.updating, fm.scanning)
+	}
+	if cmd2 == nil {
+		t.Fatal("rescan command missing")
+	}
+
+	// Unsupported sources are rejected before exec.
+	if _, err := updateArgs("docker", "nginx"); err == nil {
+		t.Fatal("docker should have no update runner")
+	}
+	if args, _ := updateArgs("npm", "typescript"); args[0] != "install" || args[1] != "-g" || args[2] != "typescript@latest" {
+		t.Fatalf("npm update args wrong: %v", args)
 	}
 }
 
