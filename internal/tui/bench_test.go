@@ -3,8 +3,11 @@ package tui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/KurutoDenzeru/envexa/internal/config"
 )
 
 // Frame-cost benchmark for the Phase 0 spike gate memo: a frame is one View()
@@ -168,9 +171,17 @@ func TestViewCycling(t *testing.T) {
 		t.Fatalf("right from outdated: %v", n.view)
 	}
 	next, _ = next.Update(key("right"))
+	if n := next.(Model); n.view != ViewSettings {
+		t.Fatalf("right from logs: %v", n.view)
+	}
+	// settings owns left/right for editing; esc returns to the dashboard
 	next, _ = next.Update(key("left"))
-	if n := next.(Model); n.view != ViewLogs {
-		t.Fatalf("left from settings: %v", n.view)
+	if n := next.(Model); n.view != ViewSettings {
+		t.Fatalf("left in settings should edit, not navigate: %v", n.view)
+	}
+	next, _ = next.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if n := next.(Model); n.view != ViewDashboard {
+		t.Fatalf("esc from settings: %v", n.view)
 	}
 
 	// tab stays on dashboard and cycles sub-tabs
@@ -247,5 +258,68 @@ func TestFilterIndices(t *testing.T) {
 	}
 	if got := filterIndices(items, ""); len(got) != 3 {
 		t.Fatalf("empty query keeps all: %v", got)
+	}
+}
+
+func TestSettingsEdit(t *testing.T) {
+	t.Setenv("ENVEXA_DATA_DIR", t.TempDir())
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	m := benchModel(100, 40)
+	m.syncSettings()
+	m.view = ViewSettings
+
+	right := tea.KeyMsg{Type: tea.KeyRight}
+	// theme cycles default -> dark and persists instantly
+	next, _ := m.Update(right)
+	sm := next.(Model)
+	if sm.editCfg.Theme != "dark" {
+		t.Fatalf("theme should cycle to dark: %q", sm.editCfg.Theme)
+	}
+	if got := config.LoadConfig().Theme; got != "dark" {
+		t.Fatalf("theme not persisted: %q", got)
+	}
+
+	// enter advances the same enum field
+	next, _ = sm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	sm = next.(Model)
+	if sm.editCfg.Theme != "light" {
+		t.Fatalf("theme should cycle to light: %q", sm.editCfg.Theme)
+	}
+
+	// recents: cursor past fields, enter sets project_path
+	sm.editCfg.RecentProjectPaths = []string{"/tmp/proj-a", "/tmp/proj-b"}
+	sm.setSel = len(settingsFields)
+	next, _ = sm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	sm = next.(Model)
+	if sm.editCfg.ProjectPath == nil || *sm.editCfg.ProjectPath != "/tmp/proj-a" {
+		t.Fatalf("enter on recent should set project_path: %v", sm.editCfg.ProjectPath)
+	}
+	if got := config.LoadConfig().ProjectPath; got == nil || *got != "/tmp/proj-a" {
+		t.Fatalf("project_path not persisted: %v", got)
+	}
+	if got := sm.View(); !contains(got, "recent projects") || !contains(got, "/tmp/proj-a") {
+		t.Fatal("settings view should render recents")
+	}
+}
+
+func TestLogsFormat(t *testing.T) {
+	base := time.Date(2026, 9, 6, 19, 0, 0, 0, time.Local)
+	logs := []config.LogPair{
+		{Time: base, Message: "INFO: Web API scan cache hit, returning cached report [system]"},
+		{Time: base.Add(time.Second), Message: "INFO: Web API scan cache hit, returning cached report [system]"},
+		{Time: base.Add(2 * time.Second), Message: "INFO: Detected Node.js project. Scanning package.json... [node]"},
+	}
+	out := formatLogLines(logs)
+	if len(out) != 2 {
+		t.Fatalf("duplicates should collapse: %d lines", len(out))
+	}
+	if !contains(out[0], "×2") || !contains(out[0], "cache hit") {
+		t.Fatalf("first line should group duplicates: %q", out[0])
+	}
+	if contains(out[0], "INFO: ") {
+		t.Fatalf("raw level prefix should be parsed away: %q", out[0])
+	}
+	if !contains(out[1], "Sep 06 19:00:02") || !contains(out[1], "[node]") {
+		t.Fatalf("time/source format wrong: %q", out[1])
 	}
 }

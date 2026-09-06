@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/KurutoDenzeru/envexa/internal/report"
@@ -169,6 +170,47 @@ func ReadLogs() []LogPair {
 		logs = append(logs, LogPair{Time: ts, Message: t[1]})
 	}
 	return logs
+}
+
+// LogEntry is the presentation shape the web dashboard and TUI both use —
+// mirrors server.rs LogEntry.
+type LogEntry struct {
+	Time    string `json:"time"`
+	Date    string `json:"date"`
+	Level   string `json:"level"`
+	Message string `json:"message"`
+	Source  string `json:"source"`
+}
+
+// ParseLogLine splits a raw "LEVEL: message [source]" log entry — the exact
+// semantics of parse_log_line in server.rs.
+func ParseLogLine(pair LogPair) LogEntry {
+	level := "INFO"
+	source := "system"
+	message := pair.Message
+
+	for _, p := range []struct{ prefix, name string }{
+		{"INFO: ", "INFO"}, {"WARN: ", "WARN"}, {"ERROR: ", "ERROR"}, {"DEBUG: ", "DEBUG"},
+	} {
+		if strings.HasPrefix(message, p.prefix) {
+			level = p.name
+			message = message[len(p.prefix):]
+			break
+		}
+	}
+	if start := strings.LastIndex(message, "["); start >= 0 {
+		if end := strings.LastIndex(message, "]"); start < end {
+			source = message[start+1 : end]
+			message = strings.TrimSpace(message[:start])
+		}
+	}
+	return LogEntry{
+		Time:    pair.Time.Format("15:04:05"),
+		Date:    pair.Time.Format("January 02, 2006"),
+		Level:   level,
+		Message: message,
+		Source:  source,
+	}
 }
 
 func WriteLogs(logs []LogPair) error {

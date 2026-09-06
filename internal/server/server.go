@@ -117,11 +117,11 @@ func handleLogs(w http.ResponseWriter, r *http.Request) {
 		seed := seedLogs()
 		_ = config.WriteLogs(seed)
 		for _, pair := range seed {
-			logs = append(logs, parseLogLine(pair))
+			logs = append(logs, config.ParseLogLine(pair))
 		}
 	} else {
 		for _, pair := range raw {
-			logs = append(logs, parseLogLine(pair))
+			logs = append(logs, config.ParseLogLine(pair))
 		}
 	}
 	writeJSON(w, map[string]any{"path": path, "logs": logs})
@@ -321,44 +321,8 @@ func staticHandler(dist string) http.HandlerFunc {
 
 // --- shared helpers -----------------------------------------------------------
 
-type LogEntry struct {
-	Time    string `json:"time"`
-	Date    string `json:"date"`
-	Level   string `json:"level"`
-	Message string `json:"message"`
-	Source  string `json:"source"`
-}
-
-// parseLogLine mirrors server.rs parse_log_line: "LEVEL: message [source]".
-func parseLogLine(pair config.LogPair) LogEntry {
-	level := "INFO"
-	source := "system"
-	message := pair.Message
-
-	for _, p := range []struct{ prefix, name string }{
-		{"INFO: ", "INFO"}, {"WARN: ", "WARN"}, {"ERROR: ", "ERROR"}, {"DEBUG: ", "DEBUG"},
-	} {
-		if strings.HasPrefix(message, p.prefix) {
-			level = p.name
-			message = message[len(p.prefix):]
-			break
-		}
-	}
-	if start := strings.LastIndex(message, "["); start >= 0 {
-		if end := strings.LastIndex(message, "]"); start < end {
-			source = message[start+1 : end]
-			message = strings.TrimRight(message[:start], " ")
-			message = strings.TrimLeft(message, " ")
-		}
-	}
-	return LogEntry{
-		Time:    pair.Time.Format("15:04:05"),
-		Date:    pair.Time.Format("January 02, 2006"),
-		Level:   level,
-		Message: message,
-		Source:  source,
-	}
-}
+// LogEntry is shared with the TUI via the config package.
+type LogEntry = config.LogEntry
 
 // seedLogs mirrors api_logs' fake 7-day history used when logs.json is empty.
 func seedLogs() []config.LogPair {

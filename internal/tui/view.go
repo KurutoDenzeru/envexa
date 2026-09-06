@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/KurutoDenzeru/envexa/internal/cli"
+	"github.com/KurutoDenzeru/envexa/internal/config"
 )
 
 // Dashboard chrome mirrors the Ratatui original (src/tui/ui.rs): ASCII logo,
@@ -238,8 +239,8 @@ func (m Model) dashboardHeader() string {
 }
 
 func projectPath() string {
-	if p := readConfig().ProjectPath; p != "" {
-		return p
+	if p := config.LoadConfig().ProjectPath; p != nil && *p != "" {
+		return *p
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -638,7 +639,8 @@ func (m Model) viewLogs() string {
 	return b.String()
 }
 
-// viewSettings renders the persisted UserConfig plus data paths.
+// viewSettings renders the editable settings — every field mirrors the web
+// dashboard settings page and persists to config.json on change.
 func (m Model) viewSettings() string {
 	var b strings.Builder
 	b.WriteString(m.dashboardHeader())
@@ -648,26 +650,32 @@ func (m Model) viewSettings() string {
 		return b.String()
 	}
 
-	cfg := readConfig()
-	dir := dataDir()
-	rows := [][2]string{
-		{"theme", cfg.Theme},
-		{"scan_timeout_secs", itou(cfg.ScanTimeoutSecs)},
-		{"daemon_interval_secs", itou(cfg.DaemonIntervalSecs)},
-		{"export_format", cfg.ExportFormat},
-		{"log_retention_days", itou(cfg.LogRetentionDays)},
-		{"project_path", cfg.ProjectPath},
-		{"data dir", dir},
+	for i, f := range settingsFields {
+		val := f.value(m.editCfg)
+		adjustable := f.adjust != nil
+		if adjustable {
+			val = dimStyle.Render("‹ ") + val + dimStyle.Render(" ›")
+		}
+		line := okStyle.Render(pad(f.name, 22)) + val
+		if i == m.setSel {
+			line = selectedRow.Render(stripAnsi(line))
+		}
+		b.WriteString(line + "\n")
 	}
-	for _, r := range rows {
-		b.WriteString(okStyle.Render(pad(r[0], 22)) + r[1] + "\n")
-	}
-	if len(cfg.RecentPaths) > 0 {
-		b.WriteString("\n" + titleStyle.Render("recent projects") + "\n")
-		for _, p := range cfg.RecentPaths {
-			b.WriteString("  " + dimStyle.Render(p) + "\n")
+
+	recents := m.editCfg.RecentProjectPaths
+	if len(recents) > 0 {
+		b.WriteString("\n" + titleStyle.Render("recent projects — enter to switch") + "\n")
+		for j, p := range recents {
+			line := "  " + dimStyle.Render(p)
+			if len(settingsFields)+j == m.setSel {
+				line = selectedRow.Render("  " + p)
+			}
+			b.WriteString(line + "\n")
 		}
 	}
+
+	b.WriteString("\n" + dimStyle.Render("↑↓ select · ←→ / enter change · saved to config.json instantly") + "\n")
 	b.WriteString(m.hints())
 	return b.String()
 }

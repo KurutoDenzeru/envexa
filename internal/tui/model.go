@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/KurutoDenzeru/envexa/internal/config"
 	"github.com/KurutoDenzeru/envexa/internal/scanner"
 )
 
@@ -66,6 +67,8 @@ type Model struct {
 	searchActive bool
 	searchInput  textinput.Model
 	query        string // mirrors searchInput.Value() so refilter detects changes
+	setSel       int    // settings cursor: fields, then recent projects
+	editCfg      config.UserConfig
 	logsVP       viewport.Model
 	vulnTable    table.Model
 	toolTable    table.Model

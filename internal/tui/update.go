@@ -5,8 +5,11 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/KurutoDenzeru/envexa/internal/config"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
@@ -64,6 +67,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Updating blocks input like the Rust Scanning/Updating guard.
 		if m.view == ViewUpdating {
 			switch msg.String() {
+			case "q", "ctrl+c":
+				return m, tea.Quit
+			}
+			return m, nil
+		}
+		if m.view == ViewSettings {
+			recents := len(m.editCfg.RecentProjectPaths)
+			switch msg.String() {
+			case "up":
+				m.setSel = max(0, m.setSel-1)
+			case "down":
+				m.setSel = min(len(settingsFields)+recents-1, m.setSel+1)
+			case "left":
+				m.adjustSettings(-1)
+			case "right":
+				m.adjustSettings(1)
+			case "enter":
+				if !m.adjustSettings(1) {
+					m.selectRecent()
+				}
+			case "esc", "h":
+				return *m.gotoView(ViewDashboard), nil
 			case "q", "ctrl+c":
 				return m, tea.Quit
 			}
@@ -208,17 +233,48 @@ func (m *Model) gotoView(v View) *Model {
 	if v == ViewLogs {
 		m.syncLogsVP()
 	}
+	if v == ViewSettings {
+		m.syncSettings()
+	}
 	return m
+}
+
+// syncSettings reloads the config for the settings editor and resets the
+// cursor — the editor edits a live copy and persists on every change.
+func (m *Model) syncSettings() {
+	m.editCfg = config.LoadConfig()
+	m.setSel = 0
+}
+
+// adjustSettings applies a direction to the selected field and saves; returns
+// false when the cursor is on a non-adjustable field (recents).
+func (m *Model) adjustSettings(dir int) bool {
+	if m.setSel >= len(settingsFields) {
+		return false
+	}
+	if f := settingsFields[m.setSel]; f.adjust != nil {
+		f.adjust(&m.editCfg, dir)
+		_ = config.SaveConfig(m.editCfg)
+	}
+	return true
+}
+
+// selectRecent points project_path at the highlighted recent entry.
+func (m *Model) selectRecent() bool {
+	idx := m.setSel - len(settingsFields)
+	recents := m.editCfg.RecentProjectPaths
+	if idx < 0 || idx >= len(recents) {
+		return false
+	}
+	path := recents[idx]
+	m.editCfg.ProjectPath = &path
+	return config.SaveConfig(m.editCfg) == nil
 }
 
 // syncLogsVP fills the bubbles/viewport with the full log history — the old
 // TUI scrolled these; 20 lines visible is the viewport's job now.
 func (m *Model) syncLogsVP() {
-	logs := readLogs()
-	lines := make([]string, 0, len(logs))
-	for _, l := range logs {
-		lines = append(lines, dimStyle.Render(l[0])+" "+l[1])
-	}
+	lines := formatLogLines(readLogs())
 	if len(lines) == 0 {
 		lines = append(lines, dimStyle.Render("no logs yet — run a scan"))
 	}
@@ -227,6 +283,51 @@ func (m *Model) syncLogsVP() {
 	m.logsVP = viewport.New(w, h)
 	m.logsVP.SetContent(strings.Join(lines, "\n"))
 	m.logsVP.GotoBottom()
+}
+
+// formatLogLines renders entries web-dashboard style (colored level, readable
+// time, source tag) and collapses consecutive duplicates with a ×N marker.
+func formatLogLines(logs []config.LogPair) []string {
+	var out []string
+	i := 0
+	for i < len(logs) {
+		e := config.ParseLogLine(logs[i])
+		j := i + 1
+		for j < len(logs) {
+			n := config.ParseLogLine(logs[j])
+			if n.Level == e.Level && n.Message == e.Message && n.Source == e.Source {
+				j++
+				continue
+			}
+			break
+		}
+		out = append(out, logLine(logs[i], e, j-i))
+		i = j
+	}
+	return out
+}
+
+func logLine(pair config.LogPair, e config.LogEntry, count int) string {
+	var levelStyle lipgloss.Style
+	switch e.Level {
+	case "WARN":
+		levelStyle = warningStyle
+	case "ERROR":
+		levelStyle = errorStyle
+	case "DEBUG":
+		levelStyle = dimStyle
+	default:
+		levelStyle = okStyle
+	}
+	line := dimStyle.Render(pair.Time.Format("Jan 02 15:04:05")) + "  " +
+		levelStyle.Render(pad(e.Level, 5)) + "  " + e.Message
+	if e.Source != "system" {
+		line += dimStyle.Render("  [" + e.Source + "]")
+	}
+	if count > 1 {
+		line += dimStyle.Render(fmt.Sprintf("  ×%d", count))
+	}
+	return line
 }
 
 // lastQuery returns the query used by the current filter set.
