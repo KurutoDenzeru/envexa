@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/KurutoDenzeru/envexa/internal/scanner"
@@ -59,6 +60,7 @@ type Model struct {
 	dashSel   int // dashboard_selection (shared cursor across grouped rows)
 	dashRows  int // flattened grouped-row count, for clamping dashSel
 	outSel    int // outdated_selection
+	logsVP    viewport.Model
 	vulnTable table.Model
 	toolTable table.Model
 	outTable  table.Model

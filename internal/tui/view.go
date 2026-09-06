@@ -123,7 +123,7 @@ func (m Model) hints() string {
 		return dimStyle.Render("[S]can [O]utd [L]ogs [C]fg [Q]uit")
 	}
 	return key("S", "can") + key("O", "utdated") + key("L", "ogs") + key("C", "onfig") +
-		dimStyle.Render("←→ tabs  ↑↓ nav  ") + accentStyle.Render("[Q]") + dimStyle.Render("uit")
+		dimStyle.Render("←→ views  ↑↓ nav  ") + accentStyle.Render("[Q]") + dimStyle.Render("uit")
 }
 
 // statusLine renders the health percentage, colored status dots, outdated
@@ -225,7 +225,8 @@ func (m Model) viewDashboard() string {
 func (m Model) dashboardHeader() string {
 	var b strings.Builder
 	if m.width >= 100 && m.height >= 22 {
-		b.WriteString(logoStyle.Render(logoArt) + "\n")
+		b.WriteString(lipgloss.NewStyle().Width(m.width).Align(lipgloss.Center).
+			Render(logoStyle.Render(logoArt)) + "\n")
 		b.WriteString(lipgloss.NewStyle().Width(m.width).Align(lipgloss.Center).
 			Render(dimStyle.Render(projectPath())) + "\n")
 	}
@@ -252,7 +253,8 @@ func projectPath() string {
 // the right column (grouped toolchain panels) side by side; below ~100 cols
 // the panels stack vertically with the pie hidden.
 func (m Model) dashboardBody() string {
-	leftW := 38
+	// Left column takes ~30% of the terminal, clamped to a readable band.
+	leftW := max(30, min(40, m.width*3/10))
 	rightW := m.width - leftW - 2
 	wide := m.width >= 100 && rightW > 40
 	if !wide {
@@ -260,7 +262,7 @@ func (m Model) dashboardBody() string {
 		rightW = m.width - 2
 	}
 
-	overview := panel("Overview", leftW, m.overviewLines(leftW))
+	overview := panel("Overview", leftW, m.overviewLines(leftW, m.height))
 	tooling := panel("Project Tooling", leftW, m.toolingLines(leftW))
 	left := lipgloss.JoinVertical(lipgloss.Left, overview, tooling)
 
@@ -273,11 +275,11 @@ func (m Model) dashboardBody() string {
 }
 
 // overviewLines: status legend + dot pie (pie hidden on narrow terminals).
-func (m Model) overviewLines(width int) []string {
+func (m Model) overviewLines(width, height int) []string {
 	ok, warn, errC, skip := m.statusCounts()
 	counts := map[string]int{"ok": ok, "warn": warn, "error": errC, "skipped": skip}
 	lines := wrapChunks(legendParts(counts), width-2)
-	if width-2 >= 22 {
+	if width-2 >= 22 && height >= 18 {
 		lines = append(lines, "")
 		lines = append(lines, pieChart(counts, ok+warn+errC+skip)...)
 	}
@@ -608,16 +610,13 @@ func (m Model) viewLogs() string {
 		return b.String()
 	}
 
-	logs := readLogs()
-	if len(logs) == 0 {
-		b.WriteString(dimStyle.Render("no logs yet — run a scan") + "\n")
-	} else {
-		n := len(logs)
-		start := max(0, n-20)
-		for i := start; i < n; i++ {
-			b.WriteString(dimStyle.Render(logs[i][0]) + " " + logs[i][1] + "\n")
-		}
+	// Lazy sync: gotoView/resize normally handle this; direct entry (tests,
+	// first render) needs it too. Never re-sync on plain renders — that would
+	// reset the scroll position mid-navigation.
+	if m.logsVP.Height == 0 || m.logsVP.Width != m.width-2 {
+		m.syncLogsVP()
 	}
+	b.WriteString(m.logsVP.View() + "\n")
 	b.WriteString(m.hints())
 	return b.String()
 }

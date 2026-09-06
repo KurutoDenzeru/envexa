@@ -3,6 +3,9 @@ package tui
 import (
 	"fmt"
 	"sort"
+	"strings"
+
+	"github.com/charmbracelet/bubbles/viewport"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
@@ -24,6 +27,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.ready.Width = max(10, m.width-8)
 			m.health.Width = max(10, m.width-8)
+		}
+		if m.view == ViewLogs {
+			m.syncLogsVP()
 		}
 		return m, nil
 
@@ -69,14 +75,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.scanning = true
 			return m, tea.Batch(m.spinner.Tick, scanCmd())
 		case "o":
-			m.view = ViewOutdated
-			return m, nil
+			return *m.gotoView(ViewOutdated), nil
 		case "l":
-			m.view = ViewLogs
-			return m, nil
+			return *m.gotoView(ViewLogs), nil
 		case "c":
-			m.view = ViewSettings
-			return m, nil
+			return *m.gotoView(ViewSettings), nil
 		case "h", "esc":
 			if m.view == ViewPackageDetail {
 				m.view = ViewOutdated
@@ -106,24 +109,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "tab":
+			// Dashboard sub-tabs (overview / vulnerabilities / toolchains).
 			if m.view == ViewDashboard {
 				m.dashTab = (m.dashTab + 1) % 3
 			}
 			return m, nil
-		case "left":
-			if m.view == ViewDashboard {
-				m.dashTab = (m.dashTab + 2) % 3
-				return m, nil
+		case "left", "right":
+			order := []View{ViewDashboard, ViewOutdated, ViewLogs, ViewSettings}
+			idx := 0
+			for i, v := range order {
+				if v == m.view {
+					idx = i
+					break
+				}
 			}
-			m.view = ViewDashboard
-			return m, nil
-		case "right":
-			if m.view == ViewDashboard {
-				m.dashTab = (m.dashTab + 1) % 3
-				return m, nil
+			if msg.String() == "right" {
+				idx = (idx + 1) % len(order)
+			} else {
+				idx = (idx + len(order) - 1) % len(order)
 			}
-			m.view = ViewOutdated
-			return m, nil
+			return *m.gotoView(order[idx]), nil
 		case "up", "down":
 			var cmd tea.Cmd
 			switch {
@@ -143,6 +148,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.dashSel = min(m.dashRows-1, m.dashSel+1)
 				}
+			case m.view == ViewLogs:
+				vp, c := m.logsVP.Update(msg)
+				m.logsVP = vp
+				return m, c
 			}
 			return m, cmd
 		}
@@ -152,6 +161,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // syncTables reloads bubbletea table rows from the report — equivalent to the
 // Rust renderers rebuilding Rows each frame.
+// gotoView switches top-level views and refreshes view-local state (the logs
+// viewport reloads so it picks up new entries and the current size).
+func (m *Model) gotoView(v View) *Model {
+	m.view = v
+	if v == ViewLogs {
+		m.syncLogsVP()
+	}
+	return m
+}
+
+// syncLogsVP fills the bubbles/viewport with the full log history — the old
+// TUI scrolled these; 20 lines visible is the viewport's job now.
+func (m *Model) syncLogsVP() {
+	logs := readLogs()
+	lines := make([]string, 0, len(logs))
+	for _, l := range logs {
+		lines = append(lines, dimStyle.Render(l[0])+" "+l[1])
+	}
+	if len(lines) == 0 {
+		lines = append(lines, dimStyle.Render("no logs yet — run a scan"))
+	}
+	w := max(20, m.width-2)
+	h := max(4, m.height-9)
+	m.logsVP = viewport.New(w, h)
+	m.logsVP.SetContent(strings.Join(lines, "\n"))
+	m.logsVP.GotoBottom()
+}
+
 func (m *Model) syncTables() {
 	tools := make([]string, 0, len(m.report.Results))
 	for name := range m.report.Results {

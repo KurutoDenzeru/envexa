@@ -141,3 +141,48 @@ func TestUpdateViewsAndRunner(t *testing.T) {
 }
 
 func contains(s, sub string) bool { return strings.Contains(s, sub) }
+
+func TestViewCycling(t *testing.T) {
+	t.Setenv("ENVEXA_DATA_DIR", t.TempDir())
+	m := benchModel(100, 40)
+
+	key := func(s string) tea.KeyMsg {
+		switch s {
+		case "left":
+			return tea.KeyMsg{Type: tea.KeyLeft}
+		case "right":
+			return tea.KeyMsg{Type: tea.KeyRight}
+		case "tab":
+			return tea.KeyMsg{Type: tea.KeyTab}
+		}
+		return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
+	}
+
+	// right cycles dashboard -> outdated -> logs -> settings -> dashboard
+	next, _ := m.Update(key("right"))
+	if n := next.(Model); n.view != ViewOutdated {
+		t.Fatalf("right from dashboard: %v", n.view)
+	}
+	next, _ = next.Update(key("right"))
+	if n := next.(Model); n.view != ViewLogs {
+		t.Fatalf("right from outdated: %v", n.view)
+	}
+	next, _ = next.Update(key("right"))
+	next, _ = next.Update(key("left"))
+	if n := next.(Model); n.view != ViewLogs {
+		t.Fatalf("left from settings: %v", n.view)
+	}
+
+	// tab stays on dashboard and cycles sub-tabs
+	next, _ = m.Update(key("tab"))
+	n := next.(Model)
+	if n.view != ViewDashboard || n.dashTab != dashVulns {
+		t.Fatalf("tab should cycle dashboard sub-tabs: %v %v", n.view, n.dashTab)
+	}
+
+	// left/right on dashboard also cycles sub-tab state untouched
+	next, _ = m.Update(key("right"))
+	if n := next.(Model); n.view != ViewOutdated {
+		t.Fatalf("right should leave dashboard: %v", n.view)
+	}
+}
