@@ -1,0 +1,4 @@
+version: "2"
+issues:
+  exclude-dirs:
+    - frontend/node_modules

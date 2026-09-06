@@ -96,8 +96,7 @@ func (m Model) tabsBar() string {
 	sep := dimStyle.Render(" │ ")
 	bar := strings.Join(parts, sep)
 	if m.width < 60 {
-		bar = strings.Join([]string{parts[0][:1], parts[1][:1], parts[2][:1], parts[3][:1]}, " ")
-		// first rune of each styled name, keep active accent
+		// First rune of each name, keeping the active accent.
 		bar = ""
 		for i, t := range names {
 			r := []rune(t.n)[0]
