@@ -32,7 +32,6 @@ const (
 )
 
 type scanDoneMsg struct{ report Report }
-type tickMsg time.Time
 type updateDoneMsg struct{ errMsg string }
 
 // detail mirrors the Rust detail model: the package selected in the outdated

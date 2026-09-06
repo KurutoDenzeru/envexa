@@ -127,7 +127,7 @@ func (m Model) viewOutdated() string {
 
 	if len(m.report.Outdated) > 0 {
 		b.WriteString(borderStyle.Render(m.outTable.View()) + "\n")
-		b.WriteString(fmt.Sprintf("%d outdated packages\n", len(m.report.Outdated)))
+		fmt.Fprintf(&b, "%d outdated packages\n", len(m.report.Outdated))
 	} else {
 		b.WriteString(dimStyle.Render("no report yet — press s to scan") + "\n")
 	}

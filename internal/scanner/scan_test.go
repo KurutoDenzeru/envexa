@@ -51,7 +51,7 @@ func TestScanRealToolchains(t *testing.T) {
 	for tool, r := range report.Results {
 		// Skipped scanners report tool:"" (Rust ScanResult::skipped) but the
 		// map key stays the scanner name, like scan_all_with.
-		if r.Tool != tool && !(r.Tool == "" && r.Status == "skipped") {
+		if r.Tool != tool && (r.Tool != "" || r.Status != "skipped") {
 			t.Fatalf("tool %q reported as %q", tool, r.Tool)
 		}
 		switch r.Status {

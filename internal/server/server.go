@@ -287,7 +287,7 @@ func handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 			resp["update_available"] = latest != current
 			resp["release_body"] = rel.Body
 		}
-		respHTTP.Body.Close()
+		_ = respHTTP.Body.Close()
 	}
 	writeJSON(w, resp)
 }

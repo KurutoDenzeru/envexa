@@ -30,7 +30,7 @@ func RunScan(format string, out io.Writer) error {
 		enc.SetIndent("", "  ")
 		return enc.Encode(rep)
 	case "markdown":
-		fmt.Fprint(out, renderMarkdown(rep))
+		_, _ = fmt.Fprint(out, renderMarkdown(rep))
 		return nil
 	default:
 		return fmt.Errorf("unknown format %q (want markdown|json|sarif)", format)
@@ -74,7 +74,7 @@ func CheckUpdate(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var body struct {
 		TagName string `json:"tag_name"`
 	}
@@ -84,13 +84,13 @@ func CheckUpdate(out io.Writer) error {
 	latest := strings.TrimPrefix(body.TagName, "v")
 	current := strings.TrimPrefix(Version, "v")
 	if latest == "" {
-		fmt.Fprintln(out, "envexa: no releases found")
+		_, _ = fmt.Fprintln(out, "envexa: no releases found")
 		return nil
 	}
 	if latest == current {
-		fmt.Fprintf(out, "envexa %s is up to date (latest %s)\n", current, body.TagName)
+		_, _ = fmt.Fprintf(out, "envexa %s is up to date (latest %s)\n", current, body.TagName)
 	} else {
-		fmt.Fprintf(out, "envexa %s -> %s available (run the installer to update)\n", current, body.TagName)
+		_, _ = fmt.Fprintf(out, "envexa %s -> %s available (run the installer to update)\n", current, body.TagName)
 	}
 	return nil
 }
@@ -103,7 +103,7 @@ func RunDaemon(interval time.Duration, out io.Writer) error {
 	defer ticker.Stop()
 	run := func() {
 		rep := scanner.Scan(scanner.Dir(), 60*time.Second)
-		fmt.Fprintf(out, "%s scan: %d toolchains checked\n", time.Now().Format(time.RFC3339), len(rep.Results))
+		_, _ = fmt.Fprintf(out, "%s scan: %d toolchains checked\n", time.Now().Format(time.RFC3339), len(rep.Results))
 	}
 	run()
 	for {
