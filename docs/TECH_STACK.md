@@ -12,6 +12,18 @@ This document details the ground-up technical stack and architectural decisions 
 
 ---
 
+## Go + Bash Transition (issue #34)
+
+Envexa is transitioning from a pure Rust runtime to **Go (TUI/web/CLI) + Bash (scanners)** — see [issue #34](https://github.com/KurutoDenzeru/envexa/issues/34) and `docs/spike-bubbletea-gate.md`.
+
+- **Go TUI (`internal/tui`)**: [charmbracelet/bubbletea](https://github.com/charmbracelet/bubbletea) (Elm architecture) replaces ratatui + crossterm; [lipgloss](https://github.com/charmbracelet/lipgloss) replaces `theme.rs` styling; [bubbles](https://github.com/charmbracelet/bubbles) provides `table`/`spinner`/`progress`. Frame cost measured at 50–100µs (<1% of a 16ms budget).
+- **Bash scanners (`toolchains/*.sh`)**: each of the 15 scanners is a standalone script emitting `ScanResult` JSON via `toolchains/lib/scan.sh` (`which_cached`, 30s `run_cmd` timeout, serde-compatible field names). Runs under macOS bash 3.2 and later.
+- **Go bridge (`internal/scanner`)**: runs every `toolchains/*.sh` concurrently (30s timeout each) and merges the `Report` — the counterpart of `scan_all_with`.
+- **Go web server (`internal/server`)**: net/http + static SPA serving replaces Axum + rust-embed with byte-compatible JSON responses (verified against the Axum server).
+- **Go config (`internal/config`)**: mirrors `core/config.rs` — config.json, cache.json, logs.json under the envexa data dir.
+
+---
+
 ## Core Language
 
 **[Rust (Edition 2021)](https://www.rust-lang.org/)**

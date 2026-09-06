@@ -83,17 +83,27 @@ Then confirm:
 
 ## Pre-Push Checklist
 
-Always run this before pushing:
+Rust runtime (until the issue #34 sunset gate removes it):
 
 ```bash
 cargo build && cargo clippy -- -D warnings && cargo fmt --check
 ```
 
+Go + Bash runtime (transition, issue #34):
+
+```bash
+go build ./... && go vet ./... && go test ./... && gofmt -l cmd internal
+shellcheck -S warning toolchains/*.sh toolchains/lib/scan.sh tests/toolchains_test.sh
+bash tests/toolchains_test.sh
+bash tests/parity.sh   # sunset gate harness (requires cargo; skips verdict with ENVEXA_PARITY_SKIP_RUST=1)
+(cd frontend && bun run typecheck && bun run build)
+```
+
 CLI output verification — manually run and visually inspect:
-1. `cargo run -- --help` — help text renders correctly
-2. `cargo run -- scan` — full report printed to stdout
-3. `cargo run -- update` — update check message (no-op if latest)
-4. `cargo run` (no args, in terminal) — TUI launches, `S` triggers scan, `O` shows outdated, arrows navigate, `Q` quits
+1. `cargo run -- --help` and `go run ./cmd/envexa --help` — help text renders correctly
+2. `cargo run -- scan` and `go run ./cmd/envexa scan` — full report printed to stdout
+3. `cargo run -- update` and `go run ./cmd/envexa update` — update check message
+4. `cargo run` / `go run ./cmd/envexa` (no args, in terminal) — TUI launches, `s` triggers scan, `o` shows outdated, arrows navigate, `q` quits
 5. Resize smoke test — run the TUI at narrow, medium, wide, and tiny terminal sizes; no panic, malformed layout, or broken terminal restore
 
 Do not push if any of these produce warnings or malformed output. Fix first, then push.

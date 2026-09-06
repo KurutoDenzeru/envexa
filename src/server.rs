@@ -503,13 +503,13 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
         path = "index.html".to_string();
     }
 
-    match Asset::get(path.as_str()) {
+    match <Asset as RustEmbed>::get(path.as_str()) {
         Some(content) => {
             let mime = mime_guess::from_path(path).first_or_octet_stream();
             ([(header::CONTENT_TYPE, mime.as_ref())], content.data).into_response()
         }
         None => {
-            if let Some(index) = Asset::get("index.html") {
+            if let Some(index) = <Asset as RustEmbed>::get("index.html") {
                 ([(header::CONTENT_TYPE, "text/html")], index.data).into_response()
             } else {
                 (StatusCode::NOT_FOUND, "404 Not Found").into_response()

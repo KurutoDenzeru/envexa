@@ -16,7 +16,9 @@
 
 ---
 
-Blazing-fast Rust TUI, scriptable CLI, and live web dashboard for monitoring local developer tooling health. Instantly track outdated packages and audit security risks across 14+ toolchains.
+Blazing-fast TUI, scriptable CLI, and live web dashboard for monitoring local developer tooling health. Instantly track outdated packages and audit security risks across 14+ toolchains.
+
+> **.transition note:** envexa is migrating from Rust to a Go (Bubbletea) + Bash architecture — see [#34](https://github.com/KurutoDenzeru/envexa/issues/34). On this branch the runtime is: Go binary (TUI + web server + CLI) + Bash scanners (`toolchains/*.sh`). The Rust runtime remains the released default until the sunset gate passes.
 
 ## 📚 Table of Contents
 
@@ -37,15 +39,23 @@ Blazing-fast Rust TUI, scriptable CLI, and live web dashboard for monitoring loc
 curl -fsSL https://raw.githubusercontent.com/KurutoDenzeru/envexa/main/scripts/install.sh | bash
 
 # Or build from source
-git clone https://github.com/KurutoDenzeru/envexa.git && cd envexa && cargo install --path .
+git clone https://github.com/KurutoDenzeru/envexa.git && cd envexa
+
+# Rust runtime (released default until the sunset gate)
+cargo install --path .
+
+# Go + Bash runtime (issue #34 transition)
+go build -o ~/.local/bin/envexa ./cmd/envexa
 ```
 
 ### Usage
 ```bash
 envexa             # Launch the interactive TUI dashboard
 envexa scan        # Generate a comprehensive markdown report
+envexa scan --format json   # Machine-readable report (Go runtime)
 envexa serve       # Launch the interactive Web Dashboard (port 8080)
-envexa update      # Update to the latest release
+envexa update      # Check for the latest release
+envexa daemon      # Re-scan on an interval
 ```
 
 ---
