@@ -1,5 +1,7 @@
 package tui
 
+import "encoding/json"
+
 // Data shapes mirror the Rust side (src/toolchains/mod.rs ScanResult serde
 // fields, src/scanner/mod.rs Report) so bash scanners feed both runtimes
 // unchanged. Spike ships mock data until the bash scanners are wired in.
@@ -11,21 +13,22 @@ type PackageInfo struct {
 }
 
 type ScanResult struct {
-	Tool           string        `json:"tool"`
-	Status         string        `json:"status"`
-	Version        string        `json:"version,omitempty"`
-	NodeVersion    string        `json:"node_version,omitempty"`
-	PythonVersion  string        `json:"python_version,omitempty"`
-	RubyVersion    string        `json:"ruby_version,omitempty"`
-	RustcVersion   string        `json:"rustc_version,omitempty"`
-	CargoVersion   string        `json:"cargo_version,omitempty"`
-	PnpmVersion    string        `json:"pnpm_version,omitempty"`
-	BunVersion     string        `json:"bun_version,omitempty"`
-	DenoVersion    string        `json:"deno_version,omitempty"`
-	InstalledCount *uint64       `json:"installed_count,omitempty"`
-	Outdated       []PackageInfo `json:"outdated,omitempty"`
-	OutdatedGlobal []PackageInfo `json:"outdated_global,omitempty"`
-	Issues         []string      `json:"issues,omitempty"`
+	Tool           string          `json:"tool"`
+	Status         string          `json:"status"`
+	Version        string          `json:"version,omitempty"`
+	NodeVersion    string          `json:"node_version,omitempty"`
+	PythonVersion  string          `json:"python_version,omitempty"`
+	RubyVersion    string          `json:"ruby_version,omitempty"`
+	RustcVersion   string          `json:"rustc_version,omitempty"`
+	CargoVersion   string          `json:"cargo_version,omitempty"`
+	PnpmVersion    string          `json:"pnpm_version,omitempty"`
+	BunVersion     string          `json:"bun_version,omitempty"`
+	DenoVersion    string          `json:"deno_version,omitempty"`
+	InstalledCount *uint64         `json:"installed_count,omitempty"`
+	DiskUsage      json.RawMessage `json:"disk_usage,omitempty"`
+	Outdated       []PackageInfo   `json:"outdated,omitempty"`
+	OutdatedGlobal []PackageInfo   `json:"outdated_global,omitempty"`
+	Issues         []string        `json:"issues,omitempty"`
 }
 
 type OutdatedItem struct {

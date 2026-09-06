@@ -46,6 +46,42 @@ run_cmd() {
 	rm -f "$tmp"
 }
 
+# try_cmd honors the exit status (unlike run_cmd, which mirrors Rust's
+# status-ignoring behavior). Prints stdout on success, sets CMD_RC, empty on
+# timeout/failure. Used where Rust checked `status.success()` (docker info).
+CMD_RC=0
+try_cmd() { # <secs> <cmd> [args...]
+	CMD_RC=0
+	local secs="$1"
+	shift
+	local tmp
+	tmp=$(mktemp) || {
+		CMD_RC=1
+		return 1
+	}
+	if command -v timeout >/dev/null 2>&1; then
+		timeout "$secs" "$@" >"$tmp" 2>/dev/null
+	elif command -v gtimeout >/dev/null 2>&1; then
+		gtimeout "$secs" "$@" >"$tmp" 2>/dev/null
+	else
+		perl -e 'alarm shift; exec @ARGV or exit 127' -- "$secs" "$@" >"$tmp" 2>/dev/null
+	fi
+	CMD_RC=$?
+	((CMD_RC != 0)) && {
+		rm -f "$tmp"
+		return 1
+	}
+	cat "$tmp"
+	rm -f "$tmp"
+}
+
+# get_project_path mirrors mod.rs: project_path from config.json, else cwd.
+get_project_path() {
+	local cfg="$HOME/.local/share/envexa/config.json" p=""
+	[[ -f $cfg ]] && p=$(jq -r '.project_path // empty' "$cfg" 2>/dev/null)
+	[[ -n $p ]] && [[ $p != "null" ]] && printf '%s' "$p" || printf '%s' "$PWD"
+}
+
 # json_array_pkgs: TSV (name\tcurrent\tlatest) on stdin -> PackageInfo JSON array.
 json_array_pkgs() {
 	jq -Rsc 'split("\n") | map(select(length > 0) | split("\t")
@@ -73,6 +109,7 @@ emit_scan_result() {
 		--arg bun_version "${RESULT_BUN_VERSION-}" \
 		--arg deno_version "${RESULT_DENO_VERSION-}" \
 		--argjson installed_count "${RESULT_INSTALLED_COUNT:-null}" \
+		--argjson disk_usage "${RESULT_DISK_USAGE:-null}" \
 		--argjson outdated_formulae "${RESULT_OUTDATED_FORMULAE:-[]}" \
 		--argjson outdated_casks "${RESULT_OUTDATED_CASKS:-[]}" \
 		--argjson outdated "${RESULT_OUTDATED:-[]}" \
@@ -89,6 +126,7 @@ emit_scan_result() {
 		+ (if $bun_version != "" then {bun_version: $bun_version} else {} end)
 		+ (if $deno_version != "" then {deno_version: $deno_version} else {} end)
 		+ (if $installed_count != null then {installed_count: $installed_count} else {} end)
+		+ (if $disk_usage != null then {disk_usage: $disk_usage} else {} end)
 		+ (if ($outdated_formulae | length) > 0 then {outdated_formulae: $outdated_formulae} else {} end)
 		+ (if ($outdated_casks | length) > 0 then {outdated_casks: $outdated_casks} else {} end)
 		+ (if ($outdated | length) > 0 then {outdated: $outdated} else {} end)
