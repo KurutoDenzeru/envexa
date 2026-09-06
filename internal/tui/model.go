@@ -1,12 +1,15 @@
 package tui
 
 import (
+	"os"
 	"time"
 
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/KurutoDenzeru/envexa/internal/scanner"
 )
 
 // View mirrors the Rust App View enum (src/tui/app.rs).
@@ -67,13 +70,17 @@ func NewModel() Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.spinner.Tick, simulateScan())
+	return tea.Batch(m.spinner.Tick, scanCmd())
 }
 
-// simulateScan stands in for the bash scanner bridge (Phase 1) and the Rust
-// block_on scan; it defers the mock report so the spinner/throbber path runs.
-func simulateScan() tea.Cmd {
-	return tea.Tick(1200*time.Millisecond, func(time.Time) tea.Msg {
-		return scanDoneMsg{report: mockReport()}
-	})
+// scanCmd runs the real bash scanners via the Go bridge — the replacement for
+// the Rust scan_all_with call path. Runs async; the spinner keeps ticking.
+func scanCmd() tea.Cmd {
+	dir := os.Getenv("ENVEXA_TOOLCHAINS_DIR")
+	if dir == "" {
+		dir = "toolchains"
+	}
+	return func() tea.Msg {
+		return scanDoneMsg{report: scanner.Scan(dir, 60*time.Second)}
+	}
 }

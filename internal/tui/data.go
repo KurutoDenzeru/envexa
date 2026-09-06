@@ -1,49 +1,19 @@
 package tui
 
-import "encoding/json"
+import "github.com/KurutoDenzeru/envexa/internal/report"
 
-// Data shapes mirror the Rust side (src/toolchains/mod.rs ScanResult serde
-// fields, src/scanner/mod.rs Report) so bash scanners feed both runtimes
-// unchanged. Spike ships mock data until the bash scanners are wired in.
+// Data contract lives in internal/report (shared with the Go bridge); aliases
+// keep the TUI view code short. Mock data covers the spike benchmark/test path.
 
-type PackageInfo struct {
-	Name    string `json:"name"`
-	Current string `json:"current"`
-	Latest  string `json:"latest"`
-}
-
-type ScanResult struct {
-	Tool           string          `json:"tool"`
-	Status         string          `json:"status"`
-	Version        string          `json:"version,omitempty"`
-	NodeVersion    string          `json:"node_version,omitempty"`
-	PythonVersion  string          `json:"python_version,omitempty"`
-	RubyVersion    string          `json:"ruby_version,omitempty"`
-	RustcVersion   string          `json:"rustc_version,omitempty"`
-	CargoVersion   string          `json:"cargo_version,omitempty"`
-	PnpmVersion    string          `json:"pnpm_version,omitempty"`
-	BunVersion     string          `json:"bun_version,omitempty"`
-	DenoVersion    string          `json:"deno_version,omitempty"`
-	InstalledCount *uint64         `json:"installed_count,omitempty"`
-	DiskUsage      json.RawMessage `json:"disk_usage,omitempty"`
-	Outdated       []PackageInfo   `json:"outdated,omitempty"`
-	OutdatedGlobal []PackageInfo   `json:"outdated_global,omitempty"`
-	Issues         []string        `json:"issues,omitempty"`
-}
-
-type OutdatedItem struct {
-	Source  string `json:"source"`
-	Name    string `json:"name"`
-	Current string `json:"current"`
-	Latest  string `json:"latest"`
-	Size    string `json:"size"`
-}
-
-type Report struct {
-	Timestamp string                `json:"timestamp"`
-	Results   map[string]ScanResult `json:"results"`
-	Outdated  []OutdatedItem        `json:"outdated"`
-}
+type (
+	PackageInfo       = report.PackageInfo
+	ScanResult        = report.ScanResult
+	OutdatedItem      = report.OutdatedItem
+	Report            = report.Report
+	VulnerabilityInfo = report.VulnerabilityInfo
+	AuditItem         = report.AuditItem
+	SupplyChainRisk   = report.SupplyChainRisk
+)
 
 func mockReport() Report {
 	return Report{

@@ -38,7 +38,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "s":
 			m.scanning = true
-			return m, tea.Batch(m.spinner.Tick, simulateScan())
+			return m, tea.Batch(m.spinner.Tick, scanCmd())
 		case "o":
 			m.view = ViewOutdated
 			return m, nil
