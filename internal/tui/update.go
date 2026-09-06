@@ -2,6 +2,7 @@ package tui
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
@@ -78,7 +79,8 @@ func (m *Model) syncTables() {
 	dashRows := []table.Row{}
 	for _, name := range tools {
 		r := m.report.Results[name]
-		dashRows = append(dashRows, table.Row{name, r.Status, r.Version, r.Notes})
+		notes := strings.Join(r.Issues, "; ")
+		dashRows = append(dashRows, table.Row{name, r.Status, r.Version, notes})
 	}
 	m.dashTable.SetRows(dashRows)
 	m.dashTable.SetHeight(min(8, len(dashRows)+1))
