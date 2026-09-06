@@ -75,6 +75,14 @@ try_cmd() { # <secs> <cmd> [args...]
 	rm -f "$tmp"
 }
 
+# run_cmd_in mirrors mod.rs run_cmd_in: cd into dir, then run_cmd; dir missing
+# or cd failing yields empty output like the Rust Err path.
+run_cmd_in() { # <dir> <cmd> [args...]
+	local dir=$1
+	shift
+	(cd "$dir" 2>/dev/null && run_cmd "$@")
+}
+
 # get_project_path mirrors mod.rs: project_path from config.json, else cwd.
 get_project_path() {
 	local cfg="$HOME/.local/share/envexa/config.json" p=""
@@ -110,6 +118,10 @@ emit_scan_result() {
 		--arg deno_version "${RESULT_DENO_VERSION-}" \
 		--argjson installed_count "${RESULT_INSTALLED_COUNT:-null}" \
 		--argjson disk_usage "${RESULT_DISK_USAGE:-null}" \
+		--arg project_type "${RESULT_PROJECT_TYPE-}" \
+		--argjson vulnerabilities "${RESULT_VULNERABILITIES:-[]}" \
+		--argjson audit_items "${RESULT_AUDIT_ITEMS:-[]}" \
+		--argjson supply_chain_risks "${RESULT_SUPPLY_CHAIN_RISKS:-[]}" \
 		--argjson outdated_formulae "${RESULT_OUTDATED_FORMULAE:-[]}" \
 		--argjson outdated_casks "${RESULT_OUTDATED_CASKS:-[]}" \
 		--argjson outdated "${RESULT_OUTDATED:-[]}" \
@@ -127,6 +139,10 @@ emit_scan_result() {
 		+ (if $deno_version != "" then {deno_version: $deno_version} else {} end)
 		+ (if $installed_count != null then {installed_count: $installed_count} else {} end)
 		+ (if $disk_usage != null then {disk_usage: $disk_usage} else {} end)
+		+ (if $project_type != "" then {project_type: $project_type} else {} end)
+		+ (if ($vulnerabilities | length) > 0 then {vulnerabilities: $vulnerabilities} else {} end)
+		+ (if ($audit_items | length) > 0 then {audit_items: $audit_items} else {} end)
+		+ (if ($supply_chain_risks | length) > 0 then {supply_chain_risks: $supply_chain_risks} else {} end)
 		+ (if ($outdated_formulae | length) > 0 then {outdated_formulae: $outdated_formulae} else {} end)
 		+ (if ($outdated_casks | length) > 0 then {outdated_casks: $outdated_casks} else {} end)
 		+ (if ($outdated | length) > 0 then {outdated: $outdated} else {} end)

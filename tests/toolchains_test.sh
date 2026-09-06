@@ -41,7 +41,7 @@ out=$(run_cmd sleep 5) && fail "run_cmd should fail on timeout"
 unset SCAN_TIMEOUT
 
 # --- real path: whatever tools exist, output stays contract-valid ------------
-for t in npm pnpm yarn bun deno pip gem cargo docker; do
+for t in npm pnpm yarn bun deno pip gem cargo docker project security audit ci supply_chain; do
 	out=$(bash "$ROOT/toolchains/$t.sh") || fail "$t.sh (real PATH) exited nonzero"
 	valid_result "$out" "$t"
 done
