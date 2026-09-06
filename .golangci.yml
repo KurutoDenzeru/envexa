@@ -1,4 +1,5 @@
 version: "2"
-issues:
-  exclude-dirs:
-    - frontend/node_modules
+linters:
+  exclusions:
+    paths:
+      - frontend/node_modules
