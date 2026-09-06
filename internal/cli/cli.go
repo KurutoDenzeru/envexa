@@ -3,14 +3,12 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
@@ -75,42 +73,6 @@ func renderMarkdown(rep report.Report) string {
 		}
 	}
 	return b.String()
-}
-
-// Serve runs the Phase 3 preview HTTP server: scan JSON API + static
-// frontend/dist with SPA fallback. Full API parity lands next.
-func Serve(port int, dist string) error {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/scan", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		rep := scanner.Scan(toolchainsDir(), 60*time.Second)
-		_ = json.NewEncoder(w).Encode(rep)
-	})
-	mux.HandleFunc("GET /api/version", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"version": Version})
-	})
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		path := filepath.Join(dist, filepath.Clean(r.URL.Path))
-		if _, err := os.Stat(path); err != nil {
-			path = filepath.Join(dist, "index.html") // SPA fallback
-		}
-		http.ServeFile(w, r, path)
-	})
-	srv := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: mux}
-	errCh := make(chan error, 1)
-	go func() { errCh <- srv.ListenAndServe() }()
-	fmt.Printf("envexa serving on http://localhost:%d (dist: %s)\n", port, dist)
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-	select {
-	case err := <-errCh:
-		return err
-	case <-stop:
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		return srv.Shutdown(ctx)
-	}
 }
 
 // CheckUpdate compares Version against the latest GitHub release tag.

@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/KurutoDenzeru/envexa/internal/cli"
+	"github.com/KurutoDenzeru/envexa/internal/server"
 	"github.com/KurutoDenzeru/envexa/internal/tui"
 )
 
@@ -49,7 +50,7 @@ func main() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			port, _ := cmd.Flags().GetInt("port")
 			dist, _ := cmd.Flags().GetString("dist")
-			return cli.Serve(port, dist)
+			return server.Serve(port, dist)
 		},
 	}
 	serveCmd.Flags().Int("port", 8080, "port to listen on")

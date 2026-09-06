@@ -26,6 +26,8 @@ type ScanResult struct {
 	InstalledCount   *uint64             `json:"installed_count,omitempty"`
 	DiskUsage        json.RawMessage     `json:"disk_usage,omitempty"`
 	Outdated         []PackageInfo       `json:"outdated,omitempty"`
+	OutdatedFormulae []PackageInfo       `json:"outdated_formulae,omitempty"`
+	OutdatedCasks    []PackageInfo       `json:"outdated_casks,omitempty"`
 	OutdatedGlobal   []PackageInfo       `json:"outdated_global,omitempty"`
 	Issues           []string            `json:"issues,omitempty"`
 	ProjectType      string              `json:"project_type,omitempty"`
@@ -66,5 +68,7 @@ type OutdatedItem struct {
 type Report struct {
 	Timestamp string                `json:"timestamp"`
 	Results   map[string]ScanResult `json:"results"`
-	Outdated  []OutdatedItem        `json:"outdated"`
+	// Outdated is the flattened view for the TUI's outdated table — filled by
+	// the Go bridge, never serialized (Rust Report has no such field).
+	Outdated []OutdatedItem `json:"-"`
 }

@@ -3,6 +3,7 @@
 # (no brew invocation), fallback shells out to brew like the Rust version.
 # Compatible with macOS system bash 3.2 (no assoc arrays — jq does the joins).
 set -u
+[[ -n ${ENVEXA_DEBUG:-} ]] && set -x
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=lib/scan.sh
 source "$SCRIPT_DIR/lib/scan.sh"

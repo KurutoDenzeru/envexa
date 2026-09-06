@@ -83,9 +83,22 @@ run_cmd_in() { # <dir> <cmd> [args...]
 	(cd "$dir" 2>/dev/null && run_cmd "$@")
 }
 
+# data_dir mirrors core::config::dir(): XDG_DATA_HOME, ~/.local/share/envexa,
+# ~/.envexa fallback.
+data_dir() {
+	if [[ -n ${XDG_DATA_HOME:-} ]]; then
+		printf '%s' "$XDG_DATA_HOME/envexa"
+	elif [[ -n ${HOME:-} ]]; then
+		printf '%s' "$HOME/.local/share/envexa"
+	else
+		printf '%s' ".envexa"
+	fi
+}
+
 # get_project_path mirrors mod.rs: project_path from config.json, else cwd.
 get_project_path() {
-	local cfg="$HOME/.local/share/envexa/config.json" p=""
+	local cfg p=""
+	cfg="$(data_dir)/config.json"
 	[[ -f $cfg ]] && p=$(jq -r '.project_path // empty' "$cfg" 2>/dev/null)
 	[[ -n $p ]] && [[ $p != "null" ]] && printf '%s' "$p" || printf '%s' "$PWD"
 }

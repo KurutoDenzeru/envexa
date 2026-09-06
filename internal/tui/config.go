@@ -13,9 +13,12 @@ func dataDir() string {
 	if d := os.Getenv("ENVEXA_DATA_DIR"); d != "" {
 		return d
 	}
+	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+		return filepath.Join(xdg, "envexa")
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return ""
+		return filepath.Join(".", ".envexa")
 	}
 	return filepath.Join(home, ".local", "share", "envexa")
 }
