@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -68,6 +69,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		if m.searchActive && m.view == ViewOutdated {
+			switch msg.String() {
+			case "esc":
+				if m.searchInput.Value() == "" {
+					m.searchActive = false
+					m.searchInput.Blur()
+				} else {
+					m.searchInput.SetValue("")
+				}
+				m.refilter()
+				return m, nil
+			case "enter":
+				if idx, ok := m.selectedOutdated(); ok {
+					o := m.report.Outdated[idx]
+					m.detail = detail{source: o.Source, name: o.Name, current: o.Current, latest: o.Latest}
+					m.view = ViewPackageDetail
+				}
+				return m, nil
+			}
+			var cmd tea.Cmd
+			m.searchInput, cmd = m.searchInput.Update(msg)
+			if m.searchInput.Value() != m.lastQuery() {
+				m.refilter()
+			}
+			return m, cmd
+		}
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -76,23 +103,36 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(m.spinner.Tick, scanCmd())
 		case "o":
 			return *m.gotoView(ViewOutdated), nil
+		case "/":
+			if m.view == ViewOutdated {
+				m.searchActive = true
+				m.searchInput.Focus()
+				m.refilter()
+				return m, textinput.Blink
+			}
+			return m, nil
 		case "l":
 			return *m.gotoView(ViewLogs), nil
 		case "c":
 			return *m.gotoView(ViewSettings), nil
-		case "h", "esc":
+		case "esc":
 			if m.view == ViewPackageDetail {
 				m.view = ViewOutdated
 				return m, nil
 			}
 			m.view = ViewDashboard
 			return m, nil
+		case "h":
+			m.view = ViewDashboard
+			return m, nil
 		case "enter":
-			if m.view == ViewOutdated && len(m.report.Outdated) > 0 && m.outSel < len(m.report.Outdated) {
-				o := m.report.Outdated[m.outSel]
+			if m.view != ViewOutdated {
+				return m, nil
+			}
+			if idx, ok := m.selectedOutdated(); ok {
+				o := m.report.Outdated[idx]
 				m.detail = detail{source: o.Source, name: o.Name, current: o.Current, latest: o.Latest}
 				m.view = ViewPackageDetail
-				return m, nil
 			}
 			return m, nil
 		case "y":
@@ -189,6 +229,47 @@ func (m *Model) syncLogsVP() {
 	m.logsVP.GotoBottom()
 }
 
+// lastQuery returns the query used by the current filter set.
+func (m *Model) lastQuery() string {
+	return m.query
+}
+
+// refilter recomputes the filtered outdated indices for the active query.
+func (m *Model) refilter() {
+	m.query = m.searchInput.Value()
+	m.filtered = filterIndices(m.report.Outdated, m.query)
+	m.fpos = min(m.fpos, max(0, len(m.filtered)-1))
+}
+
+// selectedOutdated resolves the highlighted row (filter-aware) to an index
+// into report.Outdated.
+func (m *Model) selectedOutdated() (int, bool) {
+	if m.searchActive {
+		if len(m.filtered) == 0 || m.fpos >= len(m.filtered) {
+			return 0, false
+		}
+		return m.filtered[m.fpos], true
+	}
+	if m.outSel < len(m.report.Outdated) {
+		return m.outSel, true
+	}
+	return 0, false
+}
+
+// filterIndices returns indices of items matching the query
+// (case-insensitive substring over package and source).
+func filterIndices(items []OutdatedItem, query string) []int {
+	q := strings.ToLower(query)
+	out := make([]int, 0, len(items))
+	for i, o := range items {
+		if q == "" || strings.Contains(strings.ToLower(o.Name), q) ||
+			strings.Contains(strings.ToLower(o.Source), q) {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
 func (m *Model) syncTables() {
 	tools := make([]string, 0, len(m.report.Results))
 	for name := range m.report.Results {
@@ -214,6 +295,7 @@ func (m *Model) syncTables() {
 		}
 	}
 	m.dashRows = dashRows
+	m.refilter()
 	m.toolTable.SetRows(toolRows)
 	m.toolTable.SetHeight(min(8, len(toolRows)+1))
 	m.vulnTable.SetRows(vulnRows(vulns))

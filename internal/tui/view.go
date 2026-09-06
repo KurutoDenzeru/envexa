@@ -575,6 +575,10 @@ func (m Model) viewOutdated() string {
 	}
 
 	if len(m.report.Outdated) > 0 {
+		if m.searchActive {
+			b.WriteString(accentStyle.Render("/ "+m.searchInput.Value()) + dimStyle.Render("▏") +
+				dimStyle.Render(fmt.Sprintf("  %d/%d matches — esc clears", len(m.filtered), len(m.report.Outdated))) + "\n")
+		}
 		outLines := append([]string{tableHeader(m.width - 4)}, m.outdatedLines()...)
 		b.WriteString(panel("Outdated packages", m.width-2, outLines) + "\n")
 		fmt.Fprintf(&b, "%d outdated packages\n", len(m.report.Outdated))
@@ -586,16 +590,30 @@ func (m Model) viewOutdated() string {
 }
 
 func (m Model) outdatedLines() []string {
+	idxs := m.outdatedIndices()
 	lines := []string{}
-	for i, o := range m.report.Outdated {
+	for pos, i := range idxs {
+		o := m.report.Outdated[i]
 		line := pad(o.Source, 12) + pad(truncate(o.Name, 20), 20) +
 			pad(o.Current, 12) + pad(o.Latest, 12) + o.Size
-		if i == m.outSel {
+		if (m.searchActive && pos == m.fpos) || (!m.searchActive && i == m.outSel) {
 			line = selectedRow.Render(stripAnsi(line))
 		}
 		lines = append(lines, line)
 	}
 	return lines
+}
+
+// outdatedIndices resolves the visible row order (all rows, or filtered).
+func (m Model) outdatedIndices() []int {
+	if m.searchActive {
+		return m.filtered
+	}
+	idxs := make([]int, len(m.report.Outdated))
+	for i := range m.report.Outdated {
+		idxs[i] = i
+	}
+	return idxs
 }
 
 // viewLogs shows the scan history from the envexa data dir — newest last,

@@ -186,3 +186,66 @@ func TestViewCycling(t *testing.T) {
 		t.Fatalf("right should leave dashboard: %v", n.view)
 	}
 }
+
+func TestOutdatedSearch(t *testing.T) {
+	t.Setenv("ENVEXA_DATA_DIR", t.TempDir())
+	m := benchModel(100, 40)
+	m.report = mockReport()
+	m.syncTables()
+	m.view = ViewOutdated
+
+	// "/" activates the filter; typing narrows rows; selection maps back.
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	sm := next.(Model)
+	if !sm.searchActive {
+		t.Fatal("/ did not activate search")
+	}
+	next, _ = sm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("v")})
+	next, _ = next.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	sm = next.(Model)
+	if got := len(sm.filtered); got != 1 || sm.report.Outdated[sm.filtered[0]].Name != "vite" {
+		t.Fatalf("filter 'vi' should match vite only: %v", sm.filtered)
+	}
+	if sm.fpos != 0 {
+		t.Fatalf("cursor should reset to first match: %d", sm.fpos)
+	}
+	if got := sm.View(); !contains(got, "/ vi") || !contains(got, "vite") || contains(got, "ripgrep") {
+		t.Fatalf("filtered view wrong: %q", got)
+	}
+
+	// esc with a query clears it; esc again closes the filter.
+	next, _ = sm.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	next, _ = next.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	sm = next.(Model)
+	if sm.searchActive || len(sm.filtered) != len(sm.report.Outdated) {
+		t.Fatalf("esc should clear then close filter: %v %v", sm.searchActive, len(sm.filtered))
+	}
+
+	// enter on a filtered row opens the right package detail.
+	sm.view = ViewOutdated
+	next, _ = sm.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	next, _ = next.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("da")})
+	sm = next.(Model)
+	next, _ = sm.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	dm := next.(Model)
+	if dm.view != ViewPackageDetail || dm.detail.name != "dax" {
+		t.Fatalf("enter after filter should open dax detail: %+v %+v", dm.view, dm.detail)
+	}
+}
+
+func TestFilterIndices(t *testing.T) {
+	items := []OutdatedItem{
+		{Source: "npm", Name: "typescript"},
+		{Source: "brew", Name: "ripgrep"},
+		{Source: "npm", Name: "vite"},
+	}
+	if got := filterIndices(items, "npm"); len(got) != 2 {
+		t.Fatalf("source filter: %v", got)
+	}
+	if got := filterIndices(items, "grep"); len(got) != 1 || got[0] != 1 {
+		t.Fatalf("case-insensitive name filter: %v", got)
+	}
+	if got := filterIndices(items, ""); len(got) != 3 {
+		t.Fatalf("empty query keeps all: %v", got)
+	}
+}

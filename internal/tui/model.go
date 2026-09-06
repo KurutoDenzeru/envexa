@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -45,34 +46,43 @@ type detail struct {
 }
 
 type Model struct {
-	view      View
-	dashTab   int
-	width     int
-	height    int
-	report    Report
-	scanning  bool
-	detail    detail
-	updating  bool
-	updateMsg string
-	spinner   spinner.Model
-	ready     progress.Model
-	health    progress.Model
-	dashSel   int // dashboard_selection (shared cursor across grouped rows)
-	dashRows  int // flattened grouped-row count, for clamping dashSel
-	outSel    int // outdated_selection
-	logsVP    viewport.Model
-	vulnTable table.Model
-	toolTable table.Model
-	outTable  table.Model
+	view         View
+	dashTab      int
+	width        int
+	height       int
+	report       Report
+	scanning     bool
+	detail       detail
+	updating     bool
+	updateMsg    string
+	spinner      spinner.Model
+	ready        progress.Model
+	health       progress.Model
+	dashSel      int // dashboard_selection (shared cursor across grouped rows)
+	dashRows     int // flattened grouped-row count, for clamping dashSel
+	outSel       int // outdated_selection
+	fpos         int // position within the filtered outdated rows
+	filtered     []int
+	searchActive bool
+	searchInput  textinput.Model
+	query        string // mirrors searchInput.Value() so refilter detects changes
+	logsVP       viewport.Model
+	vulnTable    table.Model
+	toolTable    table.Model
+	outTable     table.Model
 }
 
 func NewModel() Model {
+	si := textinput.New()
+	si.Placeholder = "filter packages…"
+	si.Prompt = "/ "
 	sp := spinner.New(spinner.WithSpinner(spinner.Meter))
 	return Model{
-		view:    ViewDashboard,
-		spinner: sp,
-		ready:   progress.New(progress.WithDefaultGradient()),
-		health:  progress.New(progress.WithDefaultGradient()),
+		view:        ViewDashboard,
+		spinner:     sp,
+		searchInput: si,
+		ready:       progress.New(progress.WithDefaultGradient()),
+		health:      progress.New(progress.WithDefaultGradient()),
 		vulnTable: table.New(
 			table.WithColumns([]table.Column{
 				{Title: "Package", Width: 20},
