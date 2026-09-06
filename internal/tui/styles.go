@@ -11,11 +11,8 @@ var (
 	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
 	skippedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 
-	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6"))
-	tabActive   = lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("6")).Foreground(lipgloss.Color("0"))
-	tabInactive = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-	dimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-	borderStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("8")).Padding(0, 1)
+	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6"))
+	dimStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 )
 
 func statusStyle(status string) lipgloss.Style {

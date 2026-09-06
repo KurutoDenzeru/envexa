@@ -3,7 +3,6 @@ package tui
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
@@ -17,6 +16,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		// Readiness bar lives in the left panel: 34 cols wide, or full width
+		// when the dashboard stacks vertically.
+		if m.width >= 100 {
+			m.ready.Width = 34
+			m.health.Width = 34
+		} else {
+			m.ready.Width = max(10, m.width-8)
+			m.health.Width = max(10, m.width-8)
+		}
 		return m, nil
 
 	case scanDoneMsg:
@@ -129,8 +137,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.toolTable, cmd = m.toolTable.Update(msg)
 				m.dashSel = m.toolTable.Cursor()
 			case m.view == ViewDashboard:
-				m.dashTable, cmd = m.dashTable.Update(msg)
-				m.dashSel = m.dashTable.Cursor()
+				// Shared cursor across the grouped dashboard rows.
+				if msg.String() == "up" {
+					m.dashSel = max(0, m.dashSel-1)
+				} else {
+					m.dashSel = min(m.dashRows-1, m.dashSel+1)
+				}
 			}
 			return m, cmd
 		}
@@ -147,20 +159,24 @@ func (m *Model) syncTables() {
 	}
 	sort.Strings(tools)
 
-	dashRows := []table.Row{}
 	toolRows := []table.Row{}
 	vulns := []VulnerabilityInfo{}
+	dashRows := 0
 	for _, name := range tools {
 		r := m.report.Results[name]
-		notes := strings.Join(r.Issues, "; ")
-		dashRows = append(dashRows, table.Row{name, r.Status, r.Version, notes})
 		toolRows = append(toolRows, table.Row{name, r.Status, displayVersion(r), installedCount(r)})
 		if name == "security" {
 			vulns = r.Vulnerabilities
 		}
 	}
-	m.dashTable.SetRows(dashRows)
-	m.dashTable.SetHeight(min(8, len(dashRows)+1))
+	for _, g := range toolGroups {
+		for _, t := range g.tools {
+			if _, ok := m.report.Results[t]; ok {
+				dashRows++
+			}
+		}
+	}
+	m.dashRows = dashRows
 	m.toolTable.SetRows(toolRows)
 	m.toolTable.SetHeight(min(8, len(toolRows)+1))
 	m.vulnTable.SetRows(vulnRows(vulns))

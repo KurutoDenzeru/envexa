@@ -56,9 +56,9 @@ type Model struct {
 	spinner   spinner.Model
 	ready     progress.Model
 	health    progress.Model
-	dashSel   int // dashboard_selection
+	dashSel   int // dashboard_selection (shared cursor across grouped rows)
+	dashRows  int // flattened grouped-row count, for clamping dashSel
 	outSel    int // outdated_selection
-	dashTable table.Model
 	vulnTable table.Model
 	toolTable table.Model
 	outTable  table.Model
@@ -71,16 +71,6 @@ func NewModel() Model {
 		spinner: sp,
 		ready:   progress.New(progress.WithDefaultGradient()),
 		health:  progress.New(progress.WithDefaultGradient()),
-		dashTable: table.New(
-			table.WithColumns([]table.Column{
-				{Title: "Tool", Width: 12},
-				{Title: "Status", Width: 10},
-				{Title: "Version", Width: 12},
-				{Title: "Notes", Width: 28},
-			}),
-			table.WithFocused(true),
-			table.WithHeight(8),
-		),
 		vulnTable: table.New(
 			table.WithColumns([]table.Column{
 				{Title: "Package", Width: 20},

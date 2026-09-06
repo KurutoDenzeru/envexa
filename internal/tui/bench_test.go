@@ -47,12 +47,16 @@ func TestViewFallbacks(t *testing.T) {
 		t.Fatalf("tiny terminal not guarded: %q", got)
 	}
 	mid := benchModel(70, 30)
-	if got := mid.View(); contains(got, "ok 6") { // distribution legend, not the progress gauges
-		t.Fatalf("distribution chart should be hidden under width 80: %q", got)
+	if got := mid.View(); !contains(got, "PASS (6)") || !contains(got, "Overview") {
+		t.Fatalf("mid dashboard missing overview panel: %q", got)
+	}
+	if got := mid.View(); contains(got, "╗") { // logoArt box corner, absent from other chrome
+		t.Fatal("logo should be hidden under width 100")
 	}
 	wide := benchModel(100, 40)
-	if got := wide.View(); !contains(got, "ok 6") {
-		t.Fatal("distribution chart missing on wide terminal")
+	if got := wide.View(); !contains(got, "╗") || !contains(got, "System & Runtime") ||
+		!contains(got, "Crafted by Kuruto Denzeru") {
+		t.Fatalf("wide dashboard missing logo, groups, or footer: %q", got)
 	}
 	scanning := benchModel(100, 40)
 	scanning.scanning = true
