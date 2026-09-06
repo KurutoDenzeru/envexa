@@ -26,15 +26,18 @@ installed_of() {
 }
 
 # scan_taps extracts the first `version '…'` per tap .rb file, keyed by stem.
+# Single grep pass — a per-file fork loop over ~15k tap files takes minutes.
 scan_taps() {
-	local taps=$1 f stem ver
+	local taps="$1/Library/Taps" line f stem ver
 	[[ -d $taps ]] || return 0
-	while IFS= read -r -d '' f; do
-		stem=$(basename "$f" .rb)
-		ver=$(grep -m1 -E 'version[[:space:]]+' "$f" 2>/dev/null |
-			sed -n -E "s/^.*version[[:space:]]+[\"']([^\"']+)[\"'].*/\1/p")
-		[[ -n $ver ]] && printf '%s\t%s\n' "$stem" "$ver"
-	done < <(find "$taps" -name '.*' -prune -o -type f -name '*.rb' -print0 2>/dev/null)
+	grep -r -m1 --include='*.rb' --exclude-dir='.*' -E 'version[[:space:]]+' "$taps" 2>/dev/null |
+		while IFS= read -r line; do
+			f=${line%%:*}
+			stem=$(basename "$f" .rb)
+			ver=$(printf '%s' "$line" |
+				sed -n -E "s/^.*version[[:space:]]+[\"']([^\"']+)[\"'].*/\1/p")
+			[[ -n $ver ]] && printf '%s\t%s\n' "$stem" "$ver"
+		done
 }
 
 # tsv_to_pkgs: TSV name/current/latest -> PackageInfo array (empty -> []).

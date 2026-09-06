@@ -12,12 +12,23 @@ import (
 	"github.com/KurutoDenzeru/envexa/internal/scanner"
 )
 
-// View mirrors the Rust App View enum (src/tui/app.rs).
+// View mirrors the Rust App View enum (src/tui/app.rs) minus PackageDetail/
+// Updating, which arrive with the update-runner phase.
 type View int
 
 const (
 	ViewDashboard View = iota
 	ViewOutdated
+	ViewLogs
+	ViewSettings
+)
+
+// Dashboard sub-tabs, cycled with Tab/Left/Right: overview, vulnerabilities,
+// toolchains — keeps Project/Security/Audit signals first-class like ui.rs.
+const (
+	dashOverview = iota
+	dashVulns
+	dashToolchains
 )
 
 type scanDoneMsg struct{ report Report }
@@ -25,6 +36,7 @@ type tickMsg time.Time
 
 type Model struct {
 	view      View
+	dashTab   int
 	width     int
 	height    int
 	report    Report
@@ -35,6 +47,8 @@ type Model struct {
 	dashSel   int // dashboard_selection
 	outSel    int // outdated_selection
 	dashTable table.Model
+	vulnTable table.Model
+	toolTable table.Model
 	outTable  table.Model
 }
 
@@ -51,6 +65,26 @@ func NewModel() Model {
 				{Title: "Status", Width: 10},
 				{Title: "Version", Width: 12},
 				{Title: "Notes", Width: 28},
+			}),
+			table.WithFocused(true),
+			table.WithHeight(8),
+		),
+		vulnTable: table.New(
+			table.WithColumns([]table.Column{
+				{Title: "Package", Width: 20},
+				{Title: "Severity", Width: 10},
+				{Title: "Fixed", Width: 12},
+				{Title: "Title", Width: 40},
+			}),
+			table.WithFocused(true),
+			table.WithHeight(8),
+		),
+		toolTable: table.New(
+			table.WithColumns([]table.Column{
+				{Title: "Toolchain", Width: 14},
+				{Title: "Status", Width: 10},
+				{Title: "Version", Width: 20},
+				{Title: "Installed", Width: 10},
 			}),
 			table.WithFocused(true),
 			table.WithHeight(8),

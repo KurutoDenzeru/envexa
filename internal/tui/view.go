@@ -14,6 +14,10 @@ func (m Model) View() string {
 	switch m.view {
 	case ViewOutdated:
 		return m.viewOutdated()
+	case ViewLogs:
+		return m.viewLogs()
+	case ViewSettings:
+		return m.viewSettings()
 	default:
 		return m.viewDashboard()
 	}
@@ -54,16 +58,28 @@ func (m Model) viewDashboard() string {
 		return b.String()
 	}
 
-	if m.report.Timestamp != "" {
+	if m.report.Timestamp == "" {
+		b.WriteString(dimStyle.Render("no report yet — press s to scan") + "\n")
+		b.WriteString(dimStyle.Render("s scan · o outdated · l logs · c settings · q quit"))
+		return b.String()
+	}
+
+	switch m.dashTab {
+	case dashVulns:
+		b.WriteString(borderStyle.Render(m.vulnTable.View()) + "\n")
+		if sec, ok := m.report.Results["security"]; ok {
+			b.WriteString(dimStyle.Render(strings.Join(sec.Issues, " · ")) + "\n")
+		}
+	case dashToolchains:
+		b.WriteString(borderStyle.Render(m.toolTable.View()) + "\n")
+	default:
 		b.WriteString(m.gauges() + "\n")
 		if m.width >= 80 { // pie/chart area only when there is room
 			b.WriteString(m.distribution() + "\n")
 		}
 		b.WriteString(borderStyle.Render(m.dashTable.View()) + "\n")
-	} else {
-		b.WriteString(dimStyle.Render("no report yet — press s to scan") + "\n")
 	}
-	b.WriteString(dimStyle.Render("s scan · o outdated · ↑/↓ select · ←/→ tab · h home · q quit"))
+	b.WriteString(dimStyle.Render("s scan · o outdated · l logs · c settings · tab vulns/toolchains · ↑/↓ select · h home · q quit"))
 	return b.String()
 }
 
@@ -84,6 +100,79 @@ func (m Model) viewOutdated() string {
 	}
 	b.WriteString(dimStyle.Render("s scan · ↑/↓ select · ←/→ tab · h home · q quit"))
 	return b.String()
+}
+
+// viewLogs shows the scan history from ~/.local/share/envexa/logs.json —
+// newest last, like the Rust logs view reads them.
+func (m Model) viewLogs() string {
+	var b strings.Builder
+	b.WriteString(tabs(m.view, m.width) + "\n")
+
+	if m.width < 40 || m.height < 12 {
+		b.WriteString(dimStyle.Render("terminal too small — enlarge window") + "\n")
+		return b.String()
+	}
+
+	logs := readLogs()
+	if len(logs) == 0 {
+		b.WriteString(dimStyle.Render("no logs yet — run a scan") + "\n")
+	} else {
+		n := len(logs)
+		start := max(0, n-20)
+		for i := start; i < n; i++ {
+			b.WriteString(dimStyle.Render(logs[i][0]) + " " + logs[i][1] + "\n")
+		}
+	}
+	b.WriteString(dimStyle.Render("s scan · o outdated · h home · q quit"))
+	return b.String()
+}
+
+// viewSettings renders the persisted UserConfig plus data paths.
+func (m Model) viewSettings() string {
+	var b strings.Builder
+	b.WriteString(tabs(m.view, m.width) + "\n")
+
+	if m.width < 40 || m.height < 12 {
+		b.WriteString(dimStyle.Render("terminal too small — enlarge window") + "\n")
+		return b.String()
+	}
+
+	cfg := readConfig()
+	dir := dataDir()
+	rows := [][2]string{
+		{"theme", cfg.Theme},
+		{"scan_timeout_secs", itou(cfg.ScanTimeoutSecs)},
+		{"daemon_interval_secs", itou(cfg.DaemonIntervalSecs)},
+		{"export_format", cfg.ExportFormat},
+		{"log_retention_days", itou(cfg.LogRetentionDays)},
+		{"project_path", cfg.ProjectPath},
+		{"data dir", dir},
+	}
+	for _, r := range rows {
+		b.WriteString(okStyle.Render(pad(r[0], 22)) + r[1] + "\n")
+	}
+	if len(cfg.RecentPaths) > 0 {
+		b.WriteString("\n" + titleStyle.Render("recent projects") + "\n")
+		for _, p := range cfg.RecentPaths {
+			b.WriteString("  " + dimStyle.Render(p) + "\n")
+		}
+	}
+	b.WriteString(dimStyle.Render("s scan · o outdated · h home · q quit"))
+	return b.String()
+}
+
+func pad(s string, n int) string {
+	for len(s) < n {
+		s += " "
+	}
+	return s
+}
+
+func itou(v uint64) string {
+	if v == 0 {
+		return "—"
+	}
+	return fmt.Sprintf("%d", v)
 }
 
 // gauges renders readiness (% tools ok) and health (% non-error) via

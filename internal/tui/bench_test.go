@@ -59,4 +59,31 @@ func TestViewFallbacks(t *testing.T) {
 	}
 }
 
+func TestNewViews(t *testing.T) {
+	t.Setenv("ENVEXA_DATA_DIR", t.TempDir()) // isolate logs/config reads
+
+	m := benchModel(100, 40)
+	m.report = mockReport()
+	m.syncTables()
+
+	m.dashTab = dashVulns
+	if got := m.View(); !contains(got, "Package") || !contains(got, "Severity") {
+		t.Fatalf("vulns tab missing table headers: %q", got)
+	}
+	m.dashTab = dashToolchains
+	if got := m.View(); !contains(got, "Toolchain") {
+		t.Fatalf("toolchains tab missing table header: %q", got)
+	}
+	m.dashTab = dashOverview
+
+	m.view = ViewLogs
+	if got := m.View(); !contains(got, "no logs yet") {
+		t.Fatalf("logs view missing empty state: %q", got)
+	}
+	m.view = ViewSettings
+	if got := m.View(); !contains(got, "scan_timeout_secs") || !contains(got, "theme") {
+		t.Fatalf("settings view missing config fields: %q", got)
+	}
+}
+
 func contains(s, sub string) bool { return strings.Contains(s, sub) }
