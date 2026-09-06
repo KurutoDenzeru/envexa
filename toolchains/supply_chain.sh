@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034  # RESULT_* globals are consumed by emit_scan_result in lib/scan.sh
 # Port of src/toolchains/supply_chain.rs: flag node_modules packages that run
 # install scripts or are marked deprecated.
 set -u

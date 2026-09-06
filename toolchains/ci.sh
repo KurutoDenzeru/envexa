@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034  # RESULT_* globals are consumed by emit_scan_result in lib/scan.sh
 # Port of src/toolchains/ci.rs: scan .github/workflows for pinned GitHub Actions
 # below the known-latest major version.
 set -u

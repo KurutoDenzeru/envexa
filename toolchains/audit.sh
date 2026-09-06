@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034  # RESULT_* globals are consumed by emit_scan_result in lib/scan.sh
 # Port of src/toolchains/audit.rs: version pairing checks (node/npm, python/pip,
 # brew age, cargo vs rustc, bun age) and env-manager file checks.
 set -u

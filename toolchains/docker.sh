@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034  # RESULT_* globals are consumed by emit_scan_result in lib/scan.sh
 # Port of src/toolchains/docker.rs: version + 10s-capped daemon info probe.
 # Unlike the Rust run_cmd path, docker info checks status.success() — try_cmd
 # preserves that.

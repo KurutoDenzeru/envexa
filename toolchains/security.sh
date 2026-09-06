@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034  # RESULT_* globals are consumed by emit_scan_result in lib/scan.sh
 # Port of src/toolchains/security.rs: aggregate vulnerabilities from npm, pnpm,
 # bun, cargo, pip, go, and composer auditors. Each runs only when its lockfile
 # and CLI exist, matching the Rust gates.

@@ -35,6 +35,7 @@ done
 # --- run_cmd timeout: SCAN_TIMEOUT must kill the command ---------------------
 # shellcheck source=../toolchains/lib/scan.sh
 source "$ROOT/toolchains/lib/scan.sh"
+# shellcheck disable=SC2034  # read by run_cmd via sourced lib
 SCAN_TIMEOUT=1
 out=$(run_cmd sleep 5) && fail "run_cmd should fail on timeout"
 [[ -z $out ]] || fail "run_cmd should emit nothing on timeout"

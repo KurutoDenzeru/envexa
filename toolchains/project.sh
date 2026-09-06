@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034  # RESULT_* globals are consumed by emit_scan_result in lib/scan.sh
 # Port of src/toolchains/project.rs: detect project type from lockfiles, then
 # gather outdated packages with the matching package manager.
 set -u

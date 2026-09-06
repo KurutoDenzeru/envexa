@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034  # RESULT_* globals are consumed by emit_scan_result in lib/scan.sh
 # Port of src/toolchains/brew.rs: fast path reads the Homebrew api JWS cache
 # (no brew invocation), fallback shells out to brew like the Rust version.
 # Compatible with macOS system bash 3.2 (no assoc arrays — jq does the joins).
