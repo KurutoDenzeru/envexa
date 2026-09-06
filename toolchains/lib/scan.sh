@@ -65,6 +65,13 @@ emit_scan_result() {
 		--arg status "${RESULT_STATUS-}" \
 		--arg version "${RESULT_VERSION-}" \
 		--arg node_version "${RESULT_NODE_VERSION-}" \
+		--arg python_version "${RESULT_PYTHON_VERSION-}" \
+		--arg ruby_version "${RESULT_RUBY_VERSION-}" \
+		--arg rustc_version "${RESULT_RUSTC_VERSION-}" \
+		--arg cargo_version "${RESULT_CARGO_VERSION-}" \
+		--arg pnpm_version "${RESULT_PNPM_VERSION-}" \
+		--arg bun_version "${RESULT_BUN_VERSION-}" \
+		--arg deno_version "${RESULT_DENO_VERSION-}" \
 		--argjson installed_count "${RESULT_INSTALLED_COUNT:-null}" \
 		--argjson outdated_formulae "${RESULT_OUTDATED_FORMULAE:-[]}" \
 		--argjson outdated_casks "${RESULT_OUTDATED_CASKS:-[]}" \
@@ -74,6 +81,13 @@ emit_scan_result() {
 		'{tool: $tool, status: $status}
 		+ (if $version != "" then {version: $version} else {} end)
 		+ (if $node_version != "" then {node_version: $node_version} else {} end)
+		+ (if $python_version != "" then {python_version: $python_version} else {} end)
+		+ (if $ruby_version != "" then {ruby_version: $ruby_version} else {} end)
+		+ (if $rustc_version != "" then {rustc_version: $rustc_version} else {} end)
+		+ (if $cargo_version != "" then {cargo_version: $cargo_version} else {} end)
+		+ (if $pnpm_version != "" then {pnpm_version: $pnpm_version} else {} end)
+		+ (if $bun_version != "" then {bun_version: $bun_version} else {} end)
+		+ (if $deno_version != "" then {deno_version: $deno_version} else {} end)
 		+ (if $installed_count != null then {installed_count: $installed_count} else {} end)
 		+ (if ($outdated_formulae | length) > 0 then {outdated_formulae: $outdated_formulae} else {} end)
 		+ (if ($outdated_casks | length) > 0 then {outdated_casks: $outdated_casks} else {} end)
