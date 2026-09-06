@@ -95,6 +95,7 @@ Go + Bash runtime (transition, issue #34):
 go build ./... && go vet ./... && go test ./... && gofmt -l cmd internal
 shellcheck -S warning toolchains/*.sh toolchains/lib/scan.sh tests/toolchains_test.sh
 bash tests/toolchains_test.sh
+bash tests/parity.sh   # sunset gate harness (requires cargo; skips verdict with ENVEXA_PARITY_SKIP_RUST=1)
 (cd frontend && bun run typecheck && bun run build)
 ```
 
