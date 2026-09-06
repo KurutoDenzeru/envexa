@@ -18,21 +18,12 @@ import (
 	"github.com/KurutoDenzeru/envexa/internal/scanner"
 )
 
-const toolchainsDirEnv = "ENVEXA_TOOLCHAINS_DIR"
-
 // Version is overridden at release time via -ldflags "-X ...cli.Version=...".
 var Version = "3.0.0-alpha"
 
-func toolchainsDir() string {
-	if d := os.Getenv(toolchainsDirEnv); d != "" {
-		return d
-	}
-	return "toolchains"
-}
-
 // RunScan executes all bash scanners and renders the report.
 func RunScan(format string, out io.Writer) error {
-	rep := scanner.Scan(toolchainsDir(), 60*time.Second)
+	rep := scanner.Scan(scanner.Dir(), 60*time.Second)
 	switch format {
 	case "json":
 		enc := json.NewEncoder(out)
@@ -111,7 +102,7 @@ func RunDaemon(interval time.Duration, out io.Writer) error {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	run := func() {
-		rep := scanner.Scan(toolchainsDir(), 60*time.Second)
+		rep := scanner.Scan(scanner.Dir(), 60*time.Second)
 		fmt.Fprintf(out, "%s scan: %d toolchains checked\n", time.Now().Format(time.RFC3339), len(rep.Results))
 	}
 	run()

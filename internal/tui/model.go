@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"os"
 	"time"
 
 	"github.com/charmbracelet/bubbles/progress"
@@ -110,11 +109,7 @@ func (m Model) Init() tea.Cmd {
 // scanCmd runs the real bash scanners via the Go bridge — the replacement for
 // the Rust scan_all_with call path. Runs async; the spinner keeps ticking.
 func scanCmd() tea.Cmd {
-	dir := os.Getenv("ENVEXA_TOOLCHAINS_DIR")
-	if dir == "" {
-		dir = "toolchains"
-	}
 	return func() tea.Msg {
-		return scanDoneMsg{report: scanner.Scan(dir, 60*time.Second)}
+		return scanDoneMsg{report: scanner.Scan(scanner.Dir(), 60*time.Second)}
 	}
 }

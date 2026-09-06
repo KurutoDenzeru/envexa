@@ -8,16 +8,30 @@ package scanner
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/KurutoDenzeru/envexa/internal/config"
 	"github.com/KurutoDenzeru/envexa/internal/report"
 )
 
 const defaultTimeout = 30 * time.Second
+
+// Dir resolves the toolchain directory: ENVEXA_TOOLCHAINS_DIR, ./toolchains
+// (repo/dev layout), then the installed share dir.
+func Dir() string {
+	if d := os.Getenv("ENVEXA_TOOLCHAINS_DIR"); d != "" {
+		return d
+	}
+	if _, err := os.Stat(filepath.Join("toolchains", "lib", "scan.sh")); err == nil {
+		return "toolchains"
+	}
+	return filepath.Join(config.Dir(), "toolchains")
+}
 
 // Scan runs every *.sh directly under toolchainsDir (lib/ excluded) and merges
 // their JSON into a Report. Scripts that fail or time out are recorded as

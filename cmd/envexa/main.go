@@ -54,7 +54,7 @@ func main() {
 		},
 	}
 	serveCmd.Flags().Int("port", 8080, "port to listen on")
-	serveCmd.Flags().String("dist", "frontend/dist", "static frontend directory")
+	serveCmd.Flags().String("dist", "", "static frontend directory (default: ./frontend/dist, then the installed share dir)")
 	root.AddCommand(serveCmd)
 
 	updateCmd := &cobra.Command{

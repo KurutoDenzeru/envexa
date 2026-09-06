@@ -23,8 +23,15 @@ import (
 
 var Version = "3.0.0-alpha"
 
-// Serve runs the HTTP server; blocks until interrupted.
+// Serve runs the HTTP server; blocks until interrupted. Empty dist resolves
+// to ./frontend/dist (repo/dev) then the installed share dir.
 func Serve(port int, dist string) error {
+	if dist == "" {
+		dist = "frontend/dist"
+		if _, err := os.Stat(filepath.Join(dist, "index.html")); err != nil {
+			dist = filepath.Join(config.Dir(), "frontend", "dist")
+		}
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/scan", handleScan)
 	mux.HandleFunc("GET /api/logs", handleLogs)
@@ -75,7 +82,7 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 	logs = append(logs, config.LogPair{Time: now, Message: "INFO: Running multi-language scan engine... [system]"})
 
 	cfg := config.LoadConfig()
-	rep := scanner.Scan(toolchainsDir(), time.Duration(cfg.ScanTimeoutSecs)*time.Second)
+	rep := scanner.Scan(scanner.Dir(), time.Duration(cfg.ScanTimeoutSecs)*time.Second)
 	if cfg.EnabledScanners != nil && len(*cfg.EnabledScanners) > 0 {
 		enabled := map[string]bool{}
 		for _, name := range *cfg.EnabledScanners {
@@ -455,11 +462,4 @@ func mimeType(name string) string {
 	default:
 		return "application/octet-stream"
 	}
-}
-
-func toolchainsDir() string {
-	if d := os.Getenv("ENVEXA_TOOLCHAINS_DIR"); d != "" {
-		return d
-	}
-	return "toolchains"
 }
