@@ -63,7 +63,10 @@ export function Dashboard({
   );
 
   return (
-    <Box flexDirection="column" height={height} justifyContent="space-between">
+    // flexGrow, not height={height}: this box renders inside the App shell
+    // (header + hints already take rows), so claiming the full terminal
+    // height overflows and scrolls the alt screen over the logo.
+    <Box flexDirection="column" flexGrow={1} flexShrink={1} justifyContent="space-between">
       <Box flexDirection={wide ? "row" : "column"} gap={1}>
         {left}
         <Box flexDirection="column" flexGrow={wide ? 1 : 0} width={wide ? undefined : rightW} gap={1}>
