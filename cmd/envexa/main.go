@@ -1,18 +1,18 @@
-// Command envexa — cobra entrypoint mirroring src/core/cli.rs: no args + TTY
-// runs the bubbletea TUI, subcommands run the CLI.
+// Command envexa — cobra entrypoint: no args + TTY execs the Ink TUI
+// (envexa-tui), subcommands run the CLI.
 package main
 
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
 	"github.com/KurutoDenzeru/envexa/internal/cli"
 	"github.com/KurutoDenzeru/envexa/internal/server"
-	"github.com/KurutoDenzeru/envexa/internal/tui"
 )
 
 // Version is overridden at release time via -ldflags "-X ...cli.Version=...".
@@ -23,12 +23,17 @@ func main() {
 		Short:   "Dependency environment scanner",
 		Version: cli.Version,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if isTTY() {
-				p := tea.NewProgram(tui.NewModel(), tea.WithAltScreen())
-				_, err := p.Run()
-				return err
+			if !isTTY() {
+				return cmd.Help()
 			}
-			return cmd.Help()
+			tuiBin, err := tuiPath()
+			if err != nil {
+				return fmt.Errorf("envexa-tui not found — install it via scripts/install.sh, or run the TUI from a repo checkout with `bun run tui/cli.tsx` (set ENVEXA_TUI_BIN to override): %w", err)
+			}
+			c := exec.Command(tuiBin)
+			c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
+			c.Env = append(os.Environ(), "ENVEXA_VERSION="+cli.Version)
+			return c.Run()
 		},
 	}
 
@@ -84,6 +89,23 @@ func main() {
 		fmt.Fprintf(os.Stderr, "envexa: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// tuiPath resolves the bundled Ink TUI binary: ENVEXA_TUI_BIN, next to the
+// envexa executable (release layout), then PATH.
+func tuiPath() (string, error) {
+	if p := os.Getenv("ENVEXA_TUI_BIN"); p != "" {
+		return p, nil
+	}
+	if exe, err := os.Executable(); err == nil {
+		if real, err := filepath.EvalSymlinks(exe); err == nil {
+			candidate := filepath.Join(filepath.Dir(real), "envexa-tui")
+			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+				return candidate, nil
+			}
+		}
+	}
+	return exec.LookPath("envexa-tui")
 }
 
 func isTTY() bool {
