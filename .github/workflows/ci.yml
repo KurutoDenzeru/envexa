@@ -41,6 +41,20 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
 
+  tui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+        working-directory: tui
+      - run: bun test
+        working-directory: tui
+      - run: bun run typecheck
+        working-directory: tui
+      - run: bun build --compile cli.tsx --outfile /tmp/envexa-tui
+        working-directory: tui
+
   shell:
     runs-on: ubuntu-latest
     steps:
