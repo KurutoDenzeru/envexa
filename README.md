@@ -18,7 +18,7 @@
 
 Blazing-fast TUI, scriptable CLI, and live web dashboard for monitoring local developer tooling health. Instantly track outdated packages and audit security risks across 14+ toolchains.
 
-> **.transition note:** envexa is migrating from Rust to a Go (Bubbletea) + Bash architecture — see [#34](https://github.com/KurutoDenzeru/envexa/issues/34). On this branch the runtime is: Go binary (TUI + web server + CLI) + Bash scanners (`toolchains/*.sh`). The Rust runtime remains the released default until the sunset gate passes.
+> **.transition note:** envexa is migrating from Rust to a Go + Bash architecture — see [#34](https://github.com/KurutoDenzeru/envexa/issues/34). On this branch the runtime is: Go binary (web server + CLI) + Bash scanners (`toolchains/*.sh`) + an Ink (React for terminals) TUI on Bun ([#36](https://github.com/KurutoDenzeru/envexa/issues/36)). The Rust runtime remains the released default until the sunset gate passes.
 
 ## 📚 Table of Contents
 

@@ -46,19 +46,17 @@ cargo run -- --help       # CLI help
 - `String` over `&str` in struct fields
 - `serde_json::Value` for toolchain-specific fields
 
-## TUI Convention
+## TUI Convention (Ink on Bun, `tui/`)
 
-- App state lives in `App` struct in `app.rs` — View enum for navigation, `report: Option<Report>` for data
-- Render functions live in `ui.rs` — one function per view, called by `render()` dispatcher
-- Use `ratatui::init()` / `ratatui::restore()` in `App::run()` for terminal lifecycle
-- Blocking scan: set `View::Scanning`, draw frame, then `block_on` scan — freezes UI for 3-4s (acceptable for v1)
-- Input: `crossterm::event::read()` loop with `KeyCode` matching; `s`=scan, `o`=outdated, `h`/`Esc`=home, `q`=quit, `arrows`=navigate/switch tabs
-- Color convention: `ok`=green, `warning`=yellow, `error`=red, `skipped`=darkgray
-- Table navigation: `dashboard_selection` / `outdated_selection` tracked per view
-- ratatui widgets used: `Table` (dashboard/outdated), `Tabs` (tab bar), `Gauge`/`LineGauge` (readiness/health), `BarChart` (tooling signal distribution), `Paragraph` (text), `Block` (borders/titles), `Row`/`Cell` (table data)
-- third-party widgets are allowed when they add clear scan readability; existing examples: `tui-piechart` for overview status distribution and `throbber-widgets-tui` for scan/update activity
-- Project Tooling dashboard should keep Project, Security, and Audit visible as first-class signals, not just generic issue rows
-- Layouts must degrade across terminal sizes: compact title under narrow widths, vertical dashboard under medium widths, minimal fallback for tiny terminals, and guarded rendering for third-party widgets when inner areas are too small
+- Ink app (TypeScript + React on Bun): entry `tui/cli.tsx` renders `<App>` with `{ alternateScreen: true }`
+- App state lives in the `App` component in `cli.tsx`; views are components under `tui/views/` (Dashboard / Outdated / PackageDetail / Updating / Logs / Settings), shared chrome under `tui/components/`
+- Scan bridge `tui/lib/scan.ts` runs every `toolchains/*.sh` concurrently (30s timeout each) and merges `ScanResult` JSON — same contract as the Go bridge; config/logs/settings editor in `tui/lib/config.ts`, update runner in `tui/lib/update.ts`, shared formatting in `tui/lib/format.ts`
+- Color convention (`tui/theme.ts`): `ok`=green, `warn`=yellow, `error`=red, `skipped`=gray, accent `#5fffd7`
+- Keys: `s`=scan, `o`=outdated, `l`=logs, `c`=settings, `h`/`Esc`=home, `q`=quit, `←→`=switch views, `↑↓`=navigate, `/`=filter, Enter=detail, `y`=update confirm, Tab=dashboard sub-tab (overview/vulns/toolchains)
+- Project Tooling dashboard keeps Project, Security, and Audit visible as first-class signals
+- Layouts degrade across terminal sizes: compact title under narrow widths, vertical dashboard under ~100 cols, pie hidden when the panel is too small, minimal fallback for tiny terminals
+- Dev: `bun run tui/cli.tsx` from the repo root (scanners resolve via `./toolchains`); tests `cd tui && bun test`; typecheck `bun run typecheck`
+- Release binary: `bun build --compile cli.tsx` → `envexa-tui`; the Go `envexa` binary execs it on no-args + TTY (resolves `ENVEXA_TUI_BIN`, sibling of the executable, then PATH)
 - No obvious comments — explain *why*, not *what*
 - Conventional commits: `type(scope): description`
 - One logical change per commit, no `--no-verify`, no force push
@@ -99,11 +97,18 @@ bash tests/parity.sh   # sunset gate harness (requires cargo; skips verdict with
 (cd frontend && bun run typecheck && bun run build)
 ```
 
+Ink TUI (issue #36):
+
+```bash
+(cd tui && bun install --frozen-lockfile && bun test && bun run typecheck)
+bun build --compile tui/cli.tsx --outfile /tmp/envexa-tui   # packaging smoke
+```
+
 CLI output verification — manually run and visually inspect:
 1. `cargo run -- --help` and `go run ./cmd/envexa --help` — help text renders correctly
 2. `cargo run -- scan` and `go run ./cmd/envexa scan` — full report printed to stdout
 3. `cargo run -- update` and `go run ./cmd/envexa update` — update check message
-4. `cargo run` / `go run ./cmd/envexa` (no args, in terminal) — TUI launches, `s` triggers scan, `o` shows outdated, arrows navigate, `q` quits
+4. `bun run tui/cli.tsx` (repo root, in terminal) — TUI launches, `s` triggers scan, `o` shows outdated, arrows navigate, `q` quits; `go run ./cmd/envexa` execs the built `envexa-tui` when present
 5. Resize smoke test — run the TUI at narrow, medium, wide, and tiny terminal sizes; no panic, malformed layout, or broken terminal restore
 
 Do not push if any of these produce warnings or malformed output. Fix first, then push.
