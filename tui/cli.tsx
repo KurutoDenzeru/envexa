@@ -328,7 +328,15 @@ function App() {
           : <Text color={theme.dim}>no report yet — press s to scan</Text>;
         break;
       case "logs":
-        body = <Logs logs={logs} height={height} offset={logsOffset} />;
+        // Viewport must fit under the header: logo block (6+1 lines) renders
+        // only on wide terminals; +2 for the hints line and a spare row.
+        body = (
+          <Logs
+            logs={logs}
+            height={height - (width >= 100 && height >= 22 ? 12 : 6)}
+            offset={logsOffset}
+          />
+        );
         break;
       case "settings":
         body = editCfg ? <Settings cfg={editCfg} sel={setSel} /> : null;
