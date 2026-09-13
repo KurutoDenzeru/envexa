@@ -24,7 +24,11 @@ export function Outdated({
   width: number;
   height: number;
 }) {
-  const maxRows = Math.max(3, Math.min(12, height - 16));
+  // Fill the page like the logs view: subtract the header block (logo+path on
+  // wide terminals), the hints line, the column header, the count line, and
+  // the search line when active.
+  const headerLines = width >= 100 && height >= 22 ? 12 : 6;
+  const maxRows = Math.max(4, height - headerLines - 3 - (searchActive ? 1 : 0));
   const start = rows.length <= maxRows
     ? 0
     : Math.min(Math.max(0, cursor - (maxRows - 1)), rows.length - maxRows);
