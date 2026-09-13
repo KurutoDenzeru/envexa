@@ -10,3 +10,7 @@ report.json
 /target
 .antigravitycli/
 
+
+# Ink TUI (tui/)
+node_modules/
+tui/envexa-tui

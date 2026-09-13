@@ -2,6 +2,7 @@
 # Go-era installer: downloads the envexa-v<version>-<os>-<arch>.tar.gz release
 # artifact (binary + bash scanners + web dashboard dist) and installs it:
 #   envexa            -> ~/.local/bin
+#   envexa-tui        -> ~/.local/bin (Ink TUI binary used by `envexa`)
 #   toolchains/       -> ~/.local/share/envexa/toolchains
 #   frontend/dist     -> ~/.local/share/envexa/frontend/dist
 set -euo pipefail
@@ -80,6 +81,8 @@ main() {
     tar -xzf "${tmp}/${asset_name}" -C "$tmp"
     mv "${tmp}/envexa" "$bin_path"
     chmod +x "$bin_path"
+    mv "${tmp}/envexa-tui" "${install_dir}/envexa-tui"
+    chmod +x "${install_dir}/envexa-tui"
     mkdir -p "${share_dir}/toolchains"
     cp "${tmp}/toolchains/"*.sh "${share_dir}/toolchains/"
     mkdir -p "${share_dir}/toolchains/lib"
@@ -89,6 +92,7 @@ main() {
     echo ""
     echo "envexa ${version} installed:"
     echo "  binary:     ${bin_path}"
+    echo "  tui binary: ${install_dir}/envexa-tui"
     echo "  scanners:   ${share_dir}/toolchains"
     echo "  dashboard:  ${share_dir}/frontend/dist"
     echo ""

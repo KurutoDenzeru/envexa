@@ -4,6 +4,9 @@
 #   + .sha256 sidecars
 set -euo pipefail
 
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$ROOT"
+
 TAG="${1:-$(git describe --tags --abbrev=0 2>/dev/null || true)}"
 
 if [ -z "$TAG" ]; then
@@ -16,7 +19,10 @@ VERSION="${TAG#v}"
 echo "==> Building frontend..."
 (cd frontend && bun run build)
 
-OUT="target/release-envexa"
+echo "==> Installing TUI deps..."
+(cd tui && bun install --frozen-lockfile)
+
+OUT="${ROOT}/target/release-envexa"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
@@ -30,6 +36,11 @@ build() { # <goos> <goarch> <os-name> <arch-name>
     GOOS="$goos" GOARCH="$goarch" \
         go build -ldflags "-s -w -X github.com/KurutoDenzeru/envexa/internal/cli.Version=${VERSION}" \
         -o "$dir/envexa" ./cmd/envexa
+
+    echo "==> Building envexa-tui (bun-${osname}-${archname})..."
+    (cd tui && bun build --compile cli.tsx \
+        --target "bun-${osname}-${archname}" \
+        --outfile "${OUT}/${name}/envexa-tui")
 
     cp toolchains/*.sh "$dir/toolchains/"
     cp toolchains/lib/scan.sh "$dir/toolchains/lib/"
