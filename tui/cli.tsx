@@ -165,19 +165,6 @@ function App() {
       if (input === "q") exit();
       return;
     }
-    if (view === "settings") {
-      const recents = editCfg?.recent_project_paths ?? [];
-      if (key.upArrow) setSetSel((s) => Math.max(0, s - 1));
-      else if (key.downArrow) {
-        setSetSel((s) => Math.min(settingsFields.length + recents.length - 1, s + 1));
-      } else if (key.leftArrow) adjustSettings(-1);
-      else if (key.rightArrow) adjustSettings(1);
-      else if (key.return) {
-        if (!adjustSettings(1)) selectRecent();
-      } else if (key.escape || input === "h") setView("dashboard");
-      else if (input === "q") exit();
-      return;
-    }
     if (searchActive && view === "outdated") {
       if (key.escape) {
         if (query === "") setSearchActive(false);
@@ -202,6 +189,7 @@ function App() {
       return;
     }
 
+    // Global quick nav — works from every view, settings included.
     if (input === "q") {
       exit();
       return;
@@ -232,6 +220,26 @@ function App() {
         if (view === "packageDetail" && detail && !updating) void startUpdate(detail);
         return;
     }
+
+    if (view === "settings") {
+      const recents = editCfg?.recent_project_paths ?? [];
+      if (key.upArrow) setSetSel((s) => Math.max(0, s - 1));
+      else if (key.downArrow) {
+        setSetSel((s) => Math.min(settingsFields.length + recents.length - 1, s + 1));
+      } else if (key.leftArrow) adjustSettings(-1);
+      else if (key.rightArrow) adjustSettings(1);
+      else if (key.return) {
+        if (!adjustSettings(1)) selectRecent();
+      } else if (key.tab) {
+        // Tab cycles views from settings too — arrows stay field edits.
+        const next = viewOrder[(viewOrder.indexOf("settings") + 1) % viewOrder.length];
+        if (next === "logs") openLogs();
+        else if (next === "settings") openSettings();
+        else setView(next);
+      }
+      return;
+    }
+
     if (key.escape) {
       setView(view === "packageDetail" ? "outdated" : "dashboard");
       return;
