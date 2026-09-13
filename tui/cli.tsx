@@ -12,7 +12,7 @@ import { runScanners } from "./lib/scan";
 import type { Detail, Report, UserConfig } from "./lib/types";
 import { runUpdate, updateArgs } from "./lib/update";
 import { theme } from "./theme";
-import { Dashboard, type DashTab } from "./views/Dashboard";
+import { Dashboard, toolGroups } from "./views/Dashboard";
 import { Logs } from "./views/Logs";
 import { Outdated } from "./views/Outdated";
 import { PackageDetail } from "./views/PackageDetail";
@@ -40,7 +40,6 @@ function App() {
   const { exit } = useApp();
   const { columns: width, rows: height } = useWindowSize();
   const [view, setView] = useState<View>("dashboard");
-  const [dashTab, setDashTab] = useState<DashTab>(0);
   const [report, setReport] = useState<Report | null>(null);
   const [scanning, setScanning] = useState(true);
   const [detail, setDetail] = useState<Detail | null>(null);
@@ -196,6 +195,7 @@ function App() {
     }
     switch (input) {
       case "s":
+        setView("dashboard");
         void doScan();
         return;
       case "o":
@@ -245,7 +245,19 @@ function App() {
       return;
     }
     if (key.tab && view === "dashboard") {
-      setDashTab((t) => ((t + 1) % 3) as DashTab);
+      // Jump the shared row cursor to the next group panel (System & Runtime
+      // → Web Development → Project Tooling → wrap).
+      const starts: number[] = [];
+      let base = 0;
+      for (const g of toolGroups) {
+        const n = g.tools.filter((t) => report?.results[t]).length;
+        if (n > 0) starts.push(base);
+        base += n;
+      }
+      if (starts.length > 0) {
+        const next = starts.find((start) => start > dashSel);
+        setDashSel(next === undefined ? 0 : next);
+      }
       return;
     }
     if (key.leftArrow || key.rightArrow) {
@@ -309,7 +321,7 @@ function App() {
     switch (view) {
       case "dashboard":
         body = report
-          ? <Dashboard report={report} width={width} height={height} tab={dashTab} sel={dashSel} />
+          ? <Dashboard report={report} width={width} height={height} sel={dashSel} />
           : <Text color={theme.dim}>no report yet — press s to scan</Text>;
         break;
       case "outdated":
@@ -347,7 +359,7 @@ function App() {
   }
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" height={height}>
       <Header
         view={view}
         width={width}
@@ -355,7 +367,7 @@ function App() {
         report={report}
         projectPath={projectPath}
       />
-      {body}
+      <Box flexDirection="column" flexGrow={1}>{body}</Box>
       <Hints width={width} />
     </Box>
   );

@@ -13,6 +13,7 @@ export function ToolchainPanel({
   width,
   baseOffset,
   selected,
+  flexGrow,
 }: {
   title: string;
   tools: string[];
@@ -20,6 +21,7 @@ export function ToolchainPanel({
   width: number;
   baseOffset: number;
   selected: number;
+  flexGrow?: number;
 }) {
   const rows: Span[][] = [
     [
@@ -46,9 +48,11 @@ export function ToolchainPanel({
   }
 
   return (
-    <Panel title={title} width={width}>
+    <Panel title={title} width={width} flexGrow={flexGrow}>
       {rows.map((spans, i) => (
-        <Spans key={i} spans={spans} selected={baseOffset + i - 1 === selected} />
+        // i=0 is the column header — never selectable; the -1 sentinel
+        // (no selection) would otherwise alias to it when baseOffset=0.
+        <Spans key={i} spans={spans} selected={i > 0 && baseOffset + i - 1 === selected} />
       ))}
     </Panel>
   );

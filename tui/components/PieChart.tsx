@@ -3,7 +3,8 @@ import { statusColor } from "../theme";
 
 // Status distribution as a colored dot pie — the TS counterpart of the Go
 // dot-pie (view.go pieChart): 9x9 cell grid, 0.5 aspect correction, slices in
-// ok → warn → error → skipped order.
+// ok → warn → error → skipped order. Cells render as "● " to match the Go
+// output's density and width.
 export function PieChart({
   counts,
 }: {
@@ -34,22 +35,27 @@ export function PieChart({
           break;
         }
       }
-      row.push({ ch: "•", color: statusColor(st) });
+      row.push({ ch: "●", color: statusColor(st) });
     }
     rows.push(row);
   }
 
   return (
-    <Box flexDirection="column">
-      {rows.map((row, i) => (
-        <Text key={i}>
-          {row.map((cell, j) => (
-            <Text key={j} color={cell.color}>
-              {cell.ch}
-            </Text>
-          ))}
-        </Text>
-      ))}
+    <Box flexDirection="column" alignItems="center">
+      {rows.map((row, i) => {
+        const trimmed = [...row];
+        while (trimmed.length > 0 && trimmed[trimmed.length - 1].ch === " ") trimmed.pop();
+        return (
+          <Text key={i}>
+            {trimmed.map((cell, j) => (
+              <Text key={j}>
+                <Text color={cell.color}>{cell.ch}</Text>
+                {j < trimmed.length - 1 ? " " : ""}
+              </Text>
+            ))}
+          </Text>
+        );
+      })}
     </Box>
   );
 }
