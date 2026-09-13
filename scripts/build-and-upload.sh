@@ -16,6 +16,9 @@ VERSION="${TAG#v}"
 echo "==> Building frontend..."
 (cd frontend && bun run build)
 
+echo "==> Installing TUI deps..."
+(cd tui && bun install --frozen-lockfile)
+
 OUT="target/release-envexa"
 rm -rf "$OUT"
 mkdir -p "$OUT"
@@ -30,6 +33,11 @@ build() { # <goos> <goarch> <os-name> <arch-name>
     GOOS="$goos" GOARCH="$goarch" \
         go build -ldflags "-s -w -X github.com/KurutoDenzeru/envexa/internal/cli.Version=${VERSION}" \
         -o "$dir/envexa" ./cmd/envexa
+
+    echo "==> Building envexa-tui (bun-${osname}-${archname})..."
+    (cd tui && bun build --compile cli.tsx \
+        --target "bun-${osname}-${archname}" \
+        --outfile "${dir}/envexa-tui")
 
     cp toolchains/*.sh "$dir/toolchains/"
     cp toolchains/lib/scan.sh "$dir/toolchains/lib/"
