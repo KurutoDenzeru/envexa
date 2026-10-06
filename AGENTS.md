@@ -83,27 +83,16 @@ Then confirm:
 
 ## Pre-Push Checklist
 
-Rust runtime (until the issue #34 sunset gate removes it):
-
 ```bash
-cargo build && cargo clippy -- -D warnings && cargo fmt --check
-```
-
-Go + Bash runtime (transition, issue #34):
-
-```bash
-go build ./... && go vet ./... && go test ./... && gofmt -l cmd internal
-shellcheck -S warning toolchains/*.sh toolchains/lib/scan.sh tests/toolchains_test.sh
-bash tests/toolchains_test.sh
-bash tests/parity.sh   # sunset gate harness (requires cargo; skips verdict with ENVEXA_PARITY_SKIP_RUST=1)
+cargo build && cargo clippy -- -D warnings && cargo fmt --check && cargo test
 (cd frontend && bun run typecheck && bun run build)
 ```
 
 CLI output verification — manually run and visually inspect:
-1. `cargo run -- --help` and `go run ./cmd/envexa --help` — help text renders correctly
-2. `cargo run -- scan` and `go run ./cmd/envexa scan` — full report printed to stdout
-3. `cargo run -- update` and `go run ./cmd/envexa update` — update check message
-4. `cargo run` / `go run ./cmd/envexa` (no args, in terminal) — TUI launches, `s` triggers scan, `o` shows outdated, arrows navigate, `q` quits
+1. `cargo run -- --help` — help text renders correctly
+2. `cargo run -- scan` — full report printed to stdout
+3. `cargo run -- update` — update check message
+4. `cargo run` (no args, in terminal) — TUI launches, `s` triggers scan, `o` shows outdated, arrows navigate, `q` quits
 5. Resize smoke test — run the TUI at narrow, medium, wide, and tiny terminal sizes; no panic, malformed layout, or broken terminal restore
 
 Do not push if any of these produce warnings or malformed output. Fix first, then push.
@@ -149,20 +138,3 @@ When you make a mistake or are corrected by the developer, append it to `ERRORS.
 ```
 
 `ERRORS.md` is committed and reviewed periodically to promote entries into permanent rules.
-
-<!-- lean-ctx-compression -->
-OUTPUT STYLE: dense
-- Each statement = one atomic fact line
-- Use abbreviations: fn, cfg, impl, deps, req, res, ctx, err, ret
-- Diff lines only (+/-/~), never repeat unchanged code
-- Symbols: → (causes), + (adds), − (removes), ~ (modifies), ∴ (therefore)
-- No narration, no filler, no hedging
-- BUDGET: ≤200 tokens per response unless code block required
-<!-- /lean-ctx-compression -->
-
-<!-- lean-ctx -->
-## lean-ctx
-
-Prefer lean-ctx MCP tools over native equivalents for token savings.
-Full rules: @LEAN-CTX.md
-<!-- /lean-ctx -->

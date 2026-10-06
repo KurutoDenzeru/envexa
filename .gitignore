@@ -8,5 +8,8 @@ report.json
 # Added by cargo
 
 /target
-.antigravitycli/
+
+# Graphify output
+
+graphify-out/
 

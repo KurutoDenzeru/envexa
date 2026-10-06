@@ -25,6 +25,7 @@ async fn test_example_scan_result_creation() {
         outdated: vec![],
         outdated_global: vec![],
         vulnerabilities: vec![],
+        supply_chain_risks: vec![],
         audit_items: vec![],
         disk_usage: None,
         issues: vec![],
